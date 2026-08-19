@@ -1,4 +1,4 @@
-// MUST stay first: populates process.env from .env before store.mjs captures FRFG_CONFIG/FRFG_DATA
+// MUST stay first: populates process.env from .env before store.mjs captures SCOUT_CONFIG/SCOUT_DATA
 import './env.mjs';
 import express from 'express';
 import path from 'path';
@@ -15,26 +15,11 @@ import {
   createContextFolder, deleteContextFolder,
   readSkillFile, writeSkillFile
 } from './store.mjs';
-import { seedIfEmpty, seedContext, installStarterSnippets } from './seed.mjs';
 import { enqueueReroll, enqueueSkillEnhance, listJobs, testAgent, agentStatus, agentProviders, installAgent, openLogin, findAgent, buildAgentArgs, runOnce } from './jobs.mjs';
-import { transcribe, breakdownStory, groqKey } from './groq.mjs';
-import { analyzeImage, extractLook, resolveVision, analyzeMove } from './vision.mjs';
-import { transcribeLocal, localAsrStatus } from './localAsr.mjs';
-import { getStory, saveStory, listShots, listAllShots, writeShot, patchShot, deleteShot, replaceShots, reorderShots, duplicateShot, freeShotNo } from './story.mjs';
+import { groqKey, transcribe } from './groq.mjs';
 import { listAssets, saveAsset, deleteAsset, createCollection, deleteCollection, copyAsset, assetPath, scopeDir, readMeta, writeMeta, renameAsset, moveAsset, renameCollection, metaPath } from './library.mjs';
-import { uploadToFal, falKey, testFal } from './fal.mjs';
-import { startGeneration, listGenerations, getGeneration, deleteGeneration, saveToShot, saveToBoard, reviewCandidate, rerollCandidate, promoteCandidate, renderPath, sweepOrphans } from './generate.mjs';
-import { splitGridGeneration } from './gridsplit.mjs';
-import { providersStatus, testProvider, kieKey } from './providers.mjs';
-import { readFalCatalog, syncFalCatalog } from './catalog.mjs';
-import { getModelSchema } from './modelSchemas.mjs';
 import { getLedger, getLedgerRollup } from './ledger.mjs';
-import { registerStyleLockRoutes } from './stylelocks.mjs';
-import { registerEnhanceRoutes } from './enhance.mjs';
 import { registerMemoryRoutes } from './memory.mjs';
-import { registerRemotionRoutes } from './remotion.mjs';
-import { mountThreeD } from './threed.mjs';
-import { registerControlRoutes } from './control.mjs';
 import { registerBoardRoutes } from './board.mjs';
 import { journalAction, listActions, getAction, markAction } from './actions.mjs';
 import { stageTrash, listTrash, restoreTrash, purgeTrash, purgeAllTrash } from './trash.mjs';
@@ -46,20 +31,10 @@ import { registerAgentHomeRoutes, chatSkillsSurface } from './agentHome.mjs';
 import { testAgentPipeline } from './agentRunner.mjs';
 import { registerUserToolRoutes } from './userTools.mjs';
 import { search as structuredSearch } from './search.mjs';
-import { listBatches, readBatch, createBatch, estimateBatch, pauseBatch, resumeBatch, cancelBatch, retryBatch, reconstructQueue } from './batches.mjs';
-import { getManifest, writeManifest, setInOut, exportSelects } from './manifest.mjs';
-import { startVideoImport, getVideoJob, videoJobFramePath, commitVideoJob, discardVideoJob, videoToolsStatus,
-  retrimVideoShot, videoFrameAt, buildContactSheet, videoSheetPath, discardContactSheet } from './video.mjs';
-import { registerManualRoutes } from './manual.mjs';
-import { registerReelRoutes, resolveShotMedia } from './reel.mjs';
-import { exportReelPack } from './reelPack.mjs';
-import { registerRenderRoutes } from './reelRender.mjs';
 import { registerFeedbackRoutes, installLogRing, recordApiCall, flushOutbox } from './feedback.mjs';
-import { DEFAULT_RESOLUTION, maxRefs } from '../frontend/modelCatalog.js';
-import { INTEGRATIONS, isEnabled, byId, resolveModules } from '../shared/integrations.mjs';
 
 const APP_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.argv[2]) || Number(process.env.PORT) || 5176;
+const PORT = Number(process.argv[2]) || Number(process.env.PORT) || 5177;
 
 // Reveal a path in the OS file manager — cross-platform, best-effort, never throws.
 // `select` reveals the file inside its folder; otherwise the folder itself is opened.
@@ -68,7 +43,7 @@ const PORT = Number(process.argv[2]) || Number(process.env.PORT) || 5176;
 // Under tests this is a no-op: the export/handoff routes reveal unconditionally, so a full
 // `node --test` run would otherwise spawn a real Finder window per exercised route.
 function revealInOS(target, select = false) {
-  if (process.env.FRFG_TEST) return;
+  if (process.env.SCOUT_TEST) return;
   import('child_process').then(({ execFile }) => {
     const noop = () => {};
     if (process.platform === 'darwin') execFile('open', select ? ['-R', target] : [target], noop);
@@ -83,12 +58,6 @@ function revealInOS(target, select = false) {
 // module is the process entry point. Imported for tests (see test/), the app is built but nothing
 // binds a port or mutates the storage root — the test harness listens on an ephemeral port itself.
 const IS_MAIN = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (IS_MAIN) {
-  seedIfEmpty();
-  seedContext(getStorageRoot()); // upgrade older roots that predate the context system
-  sweepOrphans();                // fail generations orphaned by a previous crash/restart
-  reconstructQueue();            // re-enqueue still-queued batch candidates after a restart (Phase 7)
-}
 
 const app = express();
 
@@ -97,8 +66,8 @@ const app = express();
 // header must resolve to loopback) and cross-site requests (Origin, when present, must be
 // same-origin). Browsers can't spoof Origin/Host, so this closes the exfiltration vector
 // while leaving the real UI (served from this same origin) untouched. Opt into LAN access
-// with FRFG_ALLOW_LAN=1.
-const ALLOW_LAN = process.env.FRFG_ALLOW_LAN === '1' || process.env.HOST === '0.0.0.0';
+// with SCOUT_ALLOW_LAN=1.
+const ALLOW_LAN = process.env.SCOUT_ALLOW_LAN === '1' || process.env.HOST === '0.0.0.0';
 app.use((req, res, next) => {
   if (ALLOW_LAN) return next();
   const host = String(req.headers.host || '').split(':')[0].toLowerCase();
@@ -122,20 +91,13 @@ app.use(express.json({ limit: '2mb' }));
 // edits are caught separately by the indexer's fs.watch + periodic reconcile.
 function domainFor(p) {
   if (/\/items(\/|$|\?)/.test(p) || p.startsWith('/api/trash') || p.startsWith('/api/staged-trash') || p.startsWith('/api/actions')) return ['items'];
-  if (p.startsWith('/api/generations') || p.startsWith('/api/generate')) return ['generations'];
-  // an inbox apply writes generation records AND patches shot status/logs — both must repaint
-  if (p.startsWith('/api/manual')) return ['generations', 'shots'];
-  if (p.startsWith('/api/story')) return ['shots'];
-  if (p.startsWith('/api/reel')) return ['shots'];
   // the board is a VIEW of shots and assets; a node move repaints neither, but a sync/align can
   // add cards for shots the client has not loaded, so it rides the shots domain
   if (p.startsWith('/api/board')) return ['shots'];
   if (p.startsWith('/api/context') || p.startsWith('/api/assets') || p.startsWith('/api/library')) return ['assets'];
   if (p.startsWith('/api/settings')) return ['settings'];
   if (p.startsWith('/api/brief') || p.startsWith('/api/projects')) return ['projects'];
-  if (p.startsWith('/api/stylelocks')) return ['stylelocks'];
   if (p.startsWith('/api/memory') || p.startsWith('/api/folders')) return ['memory'];
-  if (p.startsWith('/api/remotion')) return ['remotion'];
   if (p.startsWith('/api/prompts') || p.startsWith('/api/snippets') || p.startsWith('/api/looks')) return ['prompts'];
   return ['misc'];
 }
@@ -176,69 +138,15 @@ app.use((req, res, next) => {
   next();
 });
 
-// ── integration gate ──
-// Modules are gated per-REQUEST rather than by skipping the mount, so flipping a switch in
-// Settings takes effect immediately instead of requiring an app restart. Mirrors the
-// disabledModels precedent: the UI hides a disabled module, and the server refuses it anyway.
-//
-// Only ACTIONS are gated, never stored data. A user who turns off Look Extractor keeps their
-// looks/*.md and can still read them; they just can't spend another vision call extracting one.
-const MODULE_ROUTES = [
-  ['remotion', p => p.startsWith('/api/remotion')],
-  ['stage3d', p => p.startsWith('/api/threed')],
-  ['videoimport', p => p.startsWith('/api/video-import')],
-  ['lookextract', p => p.startsWith('/api/looks/extract')],
-  ['storybreak', p => /^\/api\/story\/[^/]+\/breakdown/.test(p)],
-  ['transcribe', p => p.startsWith('/api/groq/transcribe')],
-  ['agent', p => p.startsWith('/api/jobs') || p.startsWith('/api/skills/enhance')],
-  // The whole filmmaker-chat surface (sessions, the isolated-home/router routes, the chat-tools
-  // toggle) is gated as one module. `chat` requires `agent` (shared/integrations.mjs), so turning
-  // the agent off gates chat too. Per-tool toggles live inside this surface, not on the module gate.
-  ['chat', p => p.startsWith('/api/chat')],
-  // Manual round-trip. Gated as one module, but note the asymmetry with the other entries: turning
-  // it off blocks new handoffs and new imports, it does NOT touch media already imported — those
-  // are ordinary generation records now and belong to the project, not to this module.
-  ['manualroundtrip', p => p.startsWith('/api/manual')],
-  // Beta feedback. Off means the panel is gone and the egress route 403s — the capture rings are
-  // renderer-side and cost nothing, but with this off there is no way to send anything anywhere.
-  ['feedback', p => p.startsWith('/api/feedback')]
-];
-app.use('/api', (req, res, next) => {
-  const full = '/api' + (req.path === '/' ? '' : req.path);
-  const settings = getSettings();
-  for (const [id, match] of MODULE_ROUTES) {
-    if (match(full) && !isEnabled(settings, id)) {
-      const mod = byId(id);
-      return res.status(403).json({
-        error: (mod ? mod.label : id) + ' is turned off — enable it in Settings → Integrations',
-        code: 'module-disabled', module: id
-      });
-    }
-  }
-  next();
-});
-
 // ── feature-module route blocks (see docs/integration/*) ──
-// style locks (lazy-fetched by the client — deliberately NOT folded into /api/state),
-// prompt enhancement, project memory + folder classification, and the Remotion composition list.
-registerStyleLockRoutes(app, { appendActivity, bumpHistory });
-registerEnhanceRoutes(app);
 registerMemoryRoutes(app, { appendActivity, bumpHistory });
-registerRemotionRoutes(app, { getSettings }); // live settings getter, not a snapshot
-mountThreeD(app);
 registerBoardRoutes(app, { appendActivity });
-registerControlRoutes(app, { appendActivity }); // depth/edge/pose/matte preprocessors → library/control/
 registerDistillRoutes(app, { appendActivity, bumpHistory }); // ticket 20 — session-end distillation + idle sweep (before chat routes so the sweep middleware runs first)
 registerChatRoutes(app, { appendActivity }); // filmmaker chat sessions (ticket 08) → chat/ + projects/<pid>/chat/
 registerAgentHomeRoutes(app, { saveSettings, appendActivity, getSession: getChatSession }); // ticket 10 — router skill / Index / isolated home
 // ticket 25 — user-authored tools. Deliberately NOT under /api/chat: authoring a tool is a workspace
 // operation that stays available with the chat module off (the tool simply has nothing to run in).
 registerUserToolRoutes(app, { appendActivity });
-// manual round-trip (backend/manual.mjs) — handoff sheets out, project inbox in. `raw` mirrors the
-// other binary upload routes; `reveal` is index.mjs's own cross-platform file-manager opener.
-registerManualRoutes(app, { reveal: revealInOS, raw: express.raw({ type: '*/*', limit: '500mb' }) });
-registerReelRoutes(app, { reveal: revealInOS, exportPack: exportReelPack });
-registerRenderRoutes(app, { reveal: revealInOS });
 // beta feedback (backend/feedback.mjs) — the ONLY outbound call in this app to a server we own.
 registerFeedbackRoutes(app);
 
@@ -283,65 +191,22 @@ app.put('/api/ui-state', (req, res) => {
   const next = { ...prev };
   for (const k of UI_ALLOWED) if (req.body?.[k] !== undefined) next[k] = req.body[k];
   next.updated = stamp();
-  writeMd(uiStateMd(), next, 'FrameForge UI state — last location + non-sensitive prefs. No secrets.\n');
+  writeMd(uiStateMd(), next, 'Scout UI state — last location + non-sensitive prefs. No secrets.\n');
   res.json(next);
 });
 
-// ── edit-manifest / selects bridge (bigger bet) — final selects in shot order for the editor ──
-app.get('/api/manifest/:pid', (req, res) => res.json(getManifest(req.params.pid)));
-app.post('/api/manifest/:pid/in-out', (req, res) => {
-  const b = req.body || {};
-  const { shot, in: inP, out } = b;
-  if (!shot) return res.status(400).json({ error: 'shot required' });
-  // Pass only the sides the body actually carries. The client sends one at a time and
-  // JSON.stringify drops the undefined twin, so `'in' in b` is what distinguishes "clear it" from
-  // "do not touch it" — reading a missing key as a value is how setting an out point used to wipe
-  // the in point. `null` is sent deliberately by the no-<video> path and must stay a no-op too.
+// ── dictation ──────────────────────────────────────────────────────────────────────────────────
+// Not film. frontend/VoiceInput.jsx is a keeper (docs/06_REUSE.md) and GOAL.md's first-run
+// interview is voice-enabled, so this route survived the strip. FrameForge had a second engine
+// here (local Parakeet) behind a settings toggle; that went with backend/localAsr.mjs, so there is
+// one engine and a plain error rather than a fallback ladder.
+app.post('/api/groq/transcribe', express.raw({ type: '*/*', limit: '80mb' }), async (req, res) => {
   try {
-    res.json(setInOut(req.params.pid, String(shot),
-      'in' in b ? inP : undefined,
-      'out' in b ? out : undefined));
-  } catch (e) {
-    // 409 for "this shot has no selected take" — a state the user can fix, not a server fault.
-    if (e.code === 'no-entry') return res.status(409).json({ error: e.message });
-    return res.status(500).json({ error: e.message });
-  }
+    const text = await transcribe(req.body, String(req.query.name || 'audio.m4a'));
+    bumpHistory('prompts');
+    res.json({ text, engine: 'groq' });
+  } catch (e) { res.status(502).json({ error: e.message || 'Transcription failed' }); }
 });
-app.post('/api/manifest/:pid/export', (req, res) => {
-  try { res.json(exportSelects(req.params.pid)); }
-  catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// ── batch variants + durable queue (Phase 7) ──
-app.get('/api/batches', (_req, res) => res.json(listBatches()));
-app.get('/api/batches/:id', (req, res) => { const b = readBatch(req.params.id); if (!b) return res.status(404).json({ error: 'batch not found' }); res.json(b); });
-app.post('/api/batches/estimate', (req, res) => {
-  const { model, shotIds, variantCount, maxSpend } = req.body || {};
-  if (!model) return res.status(400).json({ error: 'model is required' });
-  res.json(estimateBatch({ model: String(model), shotIds: Array.isArray(shotIds) ? shotIds : [], variantCount: Number(variantCount) || 4, maxSpend }));
-});
-app.post('/api/batches', (req, res) => {
-  const b = req.body || {};
-  if (!b.pid || !SLUG.test(String(b.pid))) return res.status(400).json({ error: 'valid pid required' });
-  try {
-    const batch = createBatch({
-      pid: String(b.pid), shotIds: Array.isArray(b.shotIds) ? b.shotIds.map(String) : [],
-      prompt: String(b.prompt || ''), model: String(b.model || ''), aspect: String(b.aspect || '16:9'),
-      resolution: String(b.resolution || DEFAULT_RESOLUTION),
-      refs: Array.isArray(b.refs) ? b.refs.slice(0, maxRefs(String(b.model || ''))) : [], refUrls: Array.isArray(b.refUrls) ? b.refUrls : [],
-      styleLockFragment: String(b.styleLockFragment || ''), variantCount: Number(b.variantCount) || 4,
-      baseSeed: b.baseSeed ?? null, maxSpend: b.maxSpend ?? null,
-      params: (b.params && typeof b.params === 'object' && !Array.isArray(b.params)) ? b.params : null,
-      // ticket 22 — optional chat-session attribution for spend surfacing
-      sessionId: b.sessionId ? String(b.sessionId) : null
-    });
-    res.json(batch);
-  } catch (e) { res.status(400).json({ error: e.message }); }
-});
-app.post('/api/batches/:id/pause', (req, res) => { const b = pauseBatch(req.params.id); if (!b) return res.status(404).json({ error: 'not found' }); res.json(b); });
-app.post('/api/batches/:id/resume', (req, res) => { const b = resumeBatch(req.params.id); if (!b) return res.status(404).json({ error: 'not found' }); res.json(b); });
-app.post('/api/batches/:id/cancel', (req, res) => { const b = cancelBatch(req.params.id); if (!b) return res.status(404).json({ error: 'not found' }); res.json(b); });
-app.post('/api/batches/:id/retry', (req, res) => { const r = retryBatch(req.params.id, { fresh: !!req.body?.fresh }); if (!r) return res.status(404).json({ error: 'not found' }); res.json(r); });
 
 // ── structured search (Phase 9) — typed filters + free text → exact location objects; no secrets ──
 app.get('/api/search', (req, res) => {
@@ -362,21 +227,14 @@ app.get('/api/state', (req, res) => {
   }
   const projects = listProjects().map(p => ({
     ...p,
-    context: listAssets(p.id),        // context items incl. vision meta sidecars
-    gens: listGenerations(p.id),      // generation records (F2)
-    story: getStory(p.id).content ? true : false
+    context: listAssets(p.id)        // context items incl. vision meta sidecars
   }));
   res.json({
     revision: currentRevision(),
     storageRoot: getStorageRoot(),
     settings: publicSettings(),
-    // the integration registry + each module's resolved on/off state, so the UI never has to
-    // re-derive the defaults logic (and can't drift from what the server actually enforces)
-    integrations: INTEGRATIONS,
-    modules: resolveModules(getSettings()),
     projects,
     items: listItems(),
-    shots: listAllShots(),
     library: listAssets('library'),
     activity: getActivity(),
     history: getHistory(),
@@ -386,12 +244,8 @@ app.get('/api/state', (req, res) => {
     ledger: getLedger(),
     ledgerRollup: getLedgerRollup(),   // permanent monthly totals — correct past the 500-row detail cap
     jobs: listJobs(),
-    batches: listBatches(),           // batch variants + durable queue (Phase 7)
     reviewSessions: listSessions(),   // persistent Inbox sessions (Phase 5)
-    groqReady: !!groqKey(),
-    falReady: !!falKey(),
-    kieReady: !!kieKey(),
-    providers: providersStatus()   // { fal, kie, higgsfield, arcads } → reachable? (key set / CLI installed)
+    groqReady: !!groqKey()
   });
 });
 
@@ -474,112 +328,6 @@ app.post('/api/projects/restore', (req, res) => {
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-// ── story → shots ──
-app.get('/api/story/:pid', (req, res) => {
-  res.json({ story: getStory(req.params.pid), shots: listShots(req.params.pid) });
-});
-app.put('/api/story/:pid', (req, res) => {
-  saveStory(req.params.pid, String(req.body?.content || ''));
-  bumpHistory('briefs');
-  res.json({ ok: true });
-});
-app.post('/api/story/:pid/breakdown', async (req, res) => {
-  const pid = req.params.pid;
-  const story = String(req.body?.story ?? getStory(pid).content ?? '').trim();
-  if (!story) return res.status(400).json({ error: 'story is empty — write or transcribe an idea first' });
-  try {
-    if (req.body?.story) saveStory(pid, story);
-    const skills = scanSkillRepos().filter(r => r.exists).flatMap(r => r.skills.map(s => ({ name: s.name, description: s.description })));
-    const shots = await breakdownStory(story, {
-      brief: (() => { try { return listProjects().find(p => p.id === pid)?.brief || ''; } catch { return ''; } })(),
-      skills
-    });
-    if (!shots.length) return res.status(502).json({ error: 'model returned no shots' });
-    // mode 'merge' appends after the existing shots instead of archiving them (F5 re-break)
-    let written;
-    if (req.body?.mode === 'merge') {
-      const existing = listShots(pid);
-      const offset = existing.length ? Math.max(...existing.map(s => s.no || 0)) : 0;
-      const maxScene = Math.max(0, ...existing.map(s => s.scene || 0));
-      written = shots.map(sh => writeShot(pid, {
-        ...sh, no: sh.no + offset, scene: (sh.scene || 1) + maxScene,
-        id: 'SH' + String((sh.no + offset) * 10).padStart(3, '0')
-      }, 'created by story breakdown (merged)'));
-    } else {
-      written = replaceShots(pid, shots);
-    }
-    bumpHistory('prompts', shots.length);
-    appendActivity({ dot: 'green', t: 'Story broken into ' + shots.length + ' shots', t2: '· ' + pid, s: 'skills assigned per shot — Groq ' + (getSettings().groqTextModel || ''), kind: 'proj', ref: pid, hl: 1 });
-    res.json({ shots: written });
-  } catch (e) { res.status(502).json({ error: e.message }); }
-});
-app.post('/api/story/:pid/shots', (req, res) => {
-  const existing = listShots(req.params.pid);
-  // body.id + body.no are honored when present — used by delete-undo to restore a shot verbatim
-  const restore = req.body?.id && !existing.some(s => s.id === req.body.id);
-  // freeShotNo: max(no)+1 can derive an id another shot already owns, because a reorder
-  // renumbers `no` but never renumbers `id`. Without this, "add shot" overwrote that shot.
-  const no = restore && req.body.no
-    ? req.body.no
-    : freeShotNo(existing, existing.length ? Math.max(...existing.map(s => s.no || 0)) + 1 : 1);
-  const shot = writeShot(req.params.pid, { ...req.body, no, id: restore ? req.body.id : undefined }, restore ? 'restored via undo' : 'created manually');
-  res.json(shot);
-});
-// registered before the :id PATCH so 'reorder' isn't swallowed as a shot id
-app.patch('/api/story/:pid/shots/reorder', (req, res) => {
-  const order = Array.isArray(req.body?.order) ? req.body.order.map(String) : [];
-  if (!order.length) return res.status(400).json({ error: 'order array required' });
-  res.json({ shots: reorderShots(req.params.pid, order) });
-});
-app.post('/api/story/:pid/shots/:id/duplicate', (req, res) => {
-  const sh = duplicateShot(req.params.pid, req.params.id);
-  if (!sh) return res.status(404).json({ error: 'shot not found' });
-  res.json(sh);
-});
-app.patch('/api/story/:pid/shots/:id', (req, res) => {
-  const s = patchShot(req.params.pid, req.params.id, req.body?.patch || {}, req.body?.log);
-  if (!s) return res.status(404).json({ error: 'shot not found' });
-  res.json(s);
-});
-app.delete('/api/story/:pid/shots/:id', (req, res) => {
-  deleteShot(req.params.pid, req.params.id);
-  res.json({ ok: true });
-});
-
-// ── transcription: Groq (cloud) or local (on-device Parakeet via parakeet-mlx) ──
-// settings.transcriber picks the preferred engine; on failure the route falls through to the
-// other engine automatically rather than failing hard on the user's first choice. Only errors
-// if BOTH engines fail, and that error includes both failure messages.
-app.post('/api/groq/transcribe', express.raw({ type: '*/*', limit: '80mb' }), async (req, res) => {
-  const name = String(req.query.name || 'audio.m4a');
-  const s = getSettings();
-  const order = s.transcriber === 'local'
-    ? [['local', () => transcribeLocal(req.body, name, s)], ['groq', () => transcribe(req.body, name)]]
-    : [['groq', () => transcribe(req.body, name)], ['local', () => transcribeLocal(req.body, name, s)]];
-  const errs = [];
-  for (const [engine, fn] of order) {
-    try {
-      const text = await fn();
-      bumpHistory('prompts');
-      return res.json({ text, engine });
-    } catch (e) { errs.push(engine + ': ' + e.message); }
-  }
-  res.status(502).json({ error: errs.join(' · ') || 'Transcription failed' });
-});
-app.post('/api/assets/:scope/analyze', async (req, res) => {
-  const { name, folder, provider, depth } = req.body || {};
-  const p = assetPath(req.params.scope, String(name || ''), String(folder || ''));
-  if (!p) return res.status(404).json({ error: 'asset not found' });
-  try {
-    // reuse a cached fal storage URL when there is one — the premium tier needs a hosted
-    // image, and re-uploading the same asset on every re-analyze is pure waste
-    const prev = readMeta(p) || {};
-    const meta = await analyzeImage(fs.readFileSync(p), String(name), { provider, depth, imageUrl: prev.falUrl || null });
-    if (meta.falUrl && meta.falUrl !== prev.falUrl) meta.falAt = stamp();
-    writeMeta(p, meta);
-    res.json({ meta: { ...meta, analyzed: 'just now' } });
-  } catch (e) { res.status(502).json({ error: e.message }); }
-});
 app.put('/api/assets/:scope/meta', (req, res) => {
   const { name, folder, meta } = req.body || {};
   const p = assetPath(req.params.scope, String(name || ''), String(folder || ''));
@@ -631,19 +379,6 @@ app.post('/api/assets/:scope/rename-folder', (req, res) => {
   const { name, newName } = req.body || {};
   try { res.json({ name: renameCollection(req.params.scope, String(name || ''), String(newName || '')) }); }
   catch (e) { res.status(400).json({ error: e.message }); }
-});
-
-// push an asset to fal storage; the returned CDN URL is written into the .meta.md sidecar
-app.post('/api/assets/:scope/send-fal', async (req, res) => {
-  const { name, folder } = req.body || {};
-  const p = assetPath(req.params.scope, String(name || ''), String(folder || ''));
-  if (!p) return res.status(404).json({ error: 'asset not found' });
-  try {
-    const url = await uploadToFal(fs.readFileSync(p), String(name));
-    const meta = writeMeta(p, { falUrl: url, falAt: stamp() });
-    appendActivity({ dot: 'green', t: 'Asset pushed to fal', t2: '· ' + name, s: url.slice(0, 80), kind: 'library' });
-    res.json({ url, meta });
-  } catch (e) { res.status(502).json({ error: e.message }); }
 });
 
 // ── global asset library ──
@@ -762,13 +497,6 @@ app.delete('/api/snippets/:file', (req, res) => {
   stageTrash(path.join(snippetsDir(), path.basename(String(req.params.file))), { label: 'snippet', itemKind: 'snippet' });
   res.json({ ok: true });
 });
-// Restore the curated starter pack into an existing root. First-run seeding installs it, but
-// every root created before the pack shipped has an empty snippets dir and no other way to
-// get one. Purely additive — installStarterSnippets skips any trigger already on disk.
-app.post('/api/snippets/seed', (req, res) => {
-  try { res.json({ ok: true, ...installStarterSnippets(getStorageRoot()) }); }
-  catch (e) { res.status(500).json({ error: e.message }); }
-});
 
 // ── looks (F3.3): reference image → two-tier reusable LOOK, saved as looks/<id>.md ──
 const looksDir = () => path.join(getStorageRoot(), 'looks');
@@ -779,200 +507,9 @@ app.get('/api/looks', (req, res) => {
     try { return readMd(path.join(dir, f)).data; } catch { return null; }
   }).filter(Boolean));
 });
-app.post('/api/looks/extract', async (req, res) => {
-  const { scope, name, folder, measurements, provider } = req.body || {};
-  const p = assetPath(String(scope || ''), String(name || ''), String(folder || ''));
-  if (!p) return res.status(404).json({ error: 'asset not found' });
-  try {
-    const look = await extractLook(fs.readFileSync(p), String(name), measurements || null,
-      { provider, imageUrl: readMeta(p)?.falUrl || null });
-    const id = 'look-' + Date.now();
-    const rec = { id, source: (scope === 'library' ? 'library' : scope) + '/' + (folder ? folder + '/' : '') + name, ...look, measurements: measurements || null, created: stamp() };
-    writeMd(path.join(looksDir(), id + '.md'), rec, (look.tier2 || look.tier1 || '') + '\n');
-    bumpHistory('prompts');
-    appendActivity({ dot: 'green', t: 'Look extracted', t2: '· ' + id, s: rec.source + ' — two-tier fragment saved', kind: 'library' });
-    res.json(rec);
-  } catch (e) { res.status(502).json({ error: e.message }); }
-});
-// Camera-move analyzer — the inverse of the Camera Moves picker. Best fed a contact sheet
-// (backend/video.mjs), whose panel→time map rides in the sidecar; a lone still still works,
-// the read is just blinder. Read the RAW frontmatter, not readMeta(): readMeta normalises to
-// a fixed shape and `contactSheet` is not in it, so the map would arrive as undefined.
-app.post('/api/moves/analyze', async (req, res) => {
-  const { scope, name, folder, provider } = req.body || {};
-  const p = assetPath(String(scope || ''), String(name || ''), String(folder || ''));
-  if (!p) return res.status(404).json({ error: 'asset not found' });
-  let sheet = null;
-  try { sheet = readMd(metaPath(p)).data?.contactSheet || null; } catch { /* no sidecar — analyze blind */ }
-  try {
-    const rec = await analyzeMove(fs.readFileSync(p), String(name), sheet,
-      { provider, imageUrl: readMeta(p)?.falUrl || null });
-    writeMeta(p, { cameraMove: { ...rec, read: stamp() } });
-    bumpHistory('prompts');
-    appendActivity({ dot: 'green', t: 'Camera move read', t2: '· ' + (rec.move || 'unresolved') + (rec.secondary ? ' → ' + rec.secondary : ''),
-      s: (scope === 'library' ? 'library' : scope) + '/' + name + (sheet ? ' — ' + sheet.panels?.length + ' panels' : ' — single frame'), kind: 'library' });
-    res.json({ ...rec, sheet });
-  } catch (e) { res.status(502).json({ error: e.message }); }
-});
 app.delete('/api/looks/:id', (req, res) => {
   stageTrash(path.join(looksDir(), path.basename(String(req.params.id)) + '.md'), { label: 'look/' + req.params.id, itemKind: 'look' });
   res.json({ ok: true });
-});
-
-// ── generation hub (F2): shots → FAL → real files in renders/ ──
-app.post('/api/generate', (req, res) => {
-  const { pid, shot, prompt, model, aspect, resolution, seed, refs, params, sessionId } = req.body || {};
-  if (!pid) return res.status(400).json({ error: 'pid required' });
-  if (!SLUG.test(String(pid))) return res.status(400).json({ error: 'invalid project id' });
-  try {
-    const gen = startGeneration({
-      pid: String(pid), shot: shot ? String(shot) : null,
-      prompt: String(prompt || ''), model: String(model || ''),
-      aspect: String(aspect || '16:9'), resolution: String(resolution || DEFAULT_RESOLUTION), seed: seed ?? null,
-      refs: Array.isArray(refs) ? refs.slice(0, maxRefs(String(model || ''))) : [],
-      refUrls: Array.isArray(req.body?.refUrls) ? req.body.refUrls : [],
-      params: (params && typeof params === 'object' && !Array.isArray(params)) ? params : null,
-      // ticket 22 — optional chat-session attribution for spend surfacing
-      sessionId: sessionId ? String(sessionId) : null
-    });
-    res.json(gen);
-  } catch (e) { res.status(400).json({ error: e.message }); }
-});
-app.get('/api/generations/:pid', (req, res) => res.json(listGenerations(req.params.pid)));
-// Any decision that can change a shot's selection must also land on disk: rebuild the
-// edit manifest and re-export projects/<pid>/selects/ (symlinked, shot-ordered aliases)
-// so the folder structure always mirrors the current approvals — no manual export step.
-function refreshSelectsOnDisk(pid) {
-  try { writeManifest(pid); exportSelects(pid); } catch { /* selects export is best-effort */ }
-}
-app.post('/api/generations/:pid/:id/save-to-shot', (req, res) => {
-  // optional `shot` in the body overrides the generation's own linked shot — lets the send-to
-  // picker attach a shot-less quick-gen to any target shot the user chooses. `final` selects it.
-  try {
-    const r = saveToShot(req.params.pid, req.params.id, req.body?.shot ? String(req.body.shot) : null, { final: !!req.body?.final });
-    refreshSelectsOnDisk(req.params.pid);
-    res.json(r);
-  }
-  catch (e) { res.status(400).json({ error: e.message }); }
-});
-app.post('/api/generations/:pid/:id/save-to-board', (req, res) => {
-  try {
-    const saved = saveToBoard(req.params.pid, req.params.id, String(req.body?.folder || ''));
-    appendActivity({ dot: 'amber', t: 'Render saved to board', t2: '· ' + saved.name, s: req.params.pid + ' — context/' + (saved.folder || ''), kind: 'proj', ref: req.params.pid });
-    res.json(saved);
-  } catch (e) { res.status(400).json({ error: e.message }); }
-});
-// ── Phase 2 candidate review — decisions live on the generation record ──
-app.patch('/api/generations/:pid/:id/review', (req, res) => {
-  const { patch, baseRev, baseValues } = req.body || {};
-  const r = reviewCandidate(req.params.pid, req.params.id, patch || {}, { baseRev, baseValues });
-  if (!r) return res.status(404).json({ error: 'candidate not found' });
-  if (r.conflict) return res.status(409).json({ error: 'conflict', currentRev: r.currentRev, currentValues: r.currentValues, conflictingFields: r.conflictingFields });
-  journalAction({ command: 'candidate.review', actor: 'app', targets: [req.params.pid + '/' + req.params.id], undoable: !!baseValues, before: baseValues || null, after: patch || null });
-  // keep/kill/final can all move the shot's selection (syncShotSelection) — mirror it to selects/
-  if (patch && (patch.reviewState !== undefined || patch.final !== undefined)) refreshSelectsOnDisk(req.params.pid);
-  res.json(r);
-});
-app.post('/api/generations/:pid/:id/reroll', (req, res) => {
-  try {
-    const g = rerollCandidate(req.params.pid, req.params.id, { note: String(req.body?.note || ''), freshSeed: !!req.body?.freshSeed });
-    if (!g) return res.status(404).json({ error: 'candidate not found' });
-    appendActivity({ dot: 'green', t: 'Reroll queued', t2: '· ' + (g.shot || g.id), s: req.params.pid + ' · parent ' + req.params.id, kind: 'proj', ref: req.params.pid });
-    res.json(g);
-  } catch (e) { res.status(400).json({ error: e.message }); }
-});
-app.post('/api/generations/:pid/:id/promote', (req, res) => {
-  try {
-    const scope = req.body?.scope === 'library' ? 'library' : req.params.pid;
-    const saved = promoteCandidate(req.params.pid, req.params.id, { scope, folder: String(req.body?.folder || ''), name: String(req.body?.name || '') });
-    // NB: never pass `ref: undefined` — appendActivity → writeMd only strips TOP-LEVEL undefined, so a
-    // nested undefined reaches js-yaml and throws. Build the event and add `ref` only when defined.
-    const ev = { dot: 'amber', t: saved.idempotent ? 'Already promoted' : 'Candidate promoted', t2: '· ' + saved.name, s: (scope === 'library' ? 'library' : req.params.pid) + ' / ' + (saved.folder || ''), kind: scope === 'library' ? 'library' : 'proj' };
-    if (scope !== 'library') ev.ref = req.params.pid;
-    appendActivity(ev);
-    res.json(saved);
-  } catch (e) { res.status(400).json({ error: e.message }); }
-});
-// Grid split (filmmaker-chat ticket 06) — cut a generated contact sheet into one child generation
-// per kept cell. rows/cols omitted → auto-detect; optional `skip` drops cells; optional `shots`
-// map (keyed 'r-c') attaches a cell to a shot as a candidate. Detection/geometry: shared/gridsplit.
-app.post('/api/generations/:pid/:id/split-grid', async (req, res) => {
-  try {
-    const b = req.body || {};
-    const out = await splitGridGeneration({
-      pid: req.params.pid, id: req.params.id,
-      rows: b.rows != null ? Number(b.rows) : null,
-      cols: b.cols != null ? Number(b.cols) : null,
-      gutter: b.gutter != null ? Number(b.gutter) : 0,
-      skip: Array.isArray(b.skip) ? b.skip : [],
-      shots: b.shots && typeof b.shots === 'object' ? b.shots : {}
-    });
-    res.json(out);
-  } catch (e) { res.status(400).json({ error: e.message }); }
-});
-app.delete('/api/generations/:pid/:id', (req, res) => {
-  if (!deleteGeneration(req.params.pid, req.params.id)) return res.status(404).json({ error: 'not found' });
-  res.json({ ok: true });
-});
-app.get('/api/renders/:pid/file', (req, res) => {
-  const p = renderPath(req.params.pid, String(req.query.name || ''));
-  if (!p) return res.status(404).end();
-  res.sendFile(p);
-});
-// reveal a render in Finder/Explorer, selected inside renders/ — the local-first answer to
-// "give me this file": it's already on disk, so we point at it instead of re-downloading it
-app.post('/api/renders/:pid/reveal', (req, res) => {
-  const p = renderPath(req.params.pid, String(req.body?.name || ''));
-  if (!p) return res.status(404).json({ error: 'render not found' });
-  revealInOS(p, true);
-  res.json({ ok: true, path: p });
-});
-
-// shots enriched with real file paths + FAL urls — what Remotion / export packs consume (F7).
-// Resolution order (Phase 2): 1) shot.selectedCandidate (the chosen generation), 2) legacy
-// shot.assets → item versions, 3) fallback to any kept/final candidate for the shot.
-
-// ── export pack (F7): everything an external tool needs, one button ──
-app.post('/api/export/:pid', (req, res) => {
-  const pid = req.params.pid;
-  const dir = path.join(getStorageRoot(), 'projects', pid, 'export');
-  try {
-    fs.mkdirSync(dir, { recursive: true });
-    const shots = resolveShotMedia(pid);
-    const story = getStory(pid);
-    fs.writeFileSync(path.join(dir, 'shots.json'), JSON.stringify({ project: pid, exportedAt: new Date().toISOString(), story: story.content, shots }, null, 2));
-    const esc = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
-    const cols = ['id', 'no', 'scene', 'title', 'desc', 'type', 'dur', 'move', 'light', 'transition', 'skill', 'status', 'prompt', 'videoPrompt'];
-    fs.writeFileSync(path.join(dir, 'shots.csv'), [cols.join(','), ...shots.map(s => cols.map(c => esc(s[c])).join(','))].join('\n'));
-    fs.writeFileSync(path.join(dir, 'prompts.md'),
-      '# ' + pid + ' — prompts\n\n' + shots.map(s => '## ' + s.id + ' — ' + s.title + '\n\n' + (s.prompt || '_(no prompt)_') + (s.videoPrompt ? '\n\n**video:** ' + s.videoPrompt : '')).join('\n\n') + '\n');
-    const ctx = listAssets(pid);
-    fs.writeFileSync(path.join(dir, 'moodboard.json'), JSON.stringify({
-      project: pid,
-      assets: (ctx.items || []).map(c => ({ name: c.name, board: c.folder, type: c.type, ...(c.meta || {}) }))
-    }, null, 2));
-    try { fs.copyFileSync(path.join(getStorageRoot(), 'projects', pid, 'story.md'), path.join(dir, 'story.md')); } catch { /* none */ }
-    try { fs.copyFileSync(path.join(getStorageRoot(), 'projects', pid, 'brief.md'), path.join(dir, 'brief.md')); } catch { /* none */ }
-    try { const m = writeManifest(pid); fs.writeFileSync(path.join(dir, 'edit-manifest.json'), JSON.stringify(m, null, 2)); } catch { /* no selects yet */ }
-    revealInOS(path.join(dir, 'shots.json'), true);
-    appendActivity({ dot: 'green', t: 'Export pack written', t2: '· ' + pid, s: 'projects/' + pid + '/export/ — shots, prompts, moodboard, story, brief', kind: 'proj', ref: pid });
-    res.json({ ok: true, dir, files: ['shots.json', 'shots.csv', 'prompts.md', 'moodboard.json', 'story.md', 'brief.md'] });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// ── Remotion handoff: export shots + open the project ──
-app.post('/api/remotion/open', (req, res) => {
-  const pid = String(req.body?.pid || '');
-  const proj = getSettings().remotionProject;
-  if (!proj || !fs.existsSync(proj)) return res.status(400).json({ error: 'Set a valid Remotion project path in Settings first' });
-  const shots = resolveShotMedia(pid);
-  const story = getStory(pid);
-  const payload = { exportedAt: new Date().toISOString(), project: pid, story: story.content, shots };
-  const out = path.join(proj, 'frameforge-shots.json');
-  try { fs.writeFileSync(out, JSON.stringify(payload, null, 2)); } catch (e) { return res.status(500).json({ error: e.message }); }
-  revealInOS(proj, false);
-  appendActivity({ dot: 'green', t: 'Handed off to Remotion', t2: '· ' + pid + ' — ' + shots.length + ' shots', s: 'frameforge-shots.json written into ' + proj, kind: 'proj', ref: pid });
-  res.json({ ok: true, wrote: out, shots: shots.length });
 });
 
 // ── live key tests (Settings → Test buttons) — one cheap authenticated round-trip each ──
@@ -987,109 +524,6 @@ app.get('/api/test/groq', async (_req, res) => {
     res.json({ ok: true, detail: n + ' models visible' });
   } catch (e) { res.json({ ok: false, error: e.message }); }
 });
-app.get('/api/test/fal', async (_req, res) => {
-  try { res.json(await testFal()); } catch (e) { res.json({ ok: false, error: e.message }); }
-});
-app.get('/api/test/local-asr', async (_req, res) => {
-  try {
-    const st = await localAsrStatus(getSettings());
-    res.json(st.installed
-      ? { ok: true, path: st.path, detail: 'parakeet-mlx found at ' + st.path }
-      : { ok: false, error: 'parakeet-mlx not found — install with: uv tool install parakeet-mlx' });
-  } catch (e) { res.json({ ok: false, error: e.message }); }
-});
-// new providers — one adapter-level test each (Kie credit ping / higgsfield account status /
-// a one-word Claude probe for the Arcads MCP). See backend/providers.mjs.
-for (const svc of ['kie', 'higgsfield', 'arcads']) {
-  app.get('/api/test/' + svc, async (_req, res) => {
-    try { res.json(await testProvider(svc)); } catch (e) { res.json({ ok: false, error: e.message }); }
-  });
-}
-
-// ── fal.ai full model catalog — local mirror under catalog/fal.md (Settings → FAL → Sync) ──
-app.get('/api/catalog/fal', (_req, res) => {
-  const { models, ...meta } = readFalCatalog();
-  res.json({ ...meta, models });
-});
-app.post('/api/catalog/fal/sync', async (_req, res) => {
-  try { res.json({ ok: true, ...(await syncFalCatalog()) }); }
-  catch (e) { res.json({ ok: false, error: e.message }); }
-});
-
-// ── normalized per-model input schema — drives Manual mode's settings form (ticket 04) ──
-// GET serves fresh cache / lazily syncs on first request; POST /sync forces a refresh. Model id
-// carries slashes, so it rides a `?id=` query. Non-FAL ids get the fallback marker, never a 500.
-app.get('/api/catalog/model-schema', async (req, res) => {
-  try { res.json(await getModelSchema(String(req.query.id || ''))); }
-  catch (e) { res.json({ ok: false, error: e.message }); }
-});
-app.post('/api/catalog/model-schema/sync', async (req, res) => {
-  try { res.json(await getModelSchema(String(req.query.id || req.body?.id || ''), { force: true })); }
-  catch (e) { res.json({ ok: false, error: e.message }); }
-});
-
-// ── Remotion starter comp (F7 optional) — copies a minimal comp that reads frameforge-shots.json ──
-app.post('/api/remotion/template', (req, res) => {
-  const proj = getSettings().remotionProject;
-  if (!proj || !fs.existsSync(proj)) return res.status(400).json({ error: 'Set a valid Remotion project path in Settings first' });
-  const dir = fs.existsSync(path.join(proj, 'src')) ? path.join(proj, 'src') : proj;
-  const out = path.join(dir, 'FrameForgeShots.tsx');
-  if (fs.existsSync(out) && !req.body?.overwrite) return res.status(409).json({ error: 'FrameForgeShots.tsx already exists — pass overwrite to replace it' });
-  try {
-    // The JSON is always seeded at the PROJECT ROOT, but the comp lands in src/ only when src/
-    // exists. A hardcoded '../frameforge-shots.json' therefore resolved outside the project
-    // entirely in the no-src/ layout, breaking the user's build with no way to self-correct.
-    const specifier = dir === proj ? './frameforge-shots.json' : '../frameforge-shots.json';
-    fs.writeFileSync(out, REMOTION_TEMPLATE.replace("'../frameforge-shots.json'", "'" + specifier + "'"));
-    // the starter imports frameforge-shots.json at compile time — seed an empty
-    // payload if no handoff has run yet, so the user's Remotion project still builds
-    const shotsJson = path.join(proj, 'frameforge-shots.json');
-    if (!fs.existsSync(shotsJson)) {
-      fs.writeFileSync(shotsJson, JSON.stringify({ exportedAt: null, project: null, story: '', shots: [] }, null, 2));
-    }
-    appendActivity({ dot: 'green', t: 'Remotion starter written', t2: '· FrameForgeShots.tsx', s: out + ' — register it in your Root, it reads frameforge-shots.json', kind: 'proj', ref: '' });
-    res.json({ ok: true, wrote: out });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-const REMOTION_TEMPLATE = `// FrameForgeShots — starter comp written by FrameForge (Tools → Remotion handoff).
-// Reads frameforge-shots.json from the project root and plays each shot's picked frame
-// for its duration. Register in your Root.tsx:
-//   <Composition id="FrameForgeShots" component={FrameForgeShots} durationInFrames={totalFrames}
-//     fps={30} width={1920} height={1080} />
-import React from 'react';
-import { AbsoluteFill, Img, Sequence, staticFile, useVideoConfig } from 'remotion';
-import shotsData from '../frameforge-shots.json';
-
-type ShotFile = { file?: string; path?: string; falUrl?: string };
-type Shot = { id: string; title?: string; dur?: number; files?: ShotFile[] };
-
-export const totalFrames = (shotsData.shots as Shot[]).reduce((a, s) => a + Math.round((s.dur || 4) * 30), 0) || 30;
-
-export const FrameForgeShots: React.FC = () => {
-  const { fps } = useVideoConfig();
-  let from = 0;
-  return (
-    <AbsoluteFill style={{ backgroundColor: '#0B0C0E' }}>
-      {(shotsData.shots as Shot[]).map((s) => {
-        const frames = Math.round((s.dur || 4) * fps);
-        const f = (s.files || [])[0];
-        const src = f?.falUrl || f?.file || f?.path || null;
-        const el = (
-          <Sequence key={s.id} from={from} durationInFrames={frames} name={s.id + ' ' + (s.title || '')}>
-            <AbsoluteFill style={{ alignItems: 'center', justifyContent: 'center' }}>
-              {src
-                ? <Img src={src.startsWith('http') ? src : staticFile(src)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                : <div style={{ color: '#626B78', fontFamily: 'monospace', fontSize: 40 }}>{s.id} — no frame picked</div>}
-            </AbsoluteFill>
-          </Sequence>
-        );
-        from += frames;
-        return el;
-      })}
-    </AbsoluteFill>
-  );
-};
-`;
 
 // ── project context assets (folders supported) ──
 app.post('/api/context/:pid/upload', express.raw({ type: '*/*', limit: '200mb' }), (req, res) => {
@@ -1098,65 +532,6 @@ app.post('/api/context/:pid/upload', express.raw({ type: '*/*', limit: '200mb' }
   appendActivity({ dot: 'amber', t: 'Context added', t2: '· ' + (saved.folder ? saved.folder + '/' : '') + saved.name, s: req.params.pid + ' — injected into every agent run', kind: 'proj', ref: req.params.pid });
   res.json(saved);
 });
-// ── local video import: yt-dlp / local file → ffmpeg shot-cut detection → frame picker ──
-app.get('/api/video-import/tools', (req, res) => res.json(videoToolsStatus()));
-app.post('/api/video-import/:pid', (req, res) => {
-  try {
-    res.json(startVideoImport({ pid: req.params.pid, url: String(req.body?.url || ''),
-      folder: String(req.body?.folder || ''), quality: String(req.body?.quality || 'medium') }));
-  } catch (e) { res.status(400).json({ error: e.message }); }
-});
-app.post('/api/video-import/:pid/upload', express.raw({ type: '*/*', limit: '2gb' }), (req, res) => {
-  try {
-    const name = String(req.query.name || 'video.mp4');
-    if (!/\.(mp4|mov|webm|mkv|m4v|avi)$/i.test(name)) return res.status(400).json({ error: 'Unsupported file type — use mp4, mov, webm, mkv, m4v or avi.' });
-    const tmp = path.join(os.tmpdir(), 'frameforge-upload-' + Date.now() + '-' + name.replace(/[^\w.\-]+/g, '_'));
-    fs.writeFileSync(tmp, req.body);
-    res.json(startVideoImport({ pid: req.params.pid, filePath: tmp, sourceLabel: name,
-      folder: String(req.query.folder || ''), quality: String(req.query.quality || 'medium') }));
-  } catch (e) { res.status(400).json({ error: e.message }); }
-});
-app.get('/api/video-import/job/:id', (req, res) => {
-  const job = getVideoJob(req.params.id);
-  if (!job) return res.status(404).json({ error: 'job not found' });
-  res.json(job);
-});
-app.get('/api/video-import/job/:id/frame/:ix', (req, res) => {
-  const p = videoJobFramePath(req.params.id, req.params.ix);
-  if (!p) return res.status(404).end();
-  res.sendFile(p);
-});
-// scrub: any instant in the source, for previewing where a trimmed boundary actually lands
-app.get('/api/video-import/job/:id/at', async (req, res) => {
-  const p = await videoFrameAt(req.params.id, req.query.t);
-  if (!p) return res.status(404).end();
-  res.sendFile(p);
-});
-// move a detected scene's in/out; the poster is re-cut and any sheet on that scene is dropped
-app.post('/api/video-import/job/:id/shot/:ix', async (req, res) => {
-  try { res.json(await retrimVideoShot(req.params.id, req.params.ix, { start: req.body?.start, end: req.body?.end })); }
-  catch (e) { res.status(400).json({ error: e.friendly || e.message }); }
-});
-app.post('/api/video-import/job/:id/sheet', async (req, res) => {
-  try { res.json(await buildContactSheet(req.params.id, req.body?.shot, { step: req.body?.step, panels: req.body?.panels })); }
-  catch (e) { res.status(400).json({ error: e.friendly || e.message }); }
-});
-app.get('/api/video-import/job/:id/sheet/:sid', (req, res) => {
-  const p = videoSheetPath(req.params.id, req.params.sid);
-  if (!p) return res.status(404).end();
-  res.sendFile(p);
-});
-app.post('/api/video-import/job/:id/sheet/:sid/discard', (req, res) =>
-  res.json({ ok: discardContactSheet(req.params.id, req.params.sid) }));
-app.post('/api/video-import/job/:id/save', (req, res) => {
-  try {
-    res.json({ saved: commitVideoJob(req.params.id,
-      Array.isArray(req.body?.indices) ? req.body.indices : [],
-      Array.isArray(req.body?.sheets) ? req.body.sheets : []) });
-  } catch (e) { res.status(400).json({ error: e.message }); }
-});
-app.post('/api/video-import/job/:id/discard', (req, res) => res.json({ ok: discardVideoJob(req.params.id) }));
-
 app.post('/api/context/:pid/note', (req, res) => {
   const folder = String(req.body?.folder || '');
   // Allow dots, then strip a trailing .md before re-adding one. Without the dot the sanitizer
@@ -1286,7 +661,7 @@ app.post('/api/projects/:pid/items/:id/restore', (req, res) => {
   return sendPatch(res, it);
 });
 
-// ── DEPRECATED legacy global item routes — compatibility wrappers only. The FrameForge client never
+// ── DEPRECATED legacy global item routes — compatibility wrappers only. The Scout client never
 // calls these. Exactly one project holds the id → operate and flag `deprecated`; two or more →
 // 409 "ambiguous item id" (Phase 1D), because a global id can no longer identify a record. ──
 function resolveLegacyItem(res, id) {
@@ -1349,8 +724,6 @@ app.put('/api/storage-root', (req, res) => {
   const p = String(req.body?.path || '').trim();
   if (!p) return res.status(400).json({ error: 'no path' });
   const abs = setStorageRoot(p);
-  seedIfEmpty(); // fresh root gets a fresh scaffold
-  seedContext(abs);
   res.json({ storageRoot: abs });
 });
 
@@ -1425,51 +798,6 @@ app.delete('/api/staged-trash/:id', (req, res) => {
 });
 app.post('/api/staged-trash/purge-all', (req, res) => res.json({ purged: purgeAllTrash() }));
 
-// ── auto-initialize: when settings.autoAnalyze is on, any new raster image that appears
-// on disk (dropped via Finder, the app, or another tool) gets vision metadata
-// automatically. One image per tick — sequential and free-tier friendly. Files must be
-// a few seconds old so half-copied files are never read; failures are remembered so a
-// bad image can't loop forever.
-const autoFailed = new Set();
-let autoBusy = false;
-const RASTER = /\.(png|jpe?g|gif|webp|avif)$/i;
-const autoAnalyzeTick = async () => {
-  if (autoBusy) return;
-  try {
-    const st = getSettings();
-    // the default tier needs its own key present — otherwise every tick would burn a
-    // failed request and mark a perfectly good image as permanently failed
-    // isEnabled() reads the same autoAnalyze flag via the module's legacyFlag, so the Integrations
-    // switch and the old Settings checkbox stay one control rather than two that can disagree.
-    if (!isEnabled(st, 'moodanalyze')) return;
-    if (!(resolveVision().provider === 'fal' ? falKey() : groqKey())) return;
-    // NB: listProjects()/listAssets() can throw (malformed project.md, a file removed between
-    // readdir and statSync). Those run outside the per-image try below, so the whole block is
-    // guarded — an unhandled rejection here would take the server down under Node's defaults.
-    const scopes = ['library', ...listProjects().map(p => p.id)];
-    for (const scope of scopes) {
-      const { items } = listAssets(scope);
-      const c = items.find(i =>
-        i.type === 'image' && RASTER.test(i.name) &&
-        !(i.meta && i.meta.description) &&
-        Date.now() - i.mtime > 4000 &&
-        !autoFailed.has(scope + '/' + (i.folder || '') + '/' + i.name));
-      if (!c) continue;
-      autoBusy = true;
-      const key = scope + '/' + (c.folder || '') + '/' + c.name;
-      try {
-        const p = assetPath(scope, c.name, c.folder);
-        const meta = await analyzeImage(fs.readFileSync(p), c.name, { imageUrl: c.meta?.falUrl || null });
-        if (meta.falUrl && meta.falUrl !== c.meta?.falUrl) meta.falAt = stamp();
-        writeMeta(p, meta);
-        appendActivity({ dot: 'green', t: 'Auto-initialized', t2: '· ' + c.name, s: (scope === 'library' ? 'library' : scope) + ' — vision metadata written on arrival', kind: scope === 'library' ? 'library' : 'proj', ref: scope === 'library' ? undefined : scope });
-      } catch { autoFailed.add(key); }
-      break; // one per tick
-    }
-  } catch (e) { console.warn('[frameforge] auto-analyze tick skipped:', e.message); }
-  finally { autoBusy = false; }
-};
-
 // static frontend (production build)
 const dist = path.join(APP_ROOT, 'dist');
 if (fs.existsSync(dist)) {
@@ -1487,19 +815,18 @@ if (IS_MAIN) {
   // the ring only holds what it was installed in time to see. Nothing is transmitted — the ring is
   // read only when a human presses Send in the feedback panel.
   installLogRing();
-  setInterval(autoAnalyzeTick, 6000);
   startWatch(30000); // fs.watch + 30s reconcile → external agent edits bump the revision too
   const HOST = process.env.HOST || '127.0.0.1';
-  process.env.FRFG_SELF_PORT = String(PORT); // ticket 10 — the agent home renders the Index's api base from this
+  process.env.SCOUT_SELF_PORT = String(PORT); // ticket 10 — the agent home renders the Index's api base from this
   // Without an 'error' listener an occupied port kills the process with a raw unhandled
   // EADDRINUSE stack — the usual cause being a previous instance that never shut down.
-  const server = app.listen(PORT, HOST, () => console.log('[frameforge] api on ' + HOST + ':' + PORT + ' · storage root ' + getStorageRoot()));
+  const server = app.listen(PORT, HOST, () => console.log('[scout] api on ' + HOST + ':' + PORT + ' · storage root ' + getStorageRoot()));
   server.on('error', e => {
     if (e.code === 'EADDRINUSE') {
-      console.error('[frameforge] port ' + PORT + ' is already in use — another FrameForge is probably running.');
-      console.error('[frameforge] pass a different port:  node backend/index.mjs ' + (PORT + 1) + '   (or set PORT=' + (PORT + 1) + ')');
+      console.error('[scout] port ' + PORT + ' is already in use — another Scout is probably running.');
+      console.error('[scout] pass a different port:  node backend/index.mjs ' + (PORT + 1) + '   (or set PORT=' + (PORT + 1) + ')');
     } else {
-      console.error('[frameforge] could not start server — ' + e.message);
+      console.error('[scout] could not start server — ' + e.message);
     }
     process.exit(1);
   });

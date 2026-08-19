@@ -18,6 +18,10 @@ const opts = body => ({ headers: { 'Content-Type': 'application/json' }, body: J
 
 export const api = {
   state: () => fetch('/api/state').then(j),
+  // dictation — VoiceInput ships the recorded blob raw; ?name= carries the extension so the
+  // provider's format sniff works. See backend/index.mjs POST /api/groq/transcribe.
+  transcribe: file => fetch('/api/groq/transcribe?name=' + encodeURIComponent(file.name || 'audio.m4a'),
+    { method: 'POST', headers: { 'Content-Type': file.type || 'application/octet-stream' }, body: file }).then(j),
   // Delta probe. Returns either {revision, full:false, changed:[domains]} — 40 bytes, ~2ms — or,
   // when the server can't answer from its change log (restart, or a gap longer than the ring
   // buffer), the FULL state payload, which has no `full` key. Callers must handle both: see
@@ -44,10 +48,6 @@ export const api = {
   patchPrompt: (file, patch) => fetch('/api/prompts/' + encodeURIComponent(file), { method: 'PATCH', ...opts(patch) }).then(j),
   // live key tests + remotion starter
   testKey: service => fetch('/api/test/' + service).then(j),
-  // fal full-catalog mirror (Settings → provider cards)
-  falCatalog: () => fetch('/api/catalog/fal').then(j),
-  syncFalCatalog: () => fetch('/api/catalog/fal/sync', { method: 'POST' }).then(j),
-  remotionTemplate: overwrite => fetch('/api/remotion/template', { method: 'POST', ...opts({ overwrite: !!overwrite }) }).then(r => r.json()),
   // generation hub (F2)
   generate: body => fetch('/api/generate', { method: 'POST', ...opts(body) }).then(j),
   generations: pid => fetch('/api/generations/' + pid).then(j),
@@ -59,7 +59,6 @@ export const api = {
   rerollCandidate: (pid, id, body) => fetch('/api/generations/' + pid + '/' + id + '/reroll', { method: 'POST', ...opts(body || {}) }).then(j),
   promoteCandidate: (pid, id, body) => fetch('/api/generations/' + pid + '/' + id + '/promote', { method: 'POST', ...opts(body || {}) }).then(j),
   renderUrl: (pid, name) => '/api/renders/' + pid + '/file?name=' + encodeURIComponent(name),
-  revealRender: (pid, name) => fetch('/api/renders/' + pid + '/reveal', { method: 'POST', ...opts({ name }) }).then(j),
   // manual round-trip (backend/manual.mjs) — prompts out, downloads back in
   manual: pid => fetch('/api/manual/' + pid).then(j),
   manualHandoff: (pid, body) => fetch('/api/manual/' + pid + '/handoff', { method: 'POST', ...opts(body) }).then(j),
@@ -76,8 +75,6 @@ export const api = {
   // looks (F3.3)
   looks: () => fetch('/api/looks').then(j),
   extractLook: (scope, name, folder, measurements, provider) => fetch('/api/looks/extract', { method: 'POST', ...opts({ scope, name, folder: folder || '', measurements, provider }) }).then(j),
-  // reads a contact sheet back into a move id from frontend/cameraMovements.js
-  analyzeMove: (scope, name, folder, provider) => fetch('/api/moves/analyze', { method: 'POST', ...opts({ scope, name, folder: folder || '', provider }) }).then(j),
   deleteLook: id => fetch('/api/looks/' + encodeURIComponent(id), { method: 'DELETE' }).then(j),
   // SCOPED item identity (Phase 1) — { projectId, itemId }. The client NEVER calls the legacy
   // /api/items/:id routes (those exist only as deprecated wrappers that 409 on ambiguous ids).
@@ -88,18 +85,6 @@ export const api = {
   emptyTrash: () => fetch('/api/trash/empty', { method: 'POST' }).then(j),
   actions: () => fetch('/api/actions').then(j),
   undoAction: id => fetch('/api/actions/' + encodeURIComponent(id) + '/undo', { method: 'POST' }).then(j),
-  // the Reel (animatic) — derived from shots on every read, so there is nothing to import or sync
-  reel: pid => fetch('/api/reel/' + pid).then(j),
-  reelSources: pid => fetch('/api/reel/' + pid + '/sources').then(j),
-  patchReel: (pid, patch, log) => fetch('/api/reel/' + pid, { method: 'PATCH', ...opts({ patch, log }) }).then(j),
-  layDownShots: (pid, body) => fetch('/api/reel/' + pid + '/laydown', { method: 'POST', ...opts(body || {}) }).then(j),
-  addReelClip: (pid, spec) => fetch('/api/reel/' + pid + '/clips', { method: 'POST', ...opts(spec) }).then(j),
-  patchReelClip: (pid, id, patch) => fetch('/api/reel/' + pid + '/clips/' + id, { method: 'PATCH', ...opts(patch) }).then(j),
-  deleteReelClip: (pid, id, ripple) => fetch('/api/reel/' + pid + '/clips/' + id + (ripple ? '?ripple=1' : ''), { method: 'DELETE' }).then(j),
-  setClipTake: (pid, id, generation) => fetch('/api/reel/' + pid + '/clips/' + id + '/take', { method: 'POST', ...opts({ generation }) }).then(j),
-  exportReel: (pid, formats) => fetch('/api/reel/' + pid + '/export', { method: 'POST', ...opts({ formats }) }).then(j),
-  renderReel: pid => fetch('/api/reel/' + pid + '/render', { method: 'POST' }).then(j),
-  renderReelJob: (pid, id) => fetch('/api/reel/' + pid + '/render/' + id).then(j),
   // ── the Board (per-project infinite canvas) — backend/board.mjs ──
   // Node writes are batched by the component (one PATCH per gesture, not per mousemove); every
   // route here maps 1:1 onto an operation in board.mjs so the agent tool and the UI share a path.
@@ -157,21 +142,11 @@ export const api = {
   deleteContext: (pid, name, folder) => fetch('/api/context/' + pid + '/file?name=' + encodeURIComponent(name) + '&folder=' + encodeURIComponent(folder || ''), { method: 'DELETE' }).then(j),
   contextUrl: (pid, name, folder) => '/api/context/' + pid + '/file?name=' + encodeURIComponent(name) + '&folder=' + encodeURIComponent(folder || ''),
   createFolder: (pid, name) => fetch('/api/context/' + pid + '/folder', { method: 'POST', ...opts({ name }) }).then(j),
-  // local video import — yt-dlp / local file → ffmpeg shot-cut detection → frame picker
-  videoTools: () => fetch('/api/video-import/tools').then(j),
-  videoImportUrl: (pid, url, folder, quality) => fetch('/api/video-import/' + pid, { method: 'POST', ...opts({ url, folder: folder || '', quality }) }).then(j),
-  videoImportFile: (pid, file, folder, quality) => fetch('/api/video-import/' + pid + '/upload?name=' + encodeURIComponent(file.name) + '&folder=' + encodeURIComponent(folder || '') + '&quality=' + encodeURIComponent(quality || 'medium'), { method: 'POST', body: file }).then(j),
-  videoImportJob: id => fetch('/api/video-import/job/' + id).then(j),
   // `v` is the poster revision from the job — a retrim rewrites the same path, so without it
   // the browser serves the pre-trim frame from cache and the trim looks like it did nothing.
   videoImportFrameUrl: (id, ix, v) => '/api/video-import/job/' + id + '/frame/' + ix + (v ? '?v=' + v : ''),
   videoImportAtUrl: (id, t) => '/api/video-import/job/' + id + '/at?t=' + Number(t).toFixed(2),
-  videoImportTrim: (id, ix, start, end) => fetch('/api/video-import/job/' + id + '/shot/' + ix, { method: 'POST', ...opts({ start, end }) }).then(j),
-  videoImportSheet: (id, shot, step) => fetch('/api/video-import/job/' + id + '/sheet', { method: 'POST', ...opts({ shot, step }) }).then(j),
   videoImportSheetUrl: (id, sid) => '/api/video-import/job/' + id + '/sheet/' + sid,
-  videoImportSheetDiscard: (id, sid) => fetch('/api/video-import/job/' + id + '/sheet/' + sid + '/discard', { method: 'POST' }).then(j),
-  videoImportSave: (id, indices, sheets) => fetch('/api/video-import/job/' + id + '/save', { method: 'POST', ...opts({ indices, sheets }) }).then(j),
-  videoImportDiscard: id => fetch('/api/video-import/job/' + id + '/discard', { method: 'POST' }).then(j),
   deleteFolder: (pid, name) => fetch('/api/context/' + pid + '/folder?name=' + encodeURIComponent(name), { method: 'DELETE' }).then(j),
   // story → shots
   story: pid => fetch('/api/story/' + pid).then(j),
@@ -180,8 +155,6 @@ export const api = {
   addShot: (pid, shot) => fetch('/api/story/' + pid + '/shots', { method: 'POST', ...opts(shot) }).then(j),
   patchShot: (pid, id, patch, log) => fetch('/api/story/' + pid + '/shots/' + encodeURIComponent(id), { method: 'PATCH', ...opts({ patch, log }) }).then(j),
   deleteShot: (pid, id) => fetch('/api/story/' + pid + '/shots/' + encodeURIComponent(id), { method: 'DELETE' }).then(j),
-  // groq
-  transcribe: file => fetch('/api/groq/transcribe?name=' + encodeURIComponent(file.name), { method: 'POST', body: file }).then(j),
   // opts { provider:'groq'|'fal', depth:'quick'|'deep' } override the Settings default per call
   analyzeAsset: (scope, name, folder, o) => fetch('/api/assets/' + scope + '/analyze', { method: 'POST', ...opts({ name, folder: folder || '', ...(o || {}) }) }).then(j),
   saveMeta: (scope, name, folder, meta) => fetch('/api/assets/' + scope + '/meta', { method: 'PUT', ...opts({ name, folder: folder || '', meta }) }).then(j),
@@ -193,11 +166,6 @@ export const api = {
   createLibraryFolder: name => fetch('/api/library/folder', { method: 'POST', ...opts({ name }) }).then(j),
   deleteLibraryFolder: name => fetch('/api/library/folder?name=' + encodeURIComponent(name), { method: 'DELETE' }).then(j),
   copyAsset: (fromScope, name, folder, toScope, toFolder) => fetch('/api/library/copy', { method: 'POST', ...opts({ fromScope, name, folder, toScope, toFolder }) }).then(j),
-  // control maps — any still → depth / edges / pose / cutout, written to library/control
-  controlKinds: () => fetch('/api/control/kinds').then(j),
-  controlMaps: () => fetch('/api/control').then(j),
-  deriveControl: body => fetch('/api/control/derive', { method: 'POST', ...opts(body) }).then(j),
-  deleteControl: name => fetch('/api/control/' + encodeURIComponent(name), { method: 'DELETE' }).then(j),
   // prompt builder
   prompts: () => fetch('/api/prompts').then(j),
   savePrompt: (name, prompt, axes) => fetch('/api/prompts', { method: 'POST', ...opts({ name, prompt, axes }) }).then(j),
@@ -208,9 +176,6 @@ export const api = {
   patchSnippet: (file, patch) => fetch('/api/snippets/' + encodeURIComponent(file), { method: 'PATCH', ...opts(patch) }).then(j),
   deleteSnippet: file => fetch('/api/snippets/' + encodeURIComponent(file), { method: 'DELETE' }).then(j),
   seedSnippets: () => fetch('/api/snippets/seed', { method: 'POST' }).then(j),
-  // remotion handoff + export pack
-  openRemotion: pid => fetch('/api/remotion/open', { method: 'POST', ...opts({ pid }) }).then(j),
-  exportPack: pid => fetch('/api/export/' + pid, { method: 'POST' }).then(j),
   // Agent setup. `provider` is 'claude' | 'codex'; omit it to act on the active agentCommand.
   testAgent: provider => fetch('/api/agent/test' + (provider ? '?provider=' + provider : '')).then(j),
   agentStatus: provider => fetch('/api/agent/status' + (provider ? '?provider=' + provider : '')).then(j),
@@ -235,8 +200,6 @@ export const api = {
   // renders a sample frame for a style — {fragment, subject?, model?, aspect?} → {dataUrl, model, cost}.
   // Costs real money and can take ~30s; the result is held in the draft until the style is saved.
   styleLockPreview: body => fetch('/api/stylelocks/preview', { method: 'POST', ...opts(body) }).then(j),
-  // prompt enhancement (Quick Generate) — { text, mode:'quick'|'full' } → { text }
-  enhance: (text, mode) => fetch('/api/enhance', { method: 'POST', ...opts({ text, mode }) }).then(j),
   // project memory (hot cache)
   getMemory: pid => fetch('/api/memory/' + pid).then(j),
   saveMemory: (pid, content) => fetch('/api/memory/' + pid, { method: 'PUT', ...opts({ content }) }).then(j),
@@ -247,26 +210,7 @@ export const api = {
   // References/Assets folder classification overrides
   folderKinds: pid => fetch('/api/folders/' + pid).then(j),
   setFolderKind: (pid, folder, kind) => fetch('/api/folders/' + pid, { method: 'PUT', ...opts({ folder, kind }) }).then(j),
-  // remotion library — compositions, presets, render queue, thumbnails, jobs (RemotionLibrary.jsx)
-  remotionCompositions: refresh => fetch('/api/remotion/compositions' + (refresh ? '?refresh=1' : '')).then(j),
-  remotionPresets: comp => fetch('/api/remotion/presets?comp=' + encodeURIComponent(comp || '')).then(j),
-  remotionSavePreset: (comp, name, props) => fetch('/api/remotion/presets', { method: 'POST', ...opts({ comp, name, props }) }).then(j),
-  remotionDeletePreset: file => fetch('/api/remotion/presets/' + encodeURIComponent(file), { method: 'DELETE' }).then(j),
-  remotionRender: body => fetch('/api/remotion/render', { method: 'POST', ...opts(body) }).then(j),
-  remotionPreview: (comp, props) => fetch('/api/remotion/preview', { method: 'POST', ...opts({ comp, props }) }).then(j),
-  remotionStudio: () => fetch('/api/remotion/studio').then(j),
-  remotionStudioStart: () => fetch('/api/remotion/studio', { method: 'POST', ...opts({}) }).then(j),
-  remotionStudioStop: () => fetch('/api/remotion/studio', { method: 'DELETE' }).then(j),
-  remotionThumbs: comps => fetch('/api/remotion/thumbs', { method: 'POST', ...opts(comps ? { comps } : {}) }).then(j),
-  remotionJobs: () => fetch('/api/remotion/jobs').then(j),
-  // validate a candidate project path before committing it to settings, and find a MotionKit
-  // checkout for the cold-start case
-  remotionProbe: p => fetch('/api/remotion/probe?path=' + encodeURIComponent(p || '')).then(j),
-  remotionSuggest: () => fetch('/api/remotion/suggest').then(j),
   // ── normalized per-model input schemas (ticket 04) — fallback:true in the response means
-  // "no synced spec, render the generic FormatControls instead"; never an error status.
-  modelSchema: id => fetch('/api/catalog/model-schema?id=' + encodeURIComponent(id)).then(j),
-  syncModelSchema: id => fetch('/api/catalog/model-schema/sync?id=' + encodeURIComponent(id), { method: 'POST' }).then(j),
   // ── server-side grid split (ticket 06) — writes child generation records per kept cell;
   // body: { rows?, cols?, gutter?, skip?: ['r-c'], shots?: { 'r-c': shotId } }
   splitGrid: (pid, id, body) => fetch('/api/generations/' + encodeURIComponent(pid) + '/' + encodeURIComponent(id) + '/split-grid', { method: 'POST', ...opts(body || {}) }).then(j),

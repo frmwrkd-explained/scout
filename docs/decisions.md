@@ -118,3 +118,11 @@ Deleted 22 test files whose subject no longer exists. **Salvaged two** that T01'
 - `phase-windows-spawn.test.mjs` — only two of thirteen were film (video/remotion win32 branches). The structural ones ("no backend module spawns a resolved binary without `planLaunch`") fail on *any* host if someone adds a raw spawn back, and apply to whatever Scout spawns next.
 
 In both files the removed block is replaced by a comment saying what it guarded and why the rule still holds. A deleted test with no trace is a rule nobody knows they are breaking.
+
+### Dictation was nearly stripped by accident
+**Q:** Deleting `backend/groq.mjs`'s film functions also removed `transcribe()` and its route. `frontend/VoiceInput.jsx` — a `docs/06_REUSE.md` keeper — calls it.
+**Choice:** Restored `transcribe()` and `POST /api/groq/transcribe`.
+**Why:** Dictation is not film. `GOAL.md`'s first-run interview is voice-enabled and `docs/06_REUSE.md` names `VoiceInput` as a take, so the route is a Scout capability that happened to live in a mostly-film file. Caught only by cross-checking every `api.js` method against the surviving routes — the mic button would otherwise have shipped 404ing, which is worse than either keeping or removing it. FrameForge's second engine (local Parakeet, `localAsr.mjs`) did go, so there is one engine and a plain error rather than a fallback ladder.
+
+### `frontend/api.js` trimmed to the surviving routes
+48 of 95 client methods pointed at routes that no longer exist (`reel*`, `remotion*`, `videoImport*`, `control*`, `falCatalog`, `modelSchema`, …). Removed, and every remaining method's path was verified against a live backend module. A client method for a deleted route is a 404 waiting for a caller, and it is also a lie about what the app can do.

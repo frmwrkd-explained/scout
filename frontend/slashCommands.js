@@ -3,29 +3,26 @@
 // The slash menu was a flat snippet list. This makes it two levels:
 //
 //   /              → snippets (unchanged, still first) + the group rows below
-//   /model nano    → the model catalog, filtered
-//   /look harbor   → saved style locks
-//   /camera push   → camera movements
-//   /angle low     → camera angles (the `framing` axis — see DEV-129)
 //
 // PURE MODULE. No React, no DOM: the tree is data plus a filter, so it can be unit-tested and so
 // MentionText stays a renderer. The `apply` side-effect is supplied by the composer, which owns the
 // state being mutated — a command must never reach into a surface directly.
 //
 // SNIPPETS STAY TEXT, GROUPS STAY STATE. Picking a snippet splices text into the prompt, exactly as
-// before. Picking a group item mutates composer state (model, look, movement, angle) and inserts
-// NOTHING — those are prompt fragments composed in at generate time, and injecting them as literal
-// text would double them into the outgoing prompt.
+// before. Picking a group item mutates composer state and inserts NOTHING — those are prompt
+// fragments composed in at generate time, and injecting them as literal text would double them
+// into the outgoing prompt.
 //
 // One registry, deliberately NOT a second one: the ⌘K Palette builds its own list inline
 // (frontend/Palette.jsx `items()`) because it navigates the app, while this one configures a
 // composer. They share no items. If they ever do, this is the file that should grow a shared
 // source, not a copy. (A third registry, frontend/commands.js, was written for exactly that
 // sharing and never wired to anything — deleted 2026-08-02. Keybindings are frontend/keymap.js.)
-
-import { enabledCatalog, modelKind } from './models.js';
-import { CAMERA_MOVEMENTS } from './cameraMovements.js';
-import { AXES } from './models.js';
+//
+// /model (the model catalog), /camera + /angle (camera movements/angles), and the saved-style
+// group were removed with the film domain's catalog data and style-lock files. commandGroups()
+// below pushes nothing today; it still returns a list of groups so a future Scout-specific group
+// is a `push`, not a rewrite.
 
 // ── frecency ──
 // Usage counts per kind, in localStorage. Not settings.md: this is a per-machine habit, it changes
@@ -66,54 +63,17 @@ export function filterItems(items, q, kind) {
 }
 
 // ── the tree ──
-// `ctx` is what the composer knows: its settings (for the catalog), the looks list, and the
-// fragmentProps callbacks that own each piece of state.
+// `ctx` is what the composer knows: the fragmentProps callbacks that own each piece of state.
 export function commandGroups(ctx = {}) {
-  const { settings = {}, looks = [], fp = {}, onModel = null, video = null } = ctx;
+  const { fp = {} } = ctx;
   const out = [];
 
-  if (onModel) {
-    const models = enabledCatalog(settings).flatMap(g => g.models)
-      .filter(m => video == null ? true : (modelKind(m.id) === 'video') === !!video);
-    out.push({
-      id: 'model', label: '/model', hint: 'pick a model',
-      items: models.map(m => ({ id: m.id, label: m.label, sub: (m.note || '') })),
-      // `text` is the prompt with the command already stripped. The model setter goes through
-      // the composer's own set(), which merges into a CAPTURED value object — so writing the model
-      // and the cleaned prompt as two calls made the second clobber the first (the command text
-      // stayed in the field). They must land in one write; the other groups set surface state, not
-      // composer value, and are unaffected.
-      apply: (it, text) => { bumpUse('model', it.id); onModel(it.id, text); }
-    });
-  }
-  if (fp.onLook) {
-    out.push({
-      id: 'look', label: '/look', hint: 'apply a saved style',
-      items: (looks || []).map(l => ({ id: l.id, label: l.name, sub: l.fragment || '' })),
-      apply: it => { bumpUse('look', it.id); fp.onLook(it.id); }
-    });
-  }
-  if (fp.onMove) {
-    out.push({
-      id: 'camera', label: '/camera', hint: 'camera movement',
-      items: CAMERA_MOVEMENTS.map(m => ({ id: m.id, label: m.name, sub: m.description || '' })),
-      apply: it => { bumpUse('camera', it.id); fp.onMove(it.id); }
-    });
-  }
-  if (fp.onAngle) {
-    const tokens = (AXES.find(a => a.key === 'framing') || { tokens: [] }).tokens || [];
-    out.push({
-      id: 'angle', label: '/angle', hint: 'camera angle',
-      items: tokens.map(t => ({ id: t.t, label: t.t, sub: t.d || t.f || '', thumb: t.img })),
-      apply: it => { bumpUse('angle', it.id); fp.onAngle(it.id); }
-    });
-  }
   return out;
 }
 
-// Split a slash token into [groupId, rest]. `/model nano banana` → ['model', 'nano banana'].
+// Split a slash token into [groupId, rest]. `/group item name` → ['group', 'item name'].
 // A token with no space is not yet a group entry — it is still filtering the top level, so that
-// typing "/mo" narrows the group ROWS rather than jumping into one prematurely.
+// typing a partial group id narrows the group ROWS rather than jumping into one prematurely.
 export function splitToken(token, groups) {
   const s = String(token || '');
   const sp = s.indexOf(' ');
