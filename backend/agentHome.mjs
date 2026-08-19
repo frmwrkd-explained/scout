@@ -40,7 +40,11 @@ import { listUserTools, mountName } from './userTools.mjs';
 // The already-authored system router skill. Its canonical source is the backend source tree; we copy
 // it fresh into every session home and never edit it. fileURLToPath (not URL.pathname) so a repo path
 // containing spaces — this one does — resolves without percent-encoding.
-const SYSTEM_SKILLS_SRC = path.join(path.dirname(fileURLToPath(import.meta.url)), 'skills');
+// CLAUDE.md's source-of-truth table names `skills/scout-router/` canonical: the repo root, not
+// backend/. The app copies it fresh into every session home on each run (copyTree below), so a
+// tamper in a mounted copy never persists — which is only true while this points at the one
+// canonical source.
+const SYSTEM_SKILLS_SRC = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'skills');
 const SYSTEM_ROUTER_SRC = path.join(SYSTEM_SKILLS_SRC, 'scout-router');
 export function systemRouterDir() { return SYSTEM_ROUTER_SRC; }
 

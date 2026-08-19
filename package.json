@@ -40,6 +40,7 @@
       "desktop/**",
       "backend/**",
       "shared/**",
+      "skills/**",
       "dist/**",
       "package.json"
     ],
