@@ -1,25 +1,13 @@
 node_modules/
 dist/
 release/
-.DS_Store
-._*
-*.log
-config.md
-workspace/
-
-# Credentials. `.env` alone does NOT match `.env.bak.<ts>`, which is what the key-rotation
-# script writes — two of those were sitting untracked with live FAL/Groq keys in them on
-# 2026-07-29 and would have been committed by a `git add -A`. Ignore the whole family and
-# re-admit only the example.
 .env
 .env.*
 !.env.example
+*.log
+.DS_Store
 
-# design reference bundle — a copy of ~/Downloads/frameforge-redesign, not app code
-frameforge-redesign DESIGN EXMPLE/
-
-# Local Cloudflare/miniflare emulator state for the landing page's R2 bucket. This is the blob
-# table the beta bug-report screenshots upload into during local dev, so it holds real captures —
-# binary, machine-local, and never source. It was untracked and unignored on 2026-07-30, meaning
-# one `git add -A` would have put dev screen captures into permanent history.
-.wrangler/
+# a workspace is a user's data — never in this repo
+workspace/
+.scout/index/
+.scout/cache/computed.json

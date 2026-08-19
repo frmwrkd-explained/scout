@@ -24,6 +24,7 @@ FrameForge's own `CLAUDE.md`, `README.md` and `ISSUES.md` are preserved as `docs
 | Territory scoring | `backend/territory.mjs` | Sole writer of `yield` / `hit_rate` — never set by hand |
 | The agent's view of the app | `backend/agentIndex.mjs` | Adding a capability is a new Index line, never a router-skill edit |
 | HTTP contract | `backend/index.mjs` route handlers | A field a route does not destructure does not exist |
+| The router skill | `skills/scout-router/` | **Canonical source.** The app copies it fresh into every agent session home on each run, so a tamper never persists. Edit it here, never in a mounted copy. |
 | Event log | `backend/log.mjs` | Append-only, one file per day. Every mutation lands here. |
 | Design tokens | `frontend/styles.css` `:root` | Machine truth. Light/dark are two token sets, one contract. |
 | UI primitives | `frontend/ui.jsx` | Import them. Never re-render their markup by hand. |

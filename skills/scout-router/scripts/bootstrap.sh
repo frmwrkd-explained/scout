@@ -26,6 +26,9 @@ node "$HERE/refresh.mjs" "$WS"
 if [ ! -d "$WS/.git" ]; then
   git -C "$WS" init -q
   git -C "$WS" symbolic-ref HEAD refs/heads/main 2>/dev/null || true
+  # a fresh machine often has no git identity — set a local one so this never fails
+  git -C "$WS" config user.name  "$WHO"
+  git -C "$WS" config user.email "${WHO// /.}@scout.local"
   cat > "$WS/.gitignore" <<'GI'
 .DS_Store
 .scout/index/
