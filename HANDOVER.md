@@ -1,6 +1,6 @@
 # HANDOVER — Scout, as of 2026-08-19
 
-You are taking over a partially-built app. **M0 is done. M1 is about half done. M2–M5 are untouched.**
+You are taking over a partially-built app. **M0 is done and its exit criterion is met — `npm test` is green (356 tests, 354 pass, 2 skipped) with the film domain gone, and the app boots and renders real data. M1 is about half done. M2–M5 are untouched.**
 
 This file tells you exactly where things stand, what was decided, and what will bite you. It does not replace the spec — it tells you how the spec has actually been applied so far.
 
@@ -37,7 +37,7 @@ Then `docs/02_DATA_MODEL.md`. Read `03_MEMORY.md` at M3 and `04_AGENT_CONTRACT.m
 **There is a table surface, and it is NOT T04 or T05.** I built `frontend/TableView.jsx`, `Inspector.jsx`, `cells.jsx`, `Freshness.jsx` and `Rail.jsx` out of task order, because the owner asked to see something rather than an empty shell. They work and they are wired to real routes, but they are a *read-only collection table*, not the tasks they resemble:
 
 - **T04 (document surface) is NOT started.** There is no document surface at all. No properties-collapsed-on-open, no `Editor | Raw` toggle, no editable typed rows, no `+ Add property`, no `ConflictNotification`/`DiffView`, no summary block. Clicking a row fills the inspector; it does not open the record. **Read `tasks/T04-document-surface.md` and build it properly.** `cells.jsx` is read-only by design and is the right place to add the editors.
-- **T05 (inspector) is NOT complete.** The five sections exist in the right order with counts, and `REFERENCED BY` is visually distinct from `LINKS` as the task requires. But `HISTORY` is a stub (it needs M2's event log) and **`REFERENCED BY` is computed client-side from the currently-loaded rows of the active collection only** — so a guest referenced by a territory, a learning and a project brief will show **nothing**, which is exactly T05's Demonstrate case. That needs a backend route that scans all documents for relation values pointing at this slug. It is the single biggest known-wrong thing in the codebase.
+- **T05 (inspector) is nearly complete.** Five sections in the right order with counts, `REFERENCED BY` visually distinct from `LINKS`, and backlinks now come from a real backend query that crosses collections and picks up memory objects that are in no collection at all. `HISTORY` remains a stub until M2's event log exists — that is the only piece left.
 
 ### Not started
 
@@ -51,9 +51,9 @@ Then `docs/02_DATA_MODEL.md`. Read `03_MEMORY.md` at M3 and `04_AGENT_CONTRACT.m
 
 Fix or accept these deliberately. None of them is hidden.
 
-1. **~30 tests were failing at handover.** A subagent was mid-repair on `tests/` when this was written. Run `npm test` first and see where it landed. The failures are obsolete tests (deleted features), not product regressions — but *verify* that rather than believing it.
+1. **The suite is green: 356 tests, 354 pass, 0 fail, 2 skipped** (the two skips are Windows-only launch paths, expected). Sweep `._*` first or you will chase three phantom failures. Getting here surfaced **two real product regressions**, both now fixed and recorded in `docs/decisions.md` — `syncAssets` had silently stopped excluding reference folders, and `CORE_API_ROUTES` was advertising 17 deleted routes to every agent session.
 2. **`collections.mjs`, `documents.mjs` and `views.mjs` have no tests.** I demonstrated them by curl, which `docs/07_BUILD_ORDER.md` accepts as the Demonstrate step, but its Definition of Done also says *"it has a test if it is logic"* and this is logic. **Write `tests/phase-collections.test.mjs` before building on top.** The assertion that matters most: **frontmatter wins over the computed cache** (T02 step 5 says assert it).
-3. **`REFERENCED BY` is wrong across collections** — see §1.
+3. ~~`REFERENCED BY` is wrong across collections~~ — **fixed.** `GET /api/document/references` now scans every document for declared relations and loose frontmatter pointers. Verified against the seeded workspace: `data/groups/nurses-ph.md` returns 5 referencing guests via `found_in`. T05's Demonstrate case passes.
 4. **T03's Demonstrate is not fully performed.** Two saved views returning different rows: yes, visible in the UI. A subtable listing only one guest's messages: the `bind` mechanism is implemented and the route takes `?bind=`, but there is no `message` collection to prove it with. "Delete `.scout/cache/` and everything still resolves": true by construction (every read recomputes) but not demonstrated.
 5. **The seeded workspace is built and loads.** 30 files under `workspace/` — 14 guests (8 needs-review, 2 shortlist, 2 contacted, 1 replied, 1 won), 8 groups, 3 goals, `me.md`, and 6 saved views across two collections. Content is mined from the design's own scenario. Law 4 is verified in the data: every record past `shortlist` carries `updated_by: crystal`. It is gitignored, so it is not in history — if you lose it, `docs/decisions.md` records how it was built. **Writing it against the spec surfaced seven ambiguities in `docs/02_DATA_MODEL.md`, recorded in `docs/decisions.md`. Two are spec bugs worth fixing before M2** — `multiselect` silently requires a declared `options[]` (which makes it not really a tag field), and §3 shows one view object but never the file that holds several.
 6. **`frontend/api.js` was trimmed to the surviving routes**, and 48 dead methods removed. If you add a route, add the method — and if you delete one, check `api.js`. That check is what caught dictation being stripped by accident.
