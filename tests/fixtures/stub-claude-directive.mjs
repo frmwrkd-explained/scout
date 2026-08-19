@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Test fixture — a `claude`-family stub that scripts a `frameforge` directive fence into its reply,
+// Test fixture — a `claude`-family stub that scripts a `scout` directive fence into its reply,
 // to exercise ticket-12 stream-side detection/parsing/persistence. Basename contains "claude" so the
 // runner classifies it as the claude (NDJSON stream) runner.
 //
@@ -15,8 +15,8 @@ const chunkSize = Number(process.env.STUB_CHUNK || 6);
 const sid = 'stub-dir-1';
 
 const fence = scenario === 'malformed'
-  ? '```frameforge\n{ this is not json }\n```'
-  : '```frameforge\n{"type":"show.style","ref":"s1"}\n```';
+  ? '```scout\n{ this is not json }\n```'
+  : '```scout\n{"type":"show.style","ref":"s1"}\n```';
 const full = 'Here is the look I locked:\n\n' + fence + '\n\nWant me to apply it?';
 
 const line = o => process.stdout.write(JSON.stringify(o) + '\n');

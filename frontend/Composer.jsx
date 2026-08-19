@@ -12,9 +12,9 @@
 // `density` prop, read the handover first: you are re-introducing the thing this deleted.
 //
 // CONTROLLED AND PRESENTATIONAL. It owns no fetching, no persistence, and no submit path — it
-// reads `value` and calls `onChange` with the FULL merged object (same contract as FormatControls
-// and SchemaForm, deliberately). Submitting stays with the surface, because the two wire routes are
-// NOT interchangeable and the choice between them is real logic:
+// reads `value` and calls `onChange` with the FULL merged object. Submitting stays with the
+// surface, because the two wire routes are NOT interchangeable and the choice between them is real
+// logic:
 //
 //   variantCount === 1  → POST /api/generate  (backend/index.mjs:685)
 //   variantCount  >  1  → POST /api/batches   (backend/index.mjs:252)
@@ -25,36 +25,19 @@
 //
 // REUSE LEDGER — everything below is imported, not re-rendered:
 //   Btn                      ./ui                    the Generate button
-//   ModelPicker              ./GenerationControls    the grouped model list in the TECH popover
-//   modelName                ./GenerationControls    model id → human label (never .split('/').pop())
-//   SchemaForm               ./SchemaForm            per-model fields, from the synced fal spec
 //   SnippetText              ./SnippetText           the prompt field (/ snippets, keymap guards)
 //   VoiceInput               ./VoiceInput            dictation
-//   estCost, modelById       ./models                pricing + catalog facts
 //   MONO                     ./tokens                the mono face (five files re-declare it; this
 //                                                    one imports it — do not add a sixth copy)
 //   .glass/.glassPop/.glassPill/.dlTick, .hBd/.hRow/.hFg/.hBtnAccent   styles.css
-//
-// NOT hardcoded here, on purpose: any model's resolutions, durations, aspects or params. Those come
-// from api.modelSchema(id) via SchemaForm. `fallback:true` means "no synced spec — render the
-// generic FormatControls", not an error (frontend/api.js:202-203).
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { sx } from './sx';
 import { Btn } from './ui';
-import { ModelPicker, modelName } from './GenerationControls';
-import SchemaForm from './SchemaForm';
 import MentionText from './MentionText';
 import VoiceInput from './VoiceInput';
-import { estimateCost, OUTPUT_KINDS, outputKindForModel, defaultModelForOutputKind, aspectLabel, AXES } from './models';
-import { CAMERA_MOVEMENTS, MOVE_SPEEDS, MOVE_STABILIZATIONS } from './cameraMovements';
-import { buildAssetPool } from './entities';
-import { durationField, durationChoices, durationParam, blankScene, compileScene, totalFrames, nearestChoice, QUICK_ANGLES, QUICK_MOVES } from './sequence';   // DEV-133
-import SequenceEditor from './SequenceEditor';   // DEV-133 — the scene builder's UI
-import { rateOf, secs, DEFAULT_RATE } from '../shared/timecode.mjs';
 import { api } from './api';   // styleLockRefUrl — the look-chip swatch (DEV-129)
 import { useContextMenu } from './ContextMenu';
-import SaveSnippetDialog from './SaveSnippet';
 import { MONO } from './tokens';
 
 // ── ComposerDock ─────────────────────────────────────────────────────────────────────────────
@@ -147,9 +130,8 @@ export function SegmentedControl({ options, value, onChange, size = 'md', style 
 
 // ── BarChip ──────────────────────────────────────────────────────────────────────────────────
 // The pill that sits in the bar's control row and opens a popover (tech, fragments). A genuinely
-// new form — the app's existing `Chip` (GenerationControls.jsx:37 == SchemaForm.jsx:47, byte
-// identical, neither exported) is the 6px-radius *option* chip used INSIDE popovers, a different
-// control. This is the 999px trigger pill. Do not merge them.
+// new form — the app's existing `Chip` (ui.jsx) is the 6px-radius *option* chip used INSIDE
+// popovers, a different control. This is the 999px trigger pill. Do not merge them.
 export function BarChip({ label, icon, on = false, onClick, title }) {
   return (
     <button
@@ -331,7 +313,9 @@ function Popover({ open, onClose, width = 400, align = 'left', resizeKey = null,
 export function EntityPicker({ app, pid, onPick, onClose }) {
   const [scope, setScope] = useState('project'); // 'project' | 'global'
   const [q, setQ] = useState('');
-  const pool = buildAssetPool(app, pid);
+  // entities.js — the pool builder for film production talent/location/prop — was deleted with
+  // the film domain. Scout's record-backed pool arrives at M4; until then this popover is empty.
+  const pool = [];
   const query = q.trim().toLowerCase();
   const shown = pool
     .filter(e => (scope === 'project' ? e.scope === pid : e.scope === 'library'))
@@ -510,165 +494,13 @@ const PopHead = ({ children, right }) => (
   </div>
 );
 
-// ── the tech summary, e.g. "Nano Banana 2 · 16:9 · 1K" ───────────────────────────────────────
-// In the handover this reads the VIDEO form for a video model ("kling-2.5 · 6s · 1080p"). Duration
-// and resolution are read from `params` — i.e. from the model's own synced fal schema via
-// SchemaForm — never from a hardcoded per-model table. ProjectGenerate.jsx:464-471 records why a
-// hardcoded duration picker was deleted ("a lie the UI told the user"): no route destructures
-// `duration`. Via `params` it reaches the provider verbatim (backend/providers.mjs:70-76), which
-// is exactly what the handover's "fields ← fal schema" note asks for.
-function techSummary(value) {
-  const v = value || {};
-  const p = v.params || {};
-  const parts = [modelName(v.model) || 'no model'];
-  const dur = p.duration ?? p.duration_seconds;
-  if (dur != null && dur !== '') parts.push(String(dur).replace(/s?$/, 's'));
-  else {
-    // a model whose schema declares aspect_ratio defaults it to 'auto'; showing "auto" in the bar
-    // is useless — fall back to the composer's own aspect, which is what actually ships.
-    const ar = p.aspect_ratio || p.aspectRatio;
-    // `image_size` is an aspect in FAL's vocabulary, not a size — it belongs in THIS slot, and it
-    // outranks v.aspect because it is what SchemaForm actually put on the payload.
-    parts.push((ar && ar !== 'auto' ? ar : null) || aspectLabel(p.image_size || p.imageSize) || v.aspect || '16:9');
-  }
-  // resolution only — never image_size, which already spoke above. Printing both produced
-  // "16:9 · landscape_4_3": the same fact twice, in two vocabularies, disagreeing.
-  const res = p.resolution || v.resolution;
-  if (res && typeof res === 'string' && res !== 'auto') parts.push(res);
-  return parts.join(' · ');
-}
-
-// ── TechPopoverBody / TechSettings ───────────────────────────────────────────────────────────
-// THE settings surface. The handover is explicit that exactly two popovers exist and "no third
-// popover, no settings page, no per-model UI" — so this is exported rather than kept private, and
-// the Story list's SETTINGS cell opens this same body instead of growing its own picker.
-//
-// `shot` is optional. When present (the Story row), the popover gains a SHOT section for the two
-// fields that belong to the shot record rather than to a generation — type and duration. Model,
-// aspect, resolution and every per-model param below it still come from the synced fal spec via
-// SchemaForm. Nothing here is hardcoded per model.
-export function TechPopoverBody({ settings, value, onChange, shot = null, onShotChange = null, shotTypes = [] }) {
-  const v = value || {};
-  const set = patch => onChange && onChange({ ...v, ...patch });
-  // The OUTPUT filter is DERIVED from the selected model, never stored separately — two sources of
-  // truth for "what am I making" is exactly how a UI ends up claiming Video while a still model is
-  // armed. Picking a model moves the filter; picking a filter picks that kind's default model.
-  const out = v.model ? outputKindForModel(v.model) : (v.outputKind || 'image');
-  const kinds = (OUTPUT_KINDS.find(o => o.key === out) || OUTPUT_KINDS[0]).kinds;
-  const pickKind = key => {
-    const next = defaultModelForOutputKind(settings, key);
-    // params are per-model and never portable across kinds — reset with the model, as the model
-    // picker itself does
-    set({ outputKind: key, model: next, params: {} });
-  };
-  return (
-    <>
-      <PopHead right="fields ← fal schema">TECH</PopHead>
-
-      <div style={sx('padding:0 13px 10px')}>
-        <div style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: '.12em', color: 'var(--fg-faint)', marginBottom: 6 }}>OUTPUT</div>
-        <div style={sx('display:flex;gap:5px;flex-wrap:wrap')}>
-          {OUTPUT_KINDS.map(o => {
-            const on = out === o.key;
-            const has = !!defaultModelForOutputKind(settings, o.key);
-            return (
-              <span
-                key={o.key}
-                onClick={() => has && !on && pickKind(o.key)}
-                title={has ? o.label : 'No enabled ' + o.label.toLowerCase() + ' model — enable one in Settings'}
-                className={on || !has ? '' : 'hBd'}
-                style={{
-                  ...sx('border-radius:6px;padding:4px 10px'), fontFamily: MONO, fontSize: 10,
-                  cursor: has ? (on ? 'default' : 'pointer') : 'not-allowed',
-                  color: on ? 'var(--fg)' : has ? 'var(--fg-muted)' : 'var(--border-3)',
-                  background: on ? 'var(--raise)' : 'transparent',
-                  border: '1px solid ' + (on ? 'var(--border-3)' : 'var(--border-2)'),
-                  fontWeight: on ? 700 : 400, opacity: has ? 1 : .55,
-                }}>{o.label}</span>
-            );
-          })}
-        </div>
-      </div>
-
-      {shot && (
-        <div style={sx('padding:0 13px 11px;border-bottom:1px solid var(--line)')}>
-          <div style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: '.12em', color: 'var(--fg-faint)', marginBottom: 6 }}>SHOT — TYPE · DURATION</div>
-          <div style={sx('display:flex;gap:5px;flex-wrap:wrap;align-items:center')}>
-            {shotTypes.map(t => {
-              const on = (shot.type || '') === t;
-              return (
-                <span key={t} onClick={() => onShotChange && onShotChange({ type: t })} className={on ? '' : 'hBd'}
-                  style={{
-                    ...sx('border-radius:6px;padding:4px 10px;cursor:pointer'), fontFamily: MONO, fontSize: 10,
-                    color: on ? 'var(--fg)' : 'var(--fg-muted)', background: on ? 'var(--raise)' : 'transparent',
-                    border: '1px solid ' + (on ? 'var(--border-3)' : 'var(--border-2)'), fontWeight: on ? 700 : 400,
-                  }}>{t}</span>
-              );
-            })}
-            <input
-              type="number" min={1} max={60} value={shot.dur ?? ''}
-              onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}
-              onChange={e => {
-                const n = e.target.value === '' ? '' : Math.max(1, Math.min(60, Number(e.target.value) || 1));
-                onShotChange && onShotChange({ dur: n === '' ? null : n });
-              }}
-              style={{ ...sx('background:var(--ink);border:1px solid var(--border-2);border-radius:6px;color:var(--fg);padding:4px 8px;width:58px;margin-left:auto'), fontFamily: MONO, fontSize: 10, fontVariantNumeric: 'tabular-nums' }}
-            />
-            <span style={{ fontFamily: MONO, fontSize: 9.5, color: 'var(--fg-faint)' }}>sec</span>
-          </div>
-        </div>
-      )}
-
-      {/* picking a model IS picking the type — video={null} renders every catalog group
-          (IMAGE · PREVIEW / RENDER / EDIT, VIDEO, AUDIO · MUSIC / VOICE / SOUND FX) */}
-      <ModelPicker
-        settings={settings}
-        value={v.model || ''}
-        kinds={kinds}
-        maxHeight={shot ? 180 : 230}
-        onChange={id => set({ model: id, outputKind: outputKindForModel(id), params: {} })}
-      />
-      <div style={sx('border-top:1px solid var(--line)')}>
-        <SchemaForm
-          modelId={v.model}
-          value={v.params || {}}
-          onChange={params => set({ params })}
-          format={{
-            value: { aspect: v.aspect, resolution: v.resolution, seed: v.seed, variantCount: v.variantCount },
-            onChange: next => set(next),
-            showSeed: true,
-            showVariants: true,
-          }}
-        />
-      </div>
-    </>
-  );
-}
-
-// The anchored trigger + popover as one unit, for surfaces that just want "a settings chip here".
-export function TechSettings({ label, settings, value, onChange, shot, onShotChange, shotTypes, width = 400, align = 'left' }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <span style={sx('position:relative')} onClick={e => e.stopPropagation()}>
-      <span
-        onClick={() => setOpen(o => !o)} className="hFg" title="Settings"
-        style={{ ...sx('cursor:pointer;display:inline-block'), fontFamily: MONO, fontSize: 10.5, color: open ? 'var(--fg)' : 'var(--fg-muted)', fontVariantNumeric: 'tabular-nums' }}
-      >{label}</span>
-      <Popover open={open} onClose={() => setOpen(false)} width={width} align={align}>
-        <TechPopoverBody settings={settings} value={value} onChange={onChange} shot={shot} onShotChange={onShotChange} shotTypes={shotTypes} />
-      </Popover>
-    </span>
-  );
-}
-
-
 // ── FragmentsPopoverBody ─────────────────────────────────────────────────────────────────────
 // THE ✦ fragments surface, shared. It is a component, not a render prop, precisely so that every
 // surface shows the SAME thing — a per-surface `renderFragments` callback is how three different
 // fragment panels grow again, which is the whole problem this composer exists to end.
 //
-// PROMPT PIECES ONLY: style, camera movement, speed, execution. References are attachments and
-// live behind "+ Ref" in the bar; they are not fragments and must not be dumped in here.
+// PROMPT PIECES ONLY: style. References are attachments and live behind "+ Ref" in the bar; they
+// are not fragments and must not be dumped in here.
 //
 // STYLE shows FAVOURITES ONLY. A project accumulates dozens of saved looks and listing them all
 // turns the popover into a wall — the composer's job is fast recall of the handful you actually
@@ -684,24 +516,11 @@ export function TechSettings({ label, settings, value, onChange, shot, onShotCha
 //   activeLookId   the shot's own look, '' / null = project default
 //   projectLock    the project's lock, shown as the default row's label
 //   onLook         (id) => void — '' selects the project default
-//   move/speed/stab + onMove/onSpeed/onStab   camera movement fragment
-// CAMERA and ANGLE show a QUICK SET, not the catalog. The full CAMERA_MOVEMENTS list is 20 chips
-// and rendering it here is exactly the wall the handover's "do not overwhelm" rule bans — the design
-// frame shows five presets. The quick sets are what a director reaches for constantly; the whole
-// library is one click away ("Browse all" inline, "Camera library" for the real tool).
 //
-// Both lists live in frontend/sequence.js and are imported, not declared here: the shot list offers
-// the same pickers per shot, and two copies of "what counts as quick" drift within a week.
-//
-// DEV-129 — CAMERA ANGLE. Angles are NOT a new catalog: they are the `framing` axis that already
-// lives in the 8-axis system (frontend/models.js AXES), already sits in lookBuilder's
-// CAMERA_AXIS_KEYS, already carries a prompt fragment and a one-line description per token, and
-// already has all twelve thumbnails checked in under public/axis-options/framing--*.jpg. The gap
-// was only that the composer's ✦ panel never surfaced it — you had to open StyleLab's CAMERA tab
-// to reach an angle. Adding a CAMERA_ANGLES file would have been a second source of truth for the
-// same twelve tokens; this reads the canonical one.
-const ANGLE_AXIS = () => AXES.find(a => a.key === 'framing') || { tokens: [] };
-
+// move/speed/stab/onMove/onSpeed/onStab/angle/onAngle/video stay in the signature, accepted and
+// unused: they fed the camera-movement and camera-angle quick-set sections, which were film-only
+// and were removed along with their catalog data files. A caller may still pass them; nothing
+// here reads them. Scout's own fragment model, if any, arrives later.
 export function FragmentsPopoverBody({
   app, pid, looks = [], activeLookId, projectLock = null, onLook,
   move = null, speed = 'normal', stab = 'smooth', onMove, onSpeed, onStab,
@@ -716,14 +535,6 @@ export function FragmentsPopoverBody({
     if (app && app.openStyleLockPicker) return app.openStyleLockPicker(pid, tab);
   };
   const [allLooks, setAllLooks] = useState(false);
-  const [allCams, setAllCams] = useState(false);
-  const [allAngles, setAllAngles] = useState(false);
-  // DEV-129 mode-aware collapse: a still frame has no motion, and cameraFragment() already drops
-  // the movement half for image models (lookBuilder.js:154-157) — so on an image model the whole
-  // section was UI for something the prompt would discard. Collapsed by default there, open for
-  // video, and expandable either way because a user may be about to switch models.
-  const [moveOpen, setMoveOpen] = useState(!!video);
-  useEffect(() => { setMoveOpen(!!video); }, [video]);
   const favs = looks.filter(l => l.fav);
   const FALLBACK = 4;
   // a look saved from a whole generation prompt carries that prompt as its NAME — chip it at a
@@ -795,81 +606,13 @@ export function FragmentsPopoverBody({
         {(app || onOpenStyleLab) && link('Manage style locks →', () => openLab('styles'))}
         {(app || onOpenStyleLab) && link('New style →', () => openLab('style'))}
       </div>
-
-      {/* DEV-129 — CAMERA ANGLE, from the canonical `framing` axis. Picture tiles, not text chips:
-          an angle is a thing you recognise faster than you read, and the thumbnails already exist.
-          Only rendered when the surface wires onAngle, so a composer that has no camera state
-          (plain chat) is unchanged. */}
-      {onAngle && (() => {
-        const tokens = ANGLE_AXIS().tokens || [];
-        const list = allAngles ? tokens : tokens.filter(t => QUICK_ANGLES.includes(t.t) || t.t === angle);
-        return (
-          <>
-            {head(allAngles ? 'CAMERA ANGLE — ALL ' + tokens.length : 'CAMERA ANGLE')}
-            <div style={sx('display:flex;gap:6px;flex-wrap:wrap')}>
-              {list.map(t => {
-                const on = angle === t.t;
-                return (
-                  <span key={t.t} onClick={() => onAngle(on ? null : t.t)} title={t.d || t.f} className={on ? '' : 'hBd'}
-                    style={{
-                      ...sx('display:flex;flex-direction:column;gap:3px;border-radius:7px;padding:3px;cursor:pointer;width:62px'),
-                      border: '1px solid ' + (on ? 'var(--accent)' : 'var(--border-2)'),
-                      background: on ? 'var(--accent-05)' : 'transparent'
-                    }}>
-                    {t.img
-                      ? <img src={t.img} alt="" loading="lazy" style={sx('width:100%;height:34px;object-fit:cover;border-radius:4px;display:block')} />
-                      : <span style={sx('height:34px;border-radius:4px;background:var(--sunk)')} />}
-                    <span style={{ fontFamily: MONO, fontSize: 7.5, lineHeight: 1.25, color: on ? 'var(--accent)' : 'var(--fg-muted)', textAlign: 'center' }}>{t.t}</span>
-                  </span>
-                );
-              })}
-            </div>
-            <div style={sx('display:flex;gap:12px;margin-top:8px;flex-wrap:wrap')}>
-              {!allAngles && tokens.length > list.length && link('Browse all ' + tokens.length + ' →', () => setAllAngles(true))}
-              {allAngles && link('← quick set', () => setAllAngles(false))}
-              {angle && link('clear angle', () => onAngle(null))}
-            </div>
-          </>
-        );
-      })()}
-
-      {/* DEV-129 — the movement section is collapsible and starts closed on an image model, where
-          lookBuilder drops the movement fragment anyway. The header is the toggle. */}
-      <div onClick={() => setMoveOpen(o => !o)} className="hFg" style={sx('cursor:pointer')}>
-        {head((moveOpen ? '▾ ' : '▸ ') + (allCams ? 'CAMERA MOVEMENT — ALL ' + CAMERA_MOVEMENTS.length : 'CAMERA MOVEMENT')
-          + (video ? '' : ' — VIDEO ONLY') + (!moveOpen && move ? ' · ' + move : ''))}
-      </div>
-      {moveOpen && <div style={sx('display:flex;gap:5px;flex-wrap:wrap')}>
-        {(allCams
-          ? CAMERA_MOVEMENTS
-          : CAMERA_MOVEMENTS.filter(m => QUICK_MOVES.includes(m.id) || m.id === move)
-        ).map(m => chip(m.id, m.name, move === m.id, () => onMove && onMove(move === m.id ? null : m.id), m.description))}
-      </div>}
-      {moveOpen && <div style={sx('display:flex;gap:12px;margin-top:8px;flex-wrap:wrap')}>
-        {!allCams && link('Browse all ' + CAMERA_MOVEMENTS.length + ' →', () => setAllCams(true))}
-        {allCams && link('← quick set', () => setAllCams(false))}
-        {app && link('Camera library →', () => app.go && app.go('tools', { toolsSel: 'moves' }))}
-      </div>}
-
-      {moveOpen && move && (
-        <>
-          {head('SPEED')}
-          <div style={sx('display:flex;gap:5px;flex-wrap:wrap')}>
-            {MOVE_SPEEDS.map(sp => chip(sp.id, sp.label, speed === sp.id, () => onSpeed && onSpeed(sp.id), sp.phrase))}
-          </div>
-          {head('EXECUTION')}
-          <div style={sx('display:flex;gap:5px;flex-wrap:wrap')}>
-            {MOVE_STABILIZATIONS.map(st => chip(st.id, st.label, stab === st.id, () => onStab && onStab(st.id), st.phrase))}
-          </div>
-        </>
-      )}
     </div>
   );
 }
 
 // ── Composer ─────────────────────────────────────────────────────────────────────────────────
 // Props:
-//   app            god-class — settings (for ModelPicker), snippets (for SnippetText), showToast
+//   app            god-class — snippets (for SnippetText), showToast
 //   value          { prompt, model, aspect, resolution, seed, variantCount, params, refs }
 //   onChange       (nextValue) => void — receives the FULL merged object
 //   mode           'agent' | 'manual'
@@ -889,10 +632,12 @@ export function FragmentsPopoverBody({
 //   submitLabel    default 'Generate'; the chat agent bar passes 'Send'
 //   placeholder    default matches the handover copy
 //
-//   entities       [{ key, label, thumb, kind }] — the @-mention pool (see entities.js). Typing
-//                  @ in the prompt opens autocomplete over these, and any `@key` token in the
-//                  value renders as an inline thumbnail pill (MentionText). The earlier
-//                  chips-below-the-prompt compromise was rejected by the user; inline is the spec.
+//   entities       [{ key, label, thumb, kind }] — the @-mention pool. Typing @ in the prompt
+//                  opens autocomplete over these, and any `@key` token in the value renders as an
+//                  inline thumbnail pill (MentionText). The earlier chips-below-the-prompt
+//                  compromise was rejected by the user; inline is the spec. FrameForge's pool was
+//                  built over film production entities by a module deleted with the film domain;
+//                  Scout's record-backed pool arrives at M4 — until then this stays [].
 //
 //   mentions       [{ id, label, thumb, onRemove }] — ATTACHED REFERENCES (generation frames),
 //                  rendered as a chip row under the prompt. Distinct from @-mentions: these are
@@ -915,7 +660,7 @@ export default function Composer({
   onMode = null,
   modeDisabled = null,
   pills = [],
-  entities = [],
+  entities = [],   // @-mention pool; Scout's record-backed pool arrives at M4
   pid = null,
   mentions = [],
   fragments = null,
@@ -939,17 +684,14 @@ export default function Composer({
   onCancel = null,
   style,
 }) {
-  const [pop, setPop] = useState(null);     // 'tech' | 'fragments' | null
+  const [pop, setPop] = useState(null);     // 'fragments' | 'view' | null
   // PROMPT · CLEAN → FULL → SEGMENTS, cycled by the one button. CLEAN is what you typed; FULL is
   // what ships, read as one running prompt; SEGMENTS is that same thing broken into the blocks it
-  // was assembled from, each one separately editable and separately savable.
+  // was assembled from, each one separately editable.
   const [view, setView] = useState('clean');
   const full = view !== 'clean';
   const segmented = view === 'segments';
 
-  // the save-to-snippets dialog: { text, name } | null. Opened from the right-click menu on the
-  // prompt field or on a segment, and from a segment row's ⌸ SAVE.
-  const [snippetDraft, setSnippetDraft] = useState(null);
   const menu = useContextMenu();
   const [dragOver, setDragOver] = useState(false);
   const [picker, setPicker] = useState(false); // the ＋ Add more asset-picker popup
@@ -961,97 +703,26 @@ export default function Composer({
 
   const v = value || {};
   const set = patch => onChange && onChange({ ...v, ...patch });
-  const settings = (app && app.state && app.state.settings) || {};
-
-  // ── DEV-133 · SCENE MODE ───────────────────────────────────────────────────────────────────
-  // A structured way to write ONE prompt — segments with timecodes, plus the scene blocks a long
-  // video prompt is built from. See frontend/sequence.js for what the clock is (prompt text) and
-  // what it is not (the model's duration parameter).
-  //
-  // It is NOT gated on the model declaring a duration field any more. It used to be, back when the
-  // feature was a duration picker; the gate meant the whole authoring surface vanished on any model
-  // whose fal spec had not been synced, which is most of them. The rule the gate protected — never
-  // offer a duration the model did not declare — still holds in full: `durationParam` below is the
-  // only thing that sends one, and it sends nothing when there is no field.
-  const [schema, setSchema] = useState(null);
-  useEffect(() => {
-    let live = true;
-    if (!v.model) { setSchema(null); return undefined; }
-    api.modelSchema(v.model).then(s => { if (live) setSchema(s); }).catch(() => { if (live) setSchema(null); });
-    return () => { live = false; };
-  }, [v.model]);
-  const durField = durationField(schema);
-  const totals = durationChoices(durField);
-  // The authoring rate. 24 deliberately, and not read from the project's reel: the reel's rate is a
-  // TIMELINE fact (what the animatic cuts and exports at), while this is the grid a prompt's beats
-  // are written on, and every video endpoint in the catalogue generates at 24. Resolved through
-  // rateOf rather than written as a number so the frame maths stays on shared/timecode.mjs.
-  const rate = rateOf(DEFAULT_RATE);
-  // Offered on any model that makes a moving picture. A still has no segments to time.
-  const canSequence = !v.model || outputKindForModel(v.model) === 'video';
-  // The scene STRUCTURE is local, not part of `value`. Every surface whitelists the value fields it
-  // persists (ProjectGenerate, ShotWorkspace and Chat alike), so a new key would be silently dropped
-  // by all three — and widening three whitelists for an editing aid is the wrong trade. What matters
-  // downstream is the COMPILED prompt and the duration param, and those go through the ordinary
-  // value contract, so submit, cost and guards are unaffected.
-  const [seq, setSeq] = useState(null);
-  const inSequence = !!seq && canSequence;
-
-  // The scene editor is a PROMPT BUILDER: it writes the compiled prompt and (when the model has a
-  // duration field) the nearest legal duration straight back through the ordinary value contract,
-  // so submitting needs no new path.
-  const writeSeq = next => {
-    setSeq(next);
-    // The authored clock is prompt text and may be any length. The PARAMETER still has to be one of
-    // the model's own values, so it snaps to the nearest — and the editor shows that gap until the
-    // user closes it with "fit".
-    const legal = nearestChoice(totals, secs(totalFrames(next.segments), rate));
-    set({
-      prompt: compileScene(next, rate),
-      params: { ...(v.params || {}), ...((legal != null && durationParam(durField, legal)) || {}) }
-    });
-  };
-  const startSequence = () => {
-    const seconds = totals.length ? totals[Math.min(1, totals.length - 1)] : 12;
-    writeSeq(blankScene({ seconds, count: 3, rate, context: String(v.prompt || '').trim() }));
-  };
-  const endSequence = () => setSeq(null);
   const snippets = (app && app.state && app.state.snippets) || [];
 
-  // duration comes from the model's OWN synced schema (params.duration), never a hardcoded table.
-  const durParam = (v.params || {}).duration ?? (v.params || {}).duration_seconds;
-  const est = estimateCost(v.model, { duration: durParam, variantCount: v.variantCount });
-  const cost = est.total;
-  const costBreakdown = est.perSecond
-    ? est.seconds + 's × $' + est.rate.toFixed(3) + '/s' + (est.variantCount > 1 ? ' × ' + est.variantCount : '')
-    : (est.variantCount > 1 ? '$' + est.per.toFixed(3) + ' × ' + est.variantCount : null);
   const hasText = String(v.prompt || '').trim().length > 0;
   const hasReadyAttachment = attachments.some(a => a.status === 'done');
   const canSubmit = !busy && !blockReason && (hasText || (allowEmptyPrompt && hasReadyAttachment));
 
-  // ── save-to-snippets ───────────────────────────────────────────────────────────────────────
-  // Any text on this bar can become a reusable /snippet without leaving it. The dialog owns the
-  // POST and the app.state.snippets refresh (SaveSnippet.jsx); everything here just chooses what
-  // text to hand it and what to call it by default.
-  const askSave = (text, name) => setSnippetDraft({ text: String(text || '').trim(), name });
+  // ── right-click menus ──────────────────────────────────────────────────────────────────────
+  // Copy actions for the prompt field and for individual provenance segments. The save-to-snippets
+  // affordance that used to sit alongside these (a dialog component, film-specific tooling) was
+  // removed with the film domain; only Copy survives here.
   const copy = text => {
     navigator.clipboard && navigator.clipboard.writeText(String(text || '')).catch(() => { });
     app && app.showToast && app.showToast('Copied', 'var(--accent)');
   };
-  // first few words, title-cased — a name you'd have typed anyway, pre-filled
-  const nameFrom = (text, fallback) => {
-    const words = String(text || '').replace(/\s+/g, ' ').trim().split(' ').slice(0, 4).join(' ');
-    return words ? words.charAt(0).toUpperCase() + words.slice(1) : fallback;
-  };
-  // the prompt field's own menu — "save what I highlighted" when there IS a selection, otherwise
-  // the whole prompt. Built as a thunk so the selection is read at right-click time, not render.
+  // the prompt field's own menu — copies the selection when there IS one, otherwise the whole
+  // prompt. Built as a thunk so the selection is read at right-click time, not render.
   const promptMenu = menu.open(() => {
     const sel = String((window.getSelection && window.getSelection().toString()) || '').trim();
     const whole = String(v.prompt || '').trim();
     return [
-      sel && { label: 'Save selection to snippets', hint: '⌸', onClick: () => askSave(sel, nameFrom(sel, 'Snippet')) },
-      whole && { label: 'Save prompt to snippets', hint: '⌸', onClick: () => askSave(whole, nameFrom(whole, 'Prompt')) },
-      (sel || whole) && { sep: true },
       sel && { label: 'Copy selection', onClick: () => copy(sel) },
       whole && { label: 'Copy prompt', onClick: () => copy(whole) },
       composedPrompt && { label: 'Copy full composed prompt', onClick: () => copy(composedPrompt) },
@@ -1059,7 +730,6 @@ export default function Composer({
   });
   // one provenance segment's menu — the style block, the camera clause, whatever a surface adds
   const segMenu = f => menu.open(() => [
-    f.text && { label: 'Save block to snippets', hint: '⌸', onClick: () => askSave(f.text, nameFrom(f.tag, 'Block')) },
     f.text && { label: 'Copy block', onClick: () => copy(f.text) },
     f.onEdit && { sep: true },
     f.onEdit && f.text && { label: 'Clear this block', danger: true, onClick: () => f.onEdit('') },
@@ -1084,8 +754,9 @@ export default function Composer({
     // mouse trip to a chip. Listed in the ? cheat sheet.
     if ((e.metaKey || e.ctrlKey) && !e.shiftKey) {
       const k = (e.key || '').toLowerCase();
-      if (k === 'j') { e.preventDefault(); setPop(p => (p === 'tech' ? null : 'tech')); return; }        // settings
-      if (k === 'l' && fragments) { e.preventDefault(); setPop(p => (p === 'fragments' ? null : 'fragments')); return; }  // look/camera
+      // ⌘J used to toggle the TECH popover (settings); removed with the model/format/schema
+      // cluster, so that binding is gone rather than left as a silent no-op.
+      if (k === 'l' && fragments) { e.preventDefault(); setPop(p => (p === 'fragments' ? null : 'fragments')); return; }  // look
       if (k === 'u' && onAttach) { e.preventDefault(); onAttach(); return; }                              // reference
     }
     if (e.key === 'Escape') { e.target.blur(); return; }
@@ -1115,10 +786,13 @@ export default function Composer({
   // passes, so every surface that mounts a composer gets it without a wrapper — which is the point:
   // a per-surface summary row would be exactly the "variant" this component exists to prevent.
   //
-  // It answers "what is riding on this prompt that I cannot see in the field" — the look, the camera
-  // angle, the movement. Those are prompt fragments composed in at generate time, so with the
-  // segments view collapsed they were invisible until the image came back wrong. Each pill opens
-  // the picker that owns it. Nothing set → nothing rendered, no empty chrome.
+  // It answers "what is riding on this prompt that I cannot see in the field" — the look. That is
+  // a prompt fragment composed in at generate time, so with the segments view collapsed it was
+  // invisible until the image came back wrong. The pill opens the picker that owns it. Nothing
+  // set → nothing rendered, no empty chrome.
+  //
+  // This used to derive an __angle and a __move pill too (camera angle / camera movement). Both
+  // read from catalog data files removed with the film domain, so both are gone here.
   const fp = fragmentProps || {};
   const autoPills = [];
   if (fragments) {
@@ -1132,21 +806,6 @@ export default function Composer({
       });
     } else if (fp.projectLock) {
       autoPills.push({ id: '__look', label: fp.projectLock.name, tone: 'neutral', title: 'Project style lock — ' + (fp.projectLock.fragment || ''), onClick: openFrag });
-    }
-    if (fp.angle) {
-      const tok = (AXES.find(a => a.key === 'framing') || { tokens: [] }).tokens.find(t => t.t === fp.angle);
-      autoPills.push({
-        id: '__angle', label: fp.angle, tone: 'neutral', title: (tok && (tok.d || tok.f)) || fp.angle,
-        thumb: tok && tok.img, onClick: openFrag, onRemove: fp.onAngle ? () => fp.onAngle(null) : undefined
-      });
-    }
-    if (fp.move) {
-      const m = CAMERA_MOVEMENTS.find(x => x.id === fp.move);
-      autoPills.push({
-        id: '__move', label: (m && m.name) || fp.move, tone: 'neutral',
-        title: (m && m.description) || 'camera movement',
-        onClick: openFrag, onRemove: fp.onMove ? () => fp.onMove(null) : undefined
-      });
     }
   }
   // surface-supplied pills keep their place after the derived ones
@@ -1194,14 +853,7 @@ export default function Composer({
         )}
 
         {/* prompt row — the field, plus the CLEAN/FULL/SEGMENTS toggle */}
-        {/* DEV-133 — the sequence editor replaces the single prompt field. It COMPILES into that
-            field (see writeSeq), so everything downstream — cost, guards, /api/generate — is
-            unchanged; this is a different way to write one prompt, not a second send path. */}
-        {inSequence && (
-          <SequenceEditor scene={seq} onChange={writeSeq} onExit={endSequence} rate={rate} durationChoices={totals} />
-        )}
-
-        <div style={{ ...sx('display:flex;align-items:flex-start;gap:10px'), display: inSequence ? 'none' : 'flex' }}>
+        <div style={sx('display:flex;align-items:flex-start;gap:10px')}>
           <div style={sx('flex:1;min-width:0')} onContextMenu={promptMenu}>
             <MentionText
               ref={ta}
@@ -1209,23 +861,15 @@ export default function Composer({
               onChange={e => set({ prompt: e.target.value })}
               onKeyDown={onKeyDown}
               snippets={snippets}
-              // DEV-126 — the nested / command tree. The composer supplies the CONTEXT (catalog,
-              // looks) and the setters; slashCommands.js owns the tree shape and the ranking. Each
-              // group only appears when its setter exists, so a surface with no camera state simply
-              // has no /camera — the menu never advertises something it cannot do.
+              // DEV-126 — the nested / command tree. The composer supplies the CONTEXT (looks) and
+              // the setters; slashCommands.js owns the tree shape and the ranking. Each group only
+              // appears when its setter exists, so a surface with no style-lock state simply has no
+              // /look — the menu never advertises something it cannot do. The /model and /camera
+              // groups this used to configure (settings/video/onModel) were removed with the film
+              // domain's model catalog and camera-movement data.
               commands={{
-                settings,
                 looks: fp.looks || [],
                 fp,
-                // scope /model to the current output kind. NB: `kinds` belongs to TechPopoverBody,
-                // not to this scope — derive it from the composer's own model instead.
-                video: outputKindForModel(v.model) === 'video' ? true : null,
-                // `text` is the prompt with the /command stripped — merged into the SAME set() as
-                // the model so neither write clobbers the other (see slashCommands.js)
-                onModel: (id, text) => set({
-                  model: id, outputKind: outputKindForModel(id), params: {},
-                  ...(typeof text === 'string' ? { prompt: text } : null)
-                })
               }}
               entities={allEntities}
               onBrowse={app && pid ? () => setPicker(true) : null}
@@ -1244,7 +888,7 @@ export default function Composer({
               type="button"
               onClick={() => setPop(p => (p === 'view' ? null : 'view'))}
               className="hFg"
-              title="Prompt view — clean · full · segments · shot list"
+              title="Prompt view — clean · full · segments"
               style={{
                 ...sx('border-radius:5px;padding:2px 7px;cursor:pointer;background:none'),
                 border: '1px solid ' + (full ? 'var(--border-2)' : 'var(--border)'), fontFamily: MONO, fontSize: 8.5,
@@ -1257,7 +901,7 @@ export default function Composer({
                 {[
                   ['clean', 'CLEAN', 'Only what you typed'],
                   ['full', 'FULL', 'What actually ships — fragments run inline'],
-                  ['segments', 'SEGMENTS', 'Every block on its own row — edit · add · save'],
+                  ['segments', 'SEGMENTS', 'Every block on its own row — edit · add'],
                 ].map(([id, label, desc]) => (
                   <div key={id} onClick={() => { setView(id); setPop(null); }} className="hRow"
                     style={sx('display:flex;align-items:baseline;gap:9px;padding:7px 8px;border-radius:7px;cursor:pointer')}>
@@ -1266,19 +910,6 @@ export default function Composer({
                     <span style={sx('font-size:10.5px;color:var(--fg-faint)')}>{desc}</span>
                   </div>
                 ))}
-                {/* DEV-133 — SCENE sits with the prompt views because that is what it is: a fourth
-                    way to write the one prompt. Offered on any moving-picture model; a still has no
-                    segments to time. It is NOT gated on a synced duration field — the clock it
-                    writes is prompt text, and gating on the schema hid the surface everywhere the
-                    spec had not been synced. */}
-                {canSequence && (
-                  <div onClick={() => { if (inSequence) endSequence(); else startSequence(); setPop(null); }} className="hRow"
-                    style={sx('display:flex;align-items:baseline;gap:9px;padding:7px 8px;border-radius:7px;cursor:pointer;border-top:1px solid var(--line);margin-top:4px')}>
-                    <span style={{ ...sx('flex:none;width:12px'), fontFamily: MONO, fontSize: 10, color: 'var(--accent)' }}>{inSequence ? '✓' : ''}</span>
-                    <span style={{ ...sx('flex:none'), fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: '.1em', color: inSequence ? 'var(--fg)' : 'var(--fg-soft)' }}>SCENE</span>
-                    <span style={sx('font-size:10.5px;color:var(--fg-faint)')}>Shot by shot — timing, angle, camera move</span>
-                  </div>
-                )}
               </div>
             </Popover>
           </span>
@@ -1313,15 +944,13 @@ export default function Composer({
           <div style={{ ...sx('margin-top:10px;padding:9px 12px;border-radius:8px;border:1px solid var(--line)'), background: 'rgba(10,11,14,.55)' }}>
             {segmented ? (
               /* SEGMENTS — the same fragments FULL runs together, broken into the blocks they were
-                 assembled from. A style or camera block can be read, rewritten and saved to
-                 snippets on its own, which is the whole point of splitting the view. */
+                 assembled from. A style or camera block can be read and rewritten on its own,
+                 which is the point of splitting the view. */
               <div>
                 <SegmentRow
                   label="Prompt"
                   text={String(v.prompt || '')}
                   onEdit={busy ? null : next => set({ prompt: next })}
-                  onSave={String(v.prompt || '').trim()
-                    ? () => askSave(v.prompt, nameFrom(v.prompt, 'Prompt')) : null}
                   onContextMenu={promptMenu}
                 />
                 {provenance.map((f, i) => (
@@ -1330,7 +959,6 @@ export default function Composer({
                     label={f.tag || 'block ' + (i + 1)}
                     text={f.text}
                     onEdit={f.onEdit}
-                    onSave={f.text ? () => askSave(f.text, nameFrom(f.tag, 'Block')) : null}
                     onContextMenu={segMenu(f)}
                     dim
                   />
@@ -1368,7 +996,7 @@ export default function Composer({
             )}
             <div style={{ fontFamily: MONO, fontSize: 8.5, color: 'var(--border-3)', marginTop: 5 }}>
               {segmented
-                ? 'CLICK A BLOCK TO EDIT · RIGHT-CLICK TO SAVE OR CLEAR'
+                ? 'CLICK A BLOCK TO EDIT · RIGHT-CLICK TO COPY OR CLEAR'
                 : 'FRAGMENTS INJECTED FROM LOCKS — THE MODEL NEVER REWRITES THEM'
                 + (provenance.some(f => f.onEdit) ? ' · CLICK A SECTION TO EDIT IT' : '')}
             </div>
@@ -1415,20 +1043,6 @@ export default function Composer({
               >+ Ref</button>
             )}
 
-            {showTech && <span style={sx('position:relative')}>
-              <BarChip
-                label={techSummary(v)}
-                on={pop === 'tech'}
-                onClick={() => setPop(p => (p === 'tech' ? null : 'tech'))}
-                title="Model · resolution · duration — tech settings"
-              />
-              {/* resizeKey — the settings panel is the one popover whose content density varies by
-                  model (a synced spec can run 15 fields), so its width is the user's call (DEV-134) */}
-              <Popover open={pop === 'tech'} onClose={() => setPop(null)} width={400} resizeKey="tech">
-                <TechPopoverBody settings={settings} value={v} onChange={set} />
-              </Popover>
-            </span>}
-
             {fragments && (
               <span style={sx('position:relative')}>
                 <BarChip
@@ -1436,7 +1050,7 @@ export default function Composer({
                   icon="✦"
                   on
                   onClick={() => setPop(p => (p === 'fragments' ? null : 'fragments'))}
-                  title="Prompt fragments — style, camera, references"
+                  title="Prompt fragments — style"
                 />
                 <Popover open={pop === 'fragments'} onClose={() => setPop(null)} width={480}>
                   <PopHead>✦ FRAGMENTS — PROMPT PIECES, NOT TECH</PopHead>
@@ -1454,7 +1068,11 @@ export default function Composer({
             {app ? <VoiceInput app={app} size={26} disabled={busy} onText={t => set({ prompt: (v.prompt ? v.prompt + ' ' : '') + t })} /> : null}
           </span>
 
-          {showTech ? <Cost value={cost} breakdown={costBreakdown} style={sx('margin-left:auto')} /> : <span style={sx('margin-left:auto')} />}
+          {/* showTech used to gate the tech-settings chip and a model-derived Cost readout here.
+              Both depended on the model/format/schema catalog removed with the film domain; the
+              prop stays accepted (see the signature above) but nothing reads it now — this spacer
+              is unconditional so Generate still lands flush right. */}
+          <span style={sx('margin-left:auto')} />
 
           {/* while busy the surface may offer a cancel (chat streaming) — otherwise the button
               holds the pulsing Generating… state. Never both. */}
@@ -1504,17 +1122,9 @@ export default function Composer({
         />
       )}
 
-      {/* right-click menu + save-to-snippets, both portalled to <body> — the glass shell's
-          backdrop-filter would otherwise capture their fixed positioning */}
+      {/* right-click menu, portalled to <body> — the glass shell's backdrop-filter would
+          otherwise capture its fixed positioning */}
       {menu.render()}
-      {snippetDraft && app && (
-        <SaveSnippetDialog
-          app={app}
-          text={snippetDraft.text}
-          suggestName={snippetDraft.name}
-          onClose={() => setSnippetDraft(null)}
-        />
-      )}
     </div>
   );
 }

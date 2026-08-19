@@ -149,19 +149,19 @@ test('the tool-builder skill mounts only for a toolsmith session', () => {
   freshRoot();
   const plain = prepareAgentHome({ session: { id: 'ut-plain', project: null, mode: 'agent' } });
   assert.equal(plain.toolsmith, false);
-  assert.equal(fs.existsSync(path.join(plain.skillsDir, 'frameforge-toolsmith')), false);
-  assert.doesNotMatch(plain.indexText, /frameforge-toolsmith/);
+  assert.equal(fs.existsSync(path.join(plain.skillsDir, 'scout-toolsmith')), false);
+  assert.doesNotMatch(plain.indexText, /scout-toolsmith/);
 
   const smith = prepareAgentHome({ session: { id: 'ut-smith', project: null, mode: 'agent', kind: 'toolsmith' } });
   assert.equal(smith.toolsmith, true);
-  assert.ok(fs.existsSync(path.join(smith.skillsDir, 'frameforge-toolsmith', 'SKILL.md')));
+  assert.ok(fs.existsSync(path.join(smith.skillsDir, 'scout-toolsmith', 'SKILL.md')));
   // It rides in ## Skill packs, not a section of its own — so the router's existing "one pack
   // matches → load its SKILL.md verbatim" rule fires without teaching the router a new contract.
-  assert.match(smith.indexText, /## Skill packs\nframeforge-toolsmith — .*\[skills\/frameforge-toolsmith\]/);
+  assert.match(smith.indexText, /## Skill packs\nscout-toolsmith — .*\[skills\/scout-toolsmith\]/);
   assert.match(smith.indexText, /at most four questions/, "the pack's own description carries the method");
   // its references ride along — the skill points at them and reads them only while drafting
-  assert.ok(fs.existsSync(path.join(smith.skillsDir, 'frameforge-toolsmith', 'references', 'anatomy.md')));
-  assert.ok(fs.existsSync(path.join(smith.skillsDir, 'frameforge-toolsmith', 'references', 'patterns.md')));
+  assert.ok(fs.existsSync(path.join(smith.skillsDir, 'scout-toolsmith', 'references', 'anatomy.md')));
+  assert.ok(fs.existsSync(path.join(smith.skillsDir, 'scout-toolsmith', 'references', 'patterns.md')));
 });
 
 // ── mount safety (review regressions) ──────────────────────────────────────────────────
@@ -330,7 +330,7 @@ test('branching a builder session keeps its kind, so the skill survives the bran
   assert.equal(branch.status, 200);
   assert.equal(branch.body.kind, 'toolsmith', 'a branch that drops kind silently loses the tool-builder skill');
   const home = prepareAgentHome({ session: branch.body });
-  assert.ok(fs.existsSync(path.join(home.skillsDir, 'frameforge-toolsmith')));
+  assert.ok(fs.existsSync(path.join(home.skillsDir, 'scout-toolsmith')));
 });
 
 test('kind is fixed at birth — PATCH cannot change it', async () => {

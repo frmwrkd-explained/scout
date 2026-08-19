@@ -8,7 +8,7 @@ import { app } from '../backend/index.mjs';
 // Point the store at a brand-new empty root and return it. Call at the start of each test for
 // isolation — every test then works against its own portable markdown folder.
 export function freshRoot() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'frameforge-root-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'scout-root-'));
   tempRoots.push(root); // cleaned up on process exit by _env.mjs
   fs.mkdirSync(path.join(root, 'projects'), { recursive: true });
   setStorageRoot(root);

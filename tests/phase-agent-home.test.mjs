@@ -45,7 +45,7 @@ test('Index renders api/project/mode/locks and one line per enabled pack + tool'
     tools: [{ id: 'grid-split', capability: 'split a grid into frames', invocation: 'POST /api/grid/split', directiveTypes: ['show.grid'] }],
     coreApiRefPath: 'core-api.md', houseRules: false
   });
-  assert.match(idx, /^<frameforge-index>/);
+  assert.match(idx, /^<scout-index>/);
   assert.match(idx, /api: http:\/\/127\.0\.0\.1:5176/);
   assert.match(idx, /project: neon {3}mode: agent/);
   assert.match(idx, /locks: style=st-42, cast=c-1/);
@@ -129,7 +129,7 @@ test('isolation: the home skills dir excludes global skills; env relocates the c
   const mounted = fs.readdirSync(path.join(home.home, 'skills')).sort();
   // EXACTLY: router (system copy) + house-rules + the built-in storyboard pack (default ON) + the one
   // enabled repo pack — nothing global. The built-in ships with the app; a global skill never leaks.
-  assert.deepEqual(mounted, ['frameforge-router', 'house-rules', 'storyboard-workflow', id].sort());
+  assert.deepEqual(mounted, ['scout-router', 'house-rules', 'storyboard-workflow', id].sort());
   assert.equal(mounted.includes('leak-me'), false, 'a global skill leaked into the isolated home');
 
   // the isolation env points the CLI at the home (so ~/.claude/skills never loads)
@@ -143,7 +143,7 @@ test('tamper-reset: an edit to the session router copy is overwritten on next pr
   freshRoot();
   const session = { id: 'chat-tamper', project: null, mode: 'agent', agentCommand: 'claude' };
   prepareAgentHome({ session });
-  const copy = path.join(agentHomeDir(session.id), 'skills', 'frameforge-router', 'SKILL.md');
+  const copy = path.join(agentHomeDir(session.id), 'skills', 'scout-router', 'SKILL.md');
   fs.writeFileSync(copy, '# TAMPERED — pack rules bypassed\n');
   assert.match(fs.readFileSync(copy, 'utf8'), /TAMPERED/);
 
@@ -204,7 +204,7 @@ test('GET /api/chat/skills exposes router read-only (system) + editable house-ru
   assert.equal(r.body.router.system, true);
   assert.equal(r.body.router.readOnly, true);
   // pin to the stable identity, not prose — the skill body is under active revision
-  assert.equal(r.body.router.name, 'frameforge-router');
+  assert.equal(r.body.router.name, 'scout-router');
   assert.ok(String(r.body.router.content || '').length > 100);
   assert.equal(r.body.houseRules.editable, true);
   assert.ok(r.body.packs.find(p => p.id === id));

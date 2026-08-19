@@ -60,11 +60,16 @@ export const LICENCE_PUBLIC_KEY = '';
  * anyone who can edit the call site can delete the check outright. It costs an attacker
  * nothing they did not already have, and it buys real tests. */
 export function isEnforced(publicKey = LICENCE_PUBLIC_KEY) {
-  if (process.env.FRFG_LICENCE_OFF === '1') return false;   // escape hatch for support
+  if (process.env.SCOUT_LICENCE_OFF === '1') return false;   // escape hatch for support
   return typeof publicKey === 'string' && publicKey.length > 0;
 }
 
-const API_BASE = process.env.FRFG_LICENCE_API || 'https://agreeable-gnat-469.convex.site';
+/* No default. FrameForge's licence server used to be baked in here, and a Scout build that
+   inherited it would have validated its licences against a different product's backend — the
+   same class of mistake as inheriting its auto-update feed (both cut 2026-08-19, see
+   docs/decisions.md). Unset means `isEnforced()` still governs enforcement and every network
+   call short-circuits, which is the correct behaviour until Scout has a server of its own. */
+const API_BASE = process.env.SCOUT_LICENCE_API || '';
 
 /* Refresh once a token is a day old. Far short of the 14-day expiry on purpose: it means a
    user has to be offline for thirteen consecutive days before expiry is even in sight. */
@@ -157,6 +162,11 @@ export function licenceState({ now = Date.now(), publicKey = LICENCE_PUBLIC_KEY 
 /* ── network ─────────────────────────────────────────────────────────────────────── */
 
 async function post(path, body) {
+  /* No server configured (the Scout default — see API_BASE). Report it the same way a flaky
+     network is reported, because it is the same situation from the caller's point of view: we
+     have no verdict. Doing this explicitly rather than letting `fetch('')` throw into the catch
+     below means the reason string says what actually happened. */
+  if (!API_BASE) return { reachable: false, ok: false, reason: 'no-licence-server' };
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), NET_TIMEOUT_MS);
   try {

@@ -42,7 +42,7 @@ function installCleanup() {
 }
 installCleanup();
 
-// Environment for the spawned agent CLI. When FrameForge itself runs inside a Claude Code /
+// Environment for the spawned agent CLI. When Scout itself runs inside a Claude Code /
 // IDE-agent session, that session injects proxy + session vars (ANTHROPIC_BASE_URL,
 // CLAUDECODE, CLAUDE_CODE_*…) which break the child CLI's own authentication (401 against
 // the host session's proxy). Scrub them so the CLI authenticates like a fresh terminal.
@@ -432,7 +432,7 @@ export function enqueueSkillEnhance(file, instruction) {
 }
 
 function tick() {
-  if (process.env.FRFG_TEST === '1') return; // tests never spawn the agent CLI
+  if (process.env.SCOUT_TEST === '1') return; // tests never spawn the agent CLI
   const running = jobs.filter(j => j.status === 'running').length;
   if (running >= MAX_CONCURRENT) return;
   const next = jobs.filter(j => j.status === 'queued').pop(); // oldest queued
@@ -450,7 +450,7 @@ function buildRerollPrompt(job) {
   const itemMd = fs.readFileSync(paths.itemMd(job.proj, job.itemId), 'utf8');
   const ctx = contextForAgent(job.proj);
   return [
-    'You are the FrameForge background agent for an AI video production pipeline.',
+    'You are the Scout background agent for an AI video production pipeline.',
     'Everything below is local .md context. Do not ask questions; return output only.',
     '',
     '## PROJECT BRIEF (authoritative — the core aesthetic and direction)',
@@ -477,7 +477,7 @@ function buildRerollPrompt(job) {
 function buildSkillPrompt(job) {
   const content = readSkillFile(job.skillFile);
   return [
-    'You are the FrameForge skill curator. Below is a Claude skill markdown file.',
+    'You are the Scout skill curator. Below is a Claude skill markdown file.',
     'Improve it according to the instruction while preserving its YAML frontmatter keys,',
     'overall structure, and everything that already works. Tighten prose, fix errors,',
     'add the requested capability. Return the COMPLETE updated markdown file and nothing else.',
@@ -523,7 +523,7 @@ function run(job) {
   try {
     // stdin MUST be 'ignore' — claude -p waits on an open stdin pipe, warns after 3s and
     // exits 1 ("no stdin data received"), which silently forced simulate-fallback forever.
-    // agentEnv() scrubs host-session vars so a nested FrameForge still authenticates cleanly.
+    // agentEnv() scrubs host-session vars so a nested Scout still authenticates cleanly.
     // These jobs only REWRITE TEXT (a prompt, a skill file) — they need no tools, so we do NOT
     // pass --dangerously-skip-permissions (Phase 3E). --allowedTools '' runs the CLI with an empty
     // tool set (nothing to approve, nothing dangerous), and imported project context is untrusted

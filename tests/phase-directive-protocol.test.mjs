@@ -1,5 +1,5 @@
 // Ticket 12 — the directive protocol: stream-side detection, parsing, in-place placeholder markers,
-// and durable persistence of `frameforge` fences as typed message parts.
+// and durable persistence of `scout` fences as typed message parts.
 //   · unit    — parseDirectives (well-formed, malformed, multiple, marker positions) + extractDirectives
 //   · integ   — a stub CLI scripts a directive fence; the SSE `directive` event fires, the persisted
 //               assistant message carries the placeholder marker in its prose + the directive object.
@@ -49,16 +49,16 @@ async function drain(base, id, post) {
 
 // ── unit ──
 test('parseDirectives replaces a fence with a positional marker and returns the parsed object', () => {
-  const { text, directives } = parseDirectives('before\n```frameforge\n{"type":"show.style","ref":"s1"}\n```\nafter');
+  const { text, directives } = parseDirectives('before\n```scout\n{"type":"show.style","ref":"s1"}\n```\nafter');
   assert.equal(directives.length, 1);
   assert.deepEqual(directives[0], { type: 'show.style', ref: 's1' });
   assert.equal(text, 'before\n' + directiveMarker(0) + '\nafter', 'prose keeps its order with the fence swapped for marker 0');
-  assert.ok(!/```frameforge/.test(text), 'the raw fence must not survive in the visible text');
+  assert.ok(!/```scout/.test(text), 'the raw fence must not survive in the visible text');
 });
 
 test('parseDirectives numbers multiple fences in document order', () => {
   const { text, directives } = parseDirectives(
-    'a\n```frameforge\n{"type":"show.shot","ref":"SH010"}\n```\nb\n```frameforge\n{"type":"show.style","ref":"s2"}\n```\nc');
+    'a\n```scout\n{"type":"show.shot","ref":"SH010"}\n```\nb\n```scout\n{"type":"show.style","ref":"s2"}\n```\nc');
   assert.equal(directives.length, 2);
   assert.equal(directives[0].ref, 'SH010');
   assert.equal(directives[1].ref, 's2');
@@ -66,7 +66,7 @@ test('parseDirectives numbers multiple fences in document order', () => {
 });
 
 test('parseDirectives degrades malformed JSON to a malformed directive carrying the raw body', () => {
-  const { text, directives } = parseDirectives('oops\n```frameforge\n{ not json }\n```');
+  const { text, directives } = parseDirectives('oops\n```scout\n{ not json }\n```');
   assert.equal(directives.length, 1);
   assert.equal(directives[0].type, 'malformed');
   assert.match(directives[0].raw, /not json/);
@@ -74,7 +74,7 @@ test('parseDirectives degrades malformed JSON to a malformed directive carrying 
 });
 
 test('extractDirectives keeps well-formed directives and drops malformed ones', () => {
-  const ds = extractDirectives('```frameforge\n{"type":"show.image","ref":"g1"}\n```\n```frameforge\n{bad}\n```');
+  const ds = extractDirectives('```scout\n{"type":"show.image","ref":"g1"}\n```\n```scout\n{bad}\n```');
   assert.equal(ds.length, 1);
   assert.deepEqual(ds[0], { type: 'show.image', ref: 'g1' });
 });
@@ -96,7 +96,7 @@ test('a scripted directive fence emits a `directive` event and persists a marker
   assert.equal(asst.directives.length, 1);
   assert.deepEqual(asst.directives[0], { type: 'show.style', ref: 's1' });
   assert.ok(asst.text.includes(directiveMarker(0)), 'persisted prose carries the placeholder marker: ' + asst.text);
-  assert.ok(!/```frameforge/.test(asst.text), 'the raw fence must be stripped from the persisted prose');
+  assert.ok(!/```scout/.test(asst.text), 'the raw fence must be stripped from the persisted prose');
 });
 
 // ── integration: fence split across stream chunk boundaries (no result line → delta reassembly) ──

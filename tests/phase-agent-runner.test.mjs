@@ -112,8 +112,8 @@ test('transcriptTail is bounded and ordered most-recent-last', () => {
   assert.ok(tail.indexOf('c') < tail.indexOf('d'), 'most recent last');
 });
 
-test('extractDirectives parses frameforge fences and skips malformed ones', () => {
-  const text = 'intro\n```frameforge\n{"type":"show.image","ref":"g1"}\n```\nmid\n```frameforge\n{bad json}\n```\n';
+test('extractDirectives parses scout fences and skips malformed ones', () => {
+  const text = 'intro\n```scout\n{"type":"show.image","ref":"g1"}\n```\nmid\n```scout\n{bad json}\n```\n';
   const ds = extractDirectives(text);
   assert.equal(ds.length, 1);
   assert.deepEqual(ds[0], { type: 'show.image', ref: 'g1' });

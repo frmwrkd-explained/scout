@@ -39,7 +39,7 @@ export function ledger({ service, op, model = '', units = '', cost = 0, ref = ''
   m.byOp = { ...m.byOp, [op]: (m.byOp?.[op] || 0) + c };
   rollup[mk] = m;
   writeMd(costsMd(), { entries, rollup },
-    'FrameForge cost ledger — detail rows (newest first, cap 500) + permanent monthly rollup that never trims.\n');
+    'Scout cost ledger — detail rows (newest first, cap 500) + permanent monthly rollup that never trims.\n');
   return row;
 }
 

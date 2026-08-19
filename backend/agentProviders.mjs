@@ -1,4 +1,4 @@
-// Agent CLI provider registry — the single source of truth for "which agent CLIs can FrameForge
+// Agent CLI provider registry — the single source of truth for "which agent CLIs can Scout
 // drive, and what do you type at each one".
 //
 // Everything that shells out to an agent binary (jobs.mjs's setup wizard, agentRunner.mjs's chat
@@ -6,7 +6,7 @@
 // third CLI is one entry in PROVIDERS and nothing else.
 //
 // SUBSCRIPTION ONLY. Both providers ship an API-key login path (`claude auth login --console`,
-// `codex login --api-key`); FrameForge deliberately does not expose either. loginArgs always
+// `codex login --api-key`); Scout deliberately does not expose either. loginArgs always
 // selects the subscription flow, and no code in this repo ever writes an agent API key. If you are
 // adding a provider, it needs a subscription login or it does not belong here.
 //

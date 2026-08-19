@@ -11,8 +11,8 @@
 const scenario = process.env.STUB_GEN_SCENARIO || 'single';
 
 const fence = scenario === 'batch'
-  ? '```frameforge\n{"type":"generation.batch","batch":"batch-42","project":"p"}\n```'
-  : '```frameforge\n{"type":"generation","ref":"gen-7","project":"p"}\n```';
+  ? '```scout\n{"type":"generation.batch","batch":"batch-42","project":"p"}\n```'
+  : '```scout\n{"type":"generation","ref":"gen-7","project":"p"}\n```';
 const full = 'Queued that for you:\n\n' + fence + '\n\nI\'ll surface each frame as it lands.';
 
 const line = o => process.stdout.write(JSON.stringify(o) + '\n');

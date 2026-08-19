@@ -2,16 +2,16 @@
 // --env-file flag throws when the file is missing (--env-file-if-exists is Node 22+), and
 // a missing .env must never stop the app from booting.
 //
-// Import this FIRST in any entry point, before ./store.mjs: store captures FRFG_CONFIG /
-// FRFG_DATA at module-load time, so a .env that sets those has to land before it evaluates.
+// Import this FIRST in any entry point, before ./store.mjs: store captures SCOUT_CONFIG /
+// SCOUT_DATA at module-load time, so a .env that sets those has to land before it evaluates.
 //
 // Precedence: a variable already present in process.env always wins. A real shell export
-// beats the file, and tests/_env.mjs keeps control of the hermetic FRFG_* roots.
+// beats the file, and tests/_env.mjs keeps control of the hermetic SCOUT_* roots.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ENV_FILE = process.env.FRFG_ENV_FILE
+const ENV_FILE = process.env.SCOUT_ENV_FILE
   || path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '.env');
 
 export function loadEnv(file = ENV_FILE) {

@@ -1,5 +1,5 @@
 // Filmmaker chat sessions (ticket 08) — durable, resumable conversations that let the agent
-// operate FrameForge through its own HTTP API. Everything is a portable markdown record, exactly
+// operate Scout through its own HTTP API. Everything is a portable markdown record, exactly
 // like the rest of the store: no database, no in-memory session state that a restart would lose.
 //
 // Two records per session, both under the project dir (project-scoped chat) or a workspace-level
@@ -37,11 +37,11 @@ export function projectUnderstanding(project) {
   try { brief = readMd(paths.briefMd(project)).content.trim(); } catch { /* no brief */ }
   const memory = readMemory(project).body;
   if (!brief && !memory) return '';
-  const L = ['<frameforge-project-understanding>',
+  const L = ['<scout-project-understanding>',
     'What you already know about this project — the user should not have to re-explain it.'];
   if (brief) L.push('', '## Project brief (authoritative direction)', brief);
   if (memory) L.push('', '## Project memory (hot cache — durable learnings from past sessions)', memory);
-  L.push('</frameforge-project-understanding>');
+  L.push('</scout-project-understanding>');
   return L.join('\n');
 }
 
@@ -59,7 +59,7 @@ export function hasExecutor(name) { return executors.has(name); }
 
 // The only executor this ticket ships. A scripted echo that streams its reply one word at a time so
 // the whole turn loop (SSE order, persistence, checkpoints) is exercisable without an agent CLI.
-const STREAM_DELAY = process.env.FRFG_TEST === '1' ? 0 : 35;
+const STREAM_DELAY = process.env.SCOUT_TEST === '1' ? 0 : 35;
 const nap = ms => new Promise(r => { const t = setTimeout(r, ms); t.unref?.(); });
 async function simulateExecutor({ userText, projectContext, emit }) {
   const lead = projectContext ? 'Working with the project brief and memory already in context. ' : '';
@@ -82,7 +82,7 @@ registerExecutor('cli', cliExecutor);
 // installed, else 'simulate' so a first-run/demo box degrades to setup instead of failing.
 function chooseExecutor(explicit) {
   if (explicit && executors.has(explicit)) return explicit;
-  if (process.env.FRFG_TEST === '1') return 'simulate';
+  if (process.env.SCOUT_TEST === '1') return 'simulate';
   try { return findAgent() ? 'cli' : 'simulate'; } catch { return 'simulate'; }
 }
 
@@ -308,7 +308,7 @@ export function appendSystemEvent(id, text) {
 // messages so the turn reads exactly like an agent-initiated one and the SAME inline generation cards
 // (ticket 14) render it:
 //   · a compact USER message describing the manual action (model · kind · prompt snippet)
-//   · an ASSISTANT message whose text is a ⟦frameforge:0⟧ marker with the generation directive in
+//   · an ASSISTANT message whose text is a ⟦scout:0⟧ marker with the generation directive in
 //     directives[0] — ticket 12's persistence shape, so renderMessageBody places the card inline.
 // The directive is the router grammar's ids-only envelope: { type:'generation', ref:<genId>, project }
 // for a single generate, or { type:'generation.batch', batch:<batchId>, project } for a variant batch.
@@ -340,7 +340,7 @@ export function recordManualTurn(id, { userText, assistantText, directive } = {}
 // a short structured line appended to the turn's user text so it can act on each file by reference.
 // For images that reference is the exact {scope,folder,name} triple the /api/generate route accepts
 // as a `refs` entry (so an attached still becomes a generation ref by id, no prose description). For
-// documents it is the GET url the agent fetches through FrameForge's own HTTP API. Exported so a test
+// documents it is the GET url the agent fetches through Scout's own HTTP API. Exported so a test
 // can assert the refs reach the prompt without a live agent subscription.
 export function attachmentPromptLine(attachments = []) {
   const list = (Array.isArray(attachments) ? attachments : []).filter(a => a && a.name);
@@ -355,7 +355,7 @@ export function attachmentPromptLine(attachments = []) {
         '", folder:"' + folder + '", name:"' + a.name + '" }] to the generate call; do NOT describe its contents into the prompt.';
     }
     const url = '/api/context/' + scope + '/file?folder=' + encodeURIComponent(folder) + '&name=' + encodeURIComponent(a.name);
-    return '- ' + rel + ' (' + kind + ') — read it via GET ' + url + ' (FrameForge HTTP API).';
+    return '- ' + rel + ' (' + kind + ') — read it via GET ' + url + ' (Scout HTTP API).';
   });
   return ['[attached files — already saved in this project\'s context boards]', ...lines].join('\n');
 }

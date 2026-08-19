@@ -1,4 +1,4 @@
-// The ONE declaration of FrameForge's chat tools (ticket 15).
+// The ONE declaration of Scout's chat tools (ticket 15).
 //
 // Pure data — imported by BOTH backend/agentHome.mjs (to seed registerChatTool(), whose enabled
 // entries feed the session Index) AND frontend/chat/toolRegistry.jsx (which pairs each id with its

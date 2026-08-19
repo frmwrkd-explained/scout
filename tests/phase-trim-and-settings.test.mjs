@@ -18,7 +18,7 @@ import path from 'node:path';
 
 function freshRoot(tag) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'frfg-' + tag + '-'));
-  process.env.FRFG_DATA = root;
+  process.env.SCOUT_DATA = root;
   return root;
 }
 

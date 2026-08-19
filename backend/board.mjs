@@ -23,10 +23,8 @@
 import fs from 'fs';
 import path from 'path';
 import { getStorageRoot, readMd, writeMd, stamp, safeScope, appendActivity } from './store.mjs';
-import { listShots } from './story.mjs';
 import { listContext } from './store.mjs';
 import { readFolderKinds } from './memory.mjs';
-import { assetKindOf } from '../shared/assetKinds.mjs';
 import { imageSize } from './imageSize.mjs';
 import { assetPath } from './library.mjs';
 import { applyLayout, LAYOUT_IDS, NODE_KINDS, blankNode, bounds, CARD } from '../frontend/boardLayout.js';
@@ -88,7 +86,6 @@ export function cleanNode(raw, id) {
   // whose whole purpose is being readable.
   if (raw.locked) n.locked = true;
 
-  if (t === 'shot') { n.shot = str(raw.shot, 60); if (!n.shot) return null; }
   if (t === 'asset') {
     n.scope = str(raw.scope, 60); n.name = str(raw.name, 200); n.folder = str(raw.folder || '', 200);
     if (!n.scope || !n.name) return null;
@@ -249,28 +246,10 @@ export function removeNodes(pid, ids, logLine = '') {
   return write(pid, board, logLine || ('deleted ' + gone + ' node' + (gone === 1 ? '' : 's')));
 }
 
-// Put every shot that is not already on the board onto it. The "load my project in" gesture, and
-// what `align` calls first so aligning a fresh board is not a no-op on an empty canvas.
-export function syncShots(pid, { only = null } = {}) {
-  const board = getBoard(pid);
-  const have = new Set(board.nodes.filter(n => n.t === 'shot').map(n => n.shot));
-  const want = listShots(pid).filter(s => !only || only.includes(s.id));
-  const m = minter(board);
-  const added = [];
-  for (const s of want) {
-    if (have.has(s.id)) continue;
-    const n = cleanNode({ ...blankNode('shot', { shot: s.id }, m.next), shot: s.id });
-    if (n) { board.nodes.push(n); added.push(n); }
-  }
-  m.commit();
-  return { board, added };
-}
-
-// Put the project's ASSETS on the board — the counterpart to syncShots, and the thing that makes
-// this a production canvas rather than a storyboard. Each node carries the { scope, folder, name }
-// triple every other surface uses plus its resolved `kind`, which is what `by-kind` and
-// `production` group on. The kind comes from shared/assetKinds.mjs reading the folder name, with
-// the user's own per-folder overrides applied — never a second table here.
+// Put the project's ASSETS on the board. Each node carries the { scope, folder, name } triple every
+// other surface uses plus its `kind`, which is what `by-kind` and `production` group on. The film
+// asset vocabulary (cast/location/wardrobe/prop) went with the film domain, so the kind is now the
+// folder name — one rule, still no second table. T15 replaces this with Scout's own node kinds.
 const MEDIA_RE = /\.(png|jpe?g|gif|webp|avif|svg|mp4|mov|webm|m4v)$/i;
 
 // ── an asset card is the shape of its asset ─────────────────────────────────────────────────────
@@ -313,7 +292,7 @@ export function syncAssets(pid, { kinds = null, folders = null, limit = 200 } = 
   for (const it of items) {
     if (added.length >= limit) break;
     if (!MEDIA_RE.test(it.name)) continue;
-    const kind = assetKindOf(it.folder, overrides);
+    const kind = (it.folder || '').split('/').pop() || '';
     // Default: production assets only. A board that pulled in every reference and note as well
     // would bury the cast under the moodboard on the first click.
     if (!kind) continue;
@@ -330,22 +309,16 @@ export function syncAssets(pid, { kinds = null, folders = null, limit = 200 } = 
 
 export function alignBoard(pid, layout, opts = {}) {
   const id = LAYOUT_IDS.includes(layout) ? layout : getBoard(pid).layout;
-  // Sync first: aligning is what a user reaches for on a board they have not populated yet, and
-  // "By scene" on an empty canvas returning an empty canvas reads as a broken button. Which sync
-  // runs depends on what the layout groups — By-kind on a board with no assets was the same empty
-  // no-op that syncShots was added to prevent.
+  // Sync first: aligning is what a user reaches for on a board they have not populated yet, and a
+  // layout that returns an empty canvas reads as a broken button. Which sync runs depends on what
+  // the layout groups.
   let board;
   if (opts.sync === false) board = getBoard(pid);
-  else if (id === 'by-kind') board = syncAssets(pid).board;
-  else if (id === 'production') {
-    // both, in order: syncShots hands back an unsaved board, so its nodes must be written before
-    // syncAssets re-reads from disk or the shots it just added are lost
-    const withShots = syncShots(pid);
-    if (withShots.added.length) saveBoard(pid, { nodes: withShots.board.nodes });
-    board = syncAssets(pid).board;
-  }
-  else board = syncShots(pid).board;   // unsaved; applyLayout below runs on these nodes and write() persists them
-  const shots = listShots(pid);
+  else if (id === 'by-kind' || id === 'production') board = syncAssets(pid).board;
+  else board = getBoard(pid);
+  // Shots are gone with the film domain. applyLayout still takes the list because boardLayout.js is
+  // shared with the frontend and is re-cut at T15, when Scout's node kinds land.
+  const shots = [];
 
   // Re-measure asset cards before laying them out. A board built before a card knew its own aspect
   // still holds 16:9 boxes, and nothing else would ever fix them: syncAssets skips assets already
@@ -363,9 +336,8 @@ export function alignBoard(pid, layout, opts = {}) {
     .map(n => cleanNode(n)).filter(Boolean);
   m.commit();
   board.layout = id;
-  const scenes = new Set(shots.map(s => Number(s.scene) || 0)).size;
-  return write(pid, board, 'auto-aligned · ' + id + ' — ' + shots.length + ' shot'
-    + (shots.length === 1 ? '' : 's') + ', ' + scenes + ' scene' + (scenes === 1 ? '' : 's'));
+  return write(pid, board, 'auto-aligned · ' + id + ' — ' + board.nodes.length + ' node'
+    + (board.nodes.length === 1 ? '' : 's'));
 }
 
 export function setShow(pid, show) {
@@ -390,13 +362,12 @@ export function describeBoard(pid) {
   const board = getBoard(pid);
   const count = {};
   for (const n of board.nodes) count[n.t] = (count[n.t] || 0) + 1;
-  const shots = board.nodes.filter(n => n.t === 'shot').map(n => n.shot);
   const frames = board.nodes.filter(n => n.t === 'frame').map(n => n.label).filter(Boolean);
   const text = board.nodes.filter(n => n.t === 'text' || n.t === 'note')
     .map(n => String(n.text || '').replace(/\s+/g, ' ').trim()).filter(Boolean).slice(0, 40);
   return {
     project: pid, layout: board.layout, show: board.show,
-    counts: count, total: board.nodes.length, shots, frames, text,
+    counts: count, total: board.nodes.length, frames, text,
     bounds: bounds(board.nodes), updated: board.updated
   };
 }
@@ -442,16 +413,6 @@ export function registerBoardRoutes(app, deps = {}) {
     catch (e) { res.status(400).json({ error: e.message }); }
   });
 
-  // Put the project's shots on the board without moving anything already placed.
-  app.post('/api/board/:pid/sync', (req, res) => {
-    try {
-      const { board, added } = syncShots(req.params.pid, { only: Array.isArray(req.body?.only) ? req.body.only : null });
-      if (!added.length) return res.json({ board, added });
-      const saved = saveBoard(req.params.pid, { nodes: board.nodes }, 'pulled in ' + added.length + ' shot' + (added.length === 1 ? '' : 's'));
-      res.json({ board: { ...saved, seq: board.seq }, added });
-    } catch (e) { res.status(400).json({ error: e.message }); }
-  });
-
   // Pull the project's cast / locations / wardrobe / props onto the board.
   app.post('/api/board/:pid/assets', (req, res) => {
     try {
@@ -476,17 +437,6 @@ export function registerBoardRoutes(app, deps = {}) {
   app.post('/api/board/:pid/show', (req, res) => {
     try { res.json(setShow(req.params.pid, String(req.body?.show || ''))); }
     catch (e) { res.status(400).json({ error: e.message }); }
-  });
-
-  // Export is dynamically imported: it pulls in sharp and the whole reel joiner, and a board that
-  // is never exported should not pay for either at boot.
-  app.post('/api/board/:pid/export', async (req, res) => {
-    try {
-      const { exportBoardPng } = await import('./boardExport.mjs');
-      const out = await exportBoardPng(req.params.pid, req.body || {});
-      activity({ dot: 'green', t: 'Board exported', t2: '· ' + req.params.pid, s: out.width + '×' + out.height + ' — ' + out.file, kind: 'proj', ref: req.params.pid });
-      res.json({ ok: true, ...out });
-    } catch (e) { res.status(400).json({ error: e.message }); }
   });
 
   app.get('/api/board/:pid/export/file', (req, res) => {

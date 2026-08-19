@@ -86,3 +86,35 @@ The Electron preload bridge, and with it `screenshot.js`'s three call sites and 
 
 ### 38MB of film thumbnails deleted
 `public/axis-options` (37MB) and `public/preset-previews` were the cinematic-axis preview images for StyleLab and PromptBuilder. Both are gone, so `public/` is gone.
+
+### The backend strip — 51 modules → 25
+**Q:** T01 named 14 backend modules. What about the other 37?
+**Choice:** Audited all of them. **DELETE 25**: the 13 T01 named (minus `imageSize`, kept — see below) plus `batches` `catalog` `control` `enhance` `generate` `manifest` `manual` `modelSchemas` `probe` `providers` `vision` `seed` `snippetSeeds`. **KEEP** `actions` `distill` `launch` `library` `licenceToken` `trash` `userTools` alongside the T01 keep-set. **REDUCE** `groq.mjs` to its key resolver.
+**Why:** The deleted set is the image/video generation layer — Scout generates nothing. The keeps are generic infrastructure Scout still needs: an append-only action journal, a staged trash (Law 5 — never delete), a file library, cross-platform process launching, user-authored agent tools, and Ed25519 licence tokens. `distill.mjs` turns a closed session into durable learnings, which is `docs/03_MEMORY.md`'s learnings pipeline arriving early — keeping it was not a close call.
+
+### Three boot-crash landmines, found before they fired
+`search.mjs`, `feedback.mjs` and `distill.mjs` are all in the keep-set and all statically imported from the delete-set — `listGenerations`/`listAllShots`/`getStory`, `providersStatus`/`videoToolsStatus`, and `groqKey`. A static import of a deleted module fails at **import time**, so any of the three would have taken the whole server down at boot, not degraded a feature. All three were cut in the same pass as the deletion. This is why the strip order in `PLAN.md` put decoupling before deleting.
+
+### `groq.mjs` reduced rather than deleted
+`distill.mjs` needs `groqKey()`. Rather than move it into `env.mjs`, the file survives as a 5-line module holding just the resolver, keeping the parent repo's documented convention that a provider's key resolver lives beside that provider's code. When M3 decides what Scout actually distils with, that is the one place to repoint.
+
+### `backend/skills/` — the silent-breakage risk
+`agentHome.mjs` mounts `skills/scout-router` into **every** session and hardcodes four paths into that directory. Deleting it would not crash the server; it would silently break the first session anyone opened.
+**Choice:** Deleted the two film workflow packs (`storyboard-workflow`, `manual-roundtrip`) and emptied `BUILTIN_PACKS` to `[]` rather than removing it. Rewrote `scout-router/SKILL.md` and `scout-toolsmith/SKILL.md` as honest M0 stubs.
+**Why:** The mounting mechanism is sound and M4 needs it; only the content was film. An empty `BUILTIN_PACKS` keeps every enablement path exercised. The router stub deliberately contains **no route list** — `docs/04_AGENT_CONTRACT.md` §8 says adding a capability is a new Index line, never a router-skill edit, and a route list here would be the second source of truth that rule exists to prevent.
+
+### `store.mjs` settings defaults de-filmed
+Removed `enabledModules`, `autoAnalyze`, the vision/transcription block, the Remotion project pointer, `falApiKey`/`kieApiKey`/`higgsfieldCommand`, `disabledModels`/`customModels`/`modelDefaults` and the manual-round-trip trio. `SECRET_SETTING_KEYS` drops to `['groqApiKey']`. The four hard rules in this file — `writeMd`'s `{content}` form, `readMd`'s `cache: false`, tmp+rename, and `safe`/`safeScope` — were not touched and are visibly intact.
+
+### S8 · the licence server, the other half
+`backend/licence.mjs` defaulted `API_BASE` to FrameForge's Convex deployment. Now defaults to empty, and `post()` short-circuits with `reason: 'no-licence-server'` **explicitly** rather than letting `fetch('')` throw into the catch — same outcome, but the reason string says what actually happened. `isEnforced()` still governs enforcement.
+
+### Redaction keeps a superset of secrets
+`knownSecrets()` still lists `FAL_KEY` and `KIE_API_KEY` even though both providers are gone. A superset costs nothing, someone forking from FrameForge may still have them exported, and redaction is the one place to prefer over-reaching to under-reaching.
+
+### Test triage — 56 files → 34, two salvaged rather than deleted
+Deleted 22 test files whose subject no longer exists. **Salvaged two** that T01's "delete every now-orphaned test" would have thrown away:
+- `phase-board-layout.test.mjs` — 51 tests, of which only the last four were the asset-kind vocabulary. The rest guard `boardLayout.js`, which Scout keeps.
+- `phase-windows-spawn.test.mjs` — only two of thirteen were film (video/remotion win32 branches). The structural ones ("no backend module spawns a resolved binary without `planLaunch`") fail on *any* host if someone adds a raw spawn back, and apply to whatever Scout spawns next.
+
+In both files the removed block is replaced by a comment saying what it guarded and why the rule still holds. A deleted test with no trace is a rule nobody knows they are breaking.

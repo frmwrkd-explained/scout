@@ -18,7 +18,6 @@
 // an existing node rather than minting a fresh one is load-bearing: selection, focus and the undo
 // entry all key off it, so a re-align must not look like a delete-and-recreate.
 
-import { assetKindDef } from '../shared/assetKinds.mjs';
 
 // ── the grid ───────────────────────────────────────────────────────────────────────────────────
 // One spacing unit, used by snapping, by every layout and by the background dots, so a hand-placed
@@ -318,9 +317,8 @@ export function byKind(nodes, opts = {}) {
 
     const frame = reuse(frames, kind, () => blankNode('frame', {}, mkId || undefined));
     Object.assign(frame, {
-      // the human label when the kind is one of the four canonical boards, else the folder's own
-      // name — read from shared/assetKinds.mjs rather than restated here
-      t: 'frame', kind, label: String((assetKindDef(kind) || {}).label || kind).toUpperCase(),
+      // the kind IS the folder name since the film asset vocabulary was removed — see Board.jsx
+      t: 'frame', kind, label: String(kind).toUpperCase(),
       x: snap(originX), y,
       w: snap(wide * CARD.w + (wide - 1) * GAP + FRAME_PAD * 2),
       h: snap(FRAME_HEAD + bodyH + FRAME_PAD)

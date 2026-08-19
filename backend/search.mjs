@@ -4,7 +4,6 @@
 // NB: settings.md (API keys, secrets) is deliberately NOT imported or scanned here (Phase 9 rule).
 import { listProjects, listItems } from './store.mjs';
 import { listAssets } from './library.mjs';
-import { listGenerations } from './generate.mjs';
 
 // ── query parsing ──
 // Recognized filter keys and their short aliases. Values compare loosely; rating: supports >=,<=,>,<.
@@ -50,21 +49,6 @@ function rows() {
       fields: { project: p.id, type: 'project' },
       location: { page: 'project', projectId: p.id, tab: 'references' }
     });
-  }
-
-  for (const p of projects) {
-    for (const g of listGenerations(p.id)) {
-      const has = [];
-      if (g.note) has.push('note');
-      if (g.status === 'failed') has.push('failure');
-      if ((g.promotedAssets || []).length || (g.routedTo && g.routedTo.kind && g.routedTo.kind !== 'none')) has.push('route');
-      out.push({
-        type: 'generation', id: g.id, pid: p.id, title: (g.label || g.shot || g.id), sub: projName(p.id) + ' · ' + (g.model || ''),
-        haystack: [g.prompt, g.note, g.model, g.status, g.label].filter(Boolean).join(' ').toLowerCase(),
-        fields: { project: p.id, type: g.status === 'failed' ? 'failure' : (g.tool === 'reroll' ? 'clip' : 'gen'), kind: /\.mp4$/i.test(g.file || '') ? 'clip' : 'img', status: g.status, review: g.reviewState, rating: g.rating || 0, final: g.final ? 'true' : 'false', model: g.model, shot: g.shot || '', batch: g.batchId || '', has, created: g.started },
-        location: { page: 'project', projectId: p.id, tab: 'generate', entity: { type: 'generation', id: g.id } }
-      });
-    }
   }
 
   for (const it of listItems()) {

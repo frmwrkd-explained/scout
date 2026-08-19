@@ -48,7 +48,7 @@ test('attachmentPromptLine — image refs carry the exact generation-ref triple;
   // image → citable as a generation ref by id, no prose description
   assert.match(line, /context\/References\/hero\.jpg \(image\)/);
   assert.match(line, /refs:\[\{ scope:"p", folder:"References", name:"hero\.jpg" \}\]/);
-  // document → the agent reads it through FrameForge's own HTTP API
+  // document → the agent reads it through Scout's own HTTP API
   assert.match(line, /GET \/api\/context\/p\/file\?folder=Script&name=treatment\.pdf/);
 });
 

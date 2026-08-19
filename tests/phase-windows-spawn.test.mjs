@@ -126,8 +126,8 @@ test('runOnce survives a storage root that does not exist yet', async () => {
      blaming the binary. Caught by CI, not by the local box, where workspace/ happened to exist. */
   const missing = path.join(BACKEND, '..', 'no-such-storage-root-' + Date.now());
   assert.equal(fs.existsSync(missing), false);
-  const prev = process.env.FRFG_DATA;
-  process.env.FRFG_DATA = missing;
+  const prev = process.env.SCOUT_DATA;
+  process.env.SCOUT_DATA = missing;
   try {
     const { runOnce, resolveBin } = await import('../backend/jobs.mjs');
     const node = resolveBin('node');
@@ -136,7 +136,7 @@ test('runOnce survives a storage root that does not exist yet', async () => {
     assert.equal(r.code, 0, 'a missing storage root must not look like a missing binary: ' + r.err);
     assert.equal(r.out, 'ok');
   } finally {
-    if (prev === undefined) delete process.env.FRFG_DATA; else process.env.FRFG_DATA = prev;
+    if (prev === undefined) delete process.env.SCOUT_DATA; else process.env.SCOUT_DATA = prev;
   }
 });
 
@@ -158,19 +158,9 @@ test('runOnce actually launches an npm .cmd shim', { skip: !IS_WIN && 'Windows-o
   assert.match(r.out.trim(), /^\d+\.\d+/);
 });
 
-test('video tool resolution has a win32 branch — `which` does not exist there', () => {
-  const src = read('video.mjs');
-  assert.match(src, /process\.platform === 'win32'/,
-    'resolveTool relied on which(1) plus POSIX-only fallbacks, so ffmpeg/ffprobe/yt-dlp resolved to '
-    + 'null on every Windows machine even when installed');
-  assert.match(src, /resolveBin\(name\)/, 'the win32 branch should reuse the PATHEXT walk, not invent a second one');
-});
-
-test('remotion prefers the .cmd shim on Windows over the unrunnable extensionless one', () => {
-  const src = read('remotion.mjs');
-  const m = /\['remotion\.cmd'[^\]]*\]/.exec(src);
-  assert.ok(m, 'remotionCli must probe Windows shim spellings explicitly');
-  assert.ok(m[0].indexOf("'remotion.cmd'") < m[0].indexOf("'remotion'"),
-    'npm writes remotion, remotion.cmd AND remotion.ps1 — testing the extensionless sh script first '
-    + 'always picked the one CreateProcess cannot run');
-});
+/* The last two cases here checked the win32 branches of video.mjs (ffmpeg/ffprobe/yt-dlp) and
+ * remotion.mjs (the .cmd shim). Both modules went with the film domain on 2026-08-19. The rule they
+ * enforced is still enforced above, by 'no backend module spawns a resolved binary without
+ * planLaunch' — which fails on any host the moment someone adds a raw spawn back, and applies to
+ * whatever Scout spawns next. See docs/decisions.md.
+ */

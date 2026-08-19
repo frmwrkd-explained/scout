@@ -9,8 +9,8 @@
 //     on EVERY prepare so tampering never persists), the mounted skill packs, the house-rules skill,
 //     plus the generated Index + Core-API reference the router consumes.
 //
-//  2. THE INDEX GENERATOR. renderIndex() produces the `<frameforge-index>` block the router skill
-//     (backend/skills/frameforge-router/SKILL.md) reads: api base + project + mode + lock ids, one
+//  2. THE INDEX GENERATOR. renderIndex() produces the `<scout-index>` block the router skill
+//     (backend/skills/scout-router/SKILL.md) reads: api base + project + mode + lock ids, one
 //     line per mounted pack (from the pack's OWN frontmatter), one line per ENABLED tool (capability
 //     + invocation pointer + registered directive types), and a pointer to the generated Core-API
 //     route reference. Disabled entries are omitted entirely — invisible, not refused. Adding a
@@ -41,14 +41,14 @@ import { listUserTools, mountName } from './userTools.mjs';
 // it fresh into every session home and never edit it. fileURLToPath (not URL.pathname) so a repo path
 // containing spaces — this one does — resolves without percent-encoding.
 const SYSTEM_SKILLS_SRC = path.join(path.dirname(fileURLToPath(import.meta.url)), 'skills');
-const SYSTEM_ROUTER_SRC = path.join(SYSTEM_SKILLS_SRC, 'frameforge-router');
+const SYSTEM_ROUTER_SRC = path.join(SYSTEM_SKILLS_SRC, 'scout-router');
 export function systemRouterDir() { return SYSTEM_ROUTER_SRC; }
 
 // The tool-builder system skill (ticket 25). Unlike the router it is NOT mounted into every session
 // — only into a session created with kind:'toolsmith' (the "+ New tool" surface). Always-mounting it
 // would tax every unrelated turn with its description and weaken the "only enabled skills mount"
 // property the agent-home tests exist to guard.
-const SYSTEM_TOOLSMITH_SRC = path.join(SYSTEM_SKILLS_SRC, 'frameforge-toolsmith');
+const SYSTEM_TOOLSMITH_SRC = path.join(SYSTEM_SKILLS_SRC, 'scout-toolsmith');
 export function toolsmithDir() { return SYSTEM_TOOLSMITH_SRC; }
 
 // ── built-in skill packs (ticket 23) ──
@@ -58,22 +58,10 @@ export function toolsmithDir() { return SYSTEM_TOOLSMITH_SRC; }
 // like the router — COPIED fresh from source into each session home on EVERY prepare, so a tamper of
 // the mounted copy never persists (a symlink would let an edit reach back into the source tree).
 //
-// A built-in pack MAY default ON (unlike repo packs, which default OFF for hackathon compliance): the
-// storyboard workflow is the demo vehicle, and every step it drives is itself confirm-gated (staged
-// proposals + the universal money gate), so a default-ON orchestrator still writes and spends nothing
-// without the user's word on a card. Enablement is resolved exactly like every other pack — an
-// explicit enabledSkillPacks entry wins, otherwise the pack's own enabledByDefault.
-const SYSTEM_STORYBOARD_SRC = path.join(SYSTEM_SKILLS_SRC, 'storyboard-workflow');
-export function storyboardWorkflowDir() { return SYSTEM_STORYBOARD_SRC; }
-// The manual round-trip pack (render elsewhere, file the downloads back). Defaults OFF: it is a
-// deliberate alternate workflow, not the house style, and mounting its description into every
-// session would tax turns that will never leave the app. Users who work this way turn it on once.
-const SYSTEM_MANUAL_SRC = path.join(SYSTEM_SKILLS_SRC, 'manual-roundtrip');
-export function manualRoundtripDir() { return SYSTEM_MANUAL_SRC; }
-export const BUILTIN_PACKS = [
-  { dir: SYSTEM_STORYBOARD_SRC, enabledByDefault: true },
-  { dir: SYSTEM_MANUAL_SRC, enabledByDefault: false }
-];
+// Scout ships no built-in workflow pack yet. FrameForge's two (storyboard-workflow, manual-roundtrip)
+// were film and went with the domain. The mechanism is untouched and the list is deliberately empty
+// rather than deleted: M4 fills it, and an empty array keeps every enablement path exercised.
+export const BUILTIN_PACKS = [];
 
 const R = () => getStorageRoot();
 const chatRoot = () => path.join(R(), 'chat');
@@ -84,11 +72,11 @@ export const agentHomeDir = sessionId => path.join(agentHomesRoot(), safe(String
 export const houseRulesDir = () => path.join(chatRoot(), 'house-rules');
 const houseRulesFile = () => path.join(houseRulesDir(), 'SKILL.md');
 
-// ── the self API base the agent operates FrameForge through ──
-// 127.0.0.1 only (never localhost — the backend binds IPv4). index.mjs stamps FRFG_SELF_PORT when it
+// ── the self API base the agent operates Scout through ──
+// 127.0.0.1 only (never localhost — the backend binds IPv4). index.mjs stamps SCOUT_SELF_PORT when it
 // binds; fall back to the documented default so a hermetic call still renders a plausible base.
 export function selfPort() {
-  return Number(process.env.FRFG_SELF_PORT) || Number(process.argv[2]) || Number(process.env.PORT) || 5176;
+  return Number(process.env.SCOUT_SELF_PORT) || Number(process.argv[2]) || Number(process.env.PORT) || 5176;
 }
 export function selfApiBase() { return 'http://127.0.0.1:' + selfPort(); }
 
@@ -269,7 +257,7 @@ export const CORE_API_ROUTES = [
   { method: 'GET',  path: '/api/generations/:pid', summary: 'List a project\'s generations (id, status queued|running|done|failed, cost, reviewState new|kept|killed, rating, batchId). Read reviewState/rating here to enumerate kept vs rejected candidates — filter by batchId to answer "the rejected ones of that batch" without asking the user to restate them. Emit a `generation` directive referencing the id(s); the app renders the live card.' },
   { method: 'POST', path: '/api/batches/estimate', summary: 'Estimate a batch cost WITHOUT queueing. Body: { model, shotIds, variantCount }. Use this for the money gate before /api/batches.' },
   { method: 'POST', path: '/api/batches', summary: 'Queue a multi-variant batch (one generation per variant). Body: { pid, prompt, model, shotIds, variantCount, sessionId?, ... }. Pass sessionId to attribute the spend to this chat session. Emit a `generation.batch` directive referencing the returned batch id; the app renders one grid card.' },
-  { method: 'GET',  path: '/api/manual/:pid', summary: 'Manual round-trip state: { inbox (files waiting to be filed, with state ready|settling|partial|ignored), handoffs, open, dir }. The user rendered these frames OUTSIDE FrameForge and dropped them in projects/<pid>/inbox/.' },
+  { method: 'GET',  path: '/api/manual/:pid', summary: 'Manual round-trip state: { inbox (files waiting to be filed, with state ready|settling|partial|ignored), handoffs, open, dir }. The user rendered these frames OUTSIDE Scout and dropped them in projects/<pid>/inbox/.' },
   { method: 'POST', path: '/api/manual/:pid/handoff', summary: 'Record prompts handed out to an external tool (Google Flow, Midjourney…). Body: { entries:[{shot,title,prompt,model,aspect}], perShot }. Returns { id, sheet, plain } — `sheet` is the paste-ready text. The ORDER is the point: it is what lets downloads be matched back for free. `prompt` must be the COMPOSED prompt (look joined in), never the bare shot.prompt.' },
   { method: 'POST', path: '/api/manual/:pid/scan', summary: 'Free match pass over the inbox — filename first, then the recorded handoff order. Returns { counts, proposals:[{file,shot,confidence,matchedBy,why,prompt}] }. PROPOSES ONLY; nothing is written. Always run this before spending a turn on /sort.' },
   { method: 'POST', path: '/api/manual/:pid/sort', summary: 'Ask the agent CLI to look at inbox files and match them to shots. Body: { files:[name…] } — send ONLY what /scan left unmatched. Returns proposals in the same shape. Costs subscription tokens; PROPOSES ONLY.' },
@@ -277,13 +265,13 @@ export const CORE_API_ROUTES = [
 ];
 export function renderCoreApiRef(apiBase = selfApiBase()) {
   const lines = [
-    '# FrameForge Core API — route reference',
+    '# Scout Core API — route reference',
     '',
     'Generated per session from route metadata. Base URL for every path below:',
     '',
     '    ' + apiBase,
     '',
-    'The agent operates FrameForge exclusively through these HTTP routes (the same seam the app UI',
+    'The agent operates Scout exclusively through these HTTP routes (the same seam the app UI',
     'uses). Reference records by id and let the app render them — never restate stored data.',
     '',
     '| Method | Path | What it does |',
@@ -295,7 +283,7 @@ export function renderCoreApiRef(apiBase = selfApiBase()) {
 }
 
 // ── the Index ──
-// Render the `<frameforge-index>` block the router SKILL.md consumes verbatim. Pure + deterministic
+// Render the `<scout-index>` block the router SKILL.md consumes verbatim. Pure + deterministic
 // so it is unit-testable without any disk or process. Disabled packs/tools are omitted ENTIRELY.
 //
 // The `[skills/<id>]` pointer is a SKILL-INVOCATION REFERENCE the agent reads, not a filesystem path:
@@ -311,7 +299,7 @@ export function renderIndex({ apiBase = selfApiBase(), project = null, mode = 'a
     ? Object.entries(locks).map(([k, v]) => k + '=' + v).join(', ')
     : 'none';
   const L = [];
-  L.push('<frameforge-index>');
+  L.push('<scout-index>');
   L.push('api: ' + apiBase);
   L.push('project: ' + (project || 'none') + '   mode: ' + (mode === 'manual' ? 'manual' : 'agent'));
   L.push('locks: ' + lockStr);
@@ -343,7 +331,7 @@ export function renderIndex({ apiBase = selfApiBase(), project = null, mode = 'a
   L.push('');
   L.push('## Core API');
   L.push(coreApiRefPath);
-  L.push('</frameforge-index>');
+  L.push('</scout-index>');
   return L.join('\n');
 }
 
@@ -355,7 +343,7 @@ export function seedHouseRules() {
   const body = [
     '---',
     'name: house-rules',
-    'description: Your standing preferences for the FrameForge chat agent. Editable.',
+    'description: Your standing preferences for the Scout chat agent. Editable.',
     'user-editable: true',
     '---',
     '',
@@ -477,7 +465,7 @@ function carryAuth(home, profile) {
 // gets `Claude Code-credentials-<sha256(dir)[:8]>`. We check the session home's own hashed entry
 // first (so a session that was ever logged into directly keeps its own identity), then fall back to
 // the default entry to inherit the user's normal login. That fallback is deliberate and is where we
-// differ from a profile manager: FrameForge chat sessions are ephemeral views of ONE logged-in user,
+// differ from a profile manager: Scout chat sessions are ephemeral views of ONE logged-in user,
 // not separate accounts, so inheriting is correct rather than a cross-profile leak.
 export function keychainServiceFor(base, configDir) {
   if (!configDir) return base;
@@ -515,7 +503,7 @@ export function prepareAgentHome({ session = {}, apiBase = selfApiBase() } = {})
   fs.mkdirSync(skillsDir, { recursive: true });
 
   // 1) router skill — always the fresh system copy from the backend source tree
-  copyTree(SYSTEM_ROUTER_SRC, path.join(skillsDir, 'frameforge-router'));
+  copyTree(SYSTEM_ROUTER_SRC, path.join(skillsDir, 'scout-router'));
 
   // 2) house-rules — seeded (empty) if missing, then copied in from its persistent canonical source
   seedHouseRules();
@@ -525,7 +513,7 @@ export function prepareAgentHome({ session = {}, apiBase = selfApiBase() } = {})
   // 3) the tool builder — ONLY for a kind:'toolsmith' session. This is how the "+ New tool" button
   // "loads the skill": no pack toggle, no user setup, just a session born with it mounted.
   const toolsmith = session.kind === 'toolsmith';
-  if (toolsmith) copyTree(SYSTEM_TOOLSMITH_SRC, path.join(skillsDir, 'frameforge-toolsmith'));
+  if (toolsmith) copyTree(SYSTEM_TOOLSMITH_SRC, path.join(skillsDir, 'scout-toolsmith'));
 
   // 4) enabled packs — mounted with file trees intact (symlink, else copy)
   // The toolsmith rides in this list rather than in an Index section of its own, deliberately: the
@@ -535,14 +523,14 @@ export function prepareAgentHome({ session = {}, apiBase = selfApiBase() } = {})
   const packs = enabledPacks();
   if (toolsmith) {
     const fm = packFrontmatter(SYSTEM_TOOLSMITH_SRC);
-    packs.unshift({ id: 'frameforge-toolsmith', name: 'frameforge-toolsmith', description: fm.description, triggers: fm.triggers });
+    packs.unshift({ id: 'scout-toolsmith', name: 'scout-toolsmith', description: fm.description, triggers: fm.triggers });
   }
   // the toolsmith entry carries no `dir` — it is already copied above, so it is Index-only here
   const mounts = packs.filter(p => p.dir).map(p => ({ id: p.id, name: p.name, mode: mountPack(p, skillsDir) }));
 
   // 5) enabled USER tools — the filmmaker's own authored instructions, copied (never symlinked: the
   // source lives in the live datastore and the tamper-reset must not be able to reach back into it).
-  // Prefixed `tool-` so an authored id can never shadow frameforge-router / house-rules / a pack.
+  // Prefixed `tool-` so an authored id can never shadow scout-router / house-rules / a pack.
   // Hoisted above the mount loop: tool enablement is PER PROJECT, so which tools get mounted into
   // this session home — not just which ones the Index lists — depends on the session's project.
   // A standalone session passes null and resolves against the global defaults alone.
@@ -603,7 +591,7 @@ export function prepareAgentHome({ session = {}, apiBase = selfApiBase() } = {})
 // router skill (the SKILL.md itself is never edited — the Index is "injected at session start").
 export function indexInjection(indexText) {
   return [
-    'You are operating as the FrameForge chat orchestrator. Load and follow the `frameforge-router`',
+    'You are operating as the Scout chat orchestrator. Load and follow the `scout-router`',
     'skill in this session. It contains no capability itself — everything you can do is enumerated in',
     'this session\'s Index below. Anything not in the Index does not exist here.',
     '',
@@ -723,7 +711,7 @@ export function chatSkillsSurface() {
   routerFiles.sort((a, b) => (a.rel === 'SKILL.md' ? -1 : b.rel === 'SKILL.md' ? 1 : a.rel.localeCompare(b.rel)));
   const hr = readHouseRules();
   return {
-    router: { name: 'frameforge-router', description: routerDescription, content: routerContent, system: true, readOnly: true, files: routerFiles },
+    router: { name: 'scout-router', description: routerDescription, content: routerContent, system: true, readOnly: true, files: routerFiles },
     houseRules: { name: 'house-rules', content: hr.content, active: hr.active, editable: true },
     packs: listSkillPacks().map(p => ({ id: p.id, name: p.name, repo: p.repo, description: p.description, triggers: p.triggers, enabled: p.enabled, builtin: !!p.builtin, files: p.files.length })),
     tools: listChatTools()

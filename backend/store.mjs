@@ -1,4 +1,4 @@
-// FrameForge .md store — every piece of metadata lives as a portable markdown file
+// Scout .md store — every piece of metadata lives as a portable markdown file
 // under the storage root. No database, no JSON blobs on disk.
 import fs from 'fs';
 import path from 'path';
@@ -8,15 +8,13 @@ import { fileURLToPath } from 'url';
 // memory.mjs imports getStorageRoot/stamp back from here — the cycle is safe because every
 // reference on both sides is used inside a function, never at module-init time.
 import { memoryForAgent } from './memory.mjs';
-// modelCatalog.js is a pure data module (no imports, no browser globals) — safe at module init.
-import { DEFAULT_PREVIEW_MODEL } from '../frontend/modelCatalog.js';
 
 const APP_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // Both the config pointer and the default storage root are overridable via env so a packaged
 // desktop app (Electron) can redirect them to a writable per-user location — the app bundle
 // itself is read-only. Unset (plain `npm start`) → the original in-repo behavior.
-const CONFIG_MD = process.env.FRFG_CONFIG || path.join(APP_ROOT, 'config.md');
-const DEFAULT_ROOT = process.env.FRFG_DATA || path.join(APP_ROOT, 'workspace');
+const CONFIG_MD = process.env.SCOUT_CONFIG || path.join(APP_ROOT, 'config.md');
+const DEFAULT_ROOT = process.env.SCOUT_DATA || path.join(APP_ROOT, 'workspace');
 
 // ── config pointer (only file that lives outside the storage root) ──
 export function getStorageRoot() {
@@ -30,7 +28,7 @@ export function getStorageRoot() {
 export function setStorageRoot(p) {
   const abs = p.replace(/^~(?=\/|$)/, os.homedir());
   fs.writeFileSync(CONFIG_MD, matter.stringify(
-    'Pointer to the FrameForge storage root. Everything else lives inside that folder as .md files.\n',
+    'Pointer to the Scout storage root. Everything else lives inside that folder as .md files.\n',
     { storageRoot: abs }
   ));
   return abs;
@@ -74,7 +72,7 @@ export const paths = {
   jobsDir: () => path.join(R(), 'jobs'),
   // Licence state: the signed token, the machine id, and when we last reached the server.
   // Inside the storage root like everything else, so "move my data" moves it too — and so
-  // the tests' FRFG_DATA temp dir isolates it without licence.mjs knowing about tests.
+  // the tests' SCOUT_DATA temp dir isolates it without licence.mjs knowing about tests.
   licenceMd: () => path.join(R(), 'licence.md')
 };
 export function safe(name) { return name.replace(/[^\w.\-]+/g, '_'); }
@@ -92,11 +90,6 @@ const DEFAULT_SKILL_REPOS = [
 const DEFAULT_SETTINGS = {
   budget: 60,
   showHints: true,
-  // Integration switchboard — see shared/integrations.mjs. Sparse on purpose: only ids the user has
-  // explicitly toggled appear here, everything else falls back to that module's own `defaultOn`.
-  // Storing it sparsely means a module added in a later version arrives with its intended default
-  // instead of being frozen off by whatever was written to disk today.
-  enabledModules: {},
   // set once the first-run wizard has been completed, so it never re-prompts
   onboarded: false,
   trackedFolders: [],
@@ -107,67 +100,10 @@ const DEFAULT_SETTINGS = {
   // readable error instead of silently fabricating a "practice" version that looks like real output.
   // Opt back in from Settings only for offline development.
   agentSimulateFallback: false,
-  // Manual round-trip (backend/manual.mjs) — sorting downloads back onto shots. Deliberately a
-  // CHEAP model: this is "which of these 12 shots is this frame", not direction. The filename and
-  // handoff-order tiers resolve most files for free and never reach the agent at all.
-  manualSortModel: 'claude-sonnet-5',
-  manualSortBatch: 8,
-  // how many renders the external tool produces per prompt (Flow does 4) — the default the
-  // handoff sheet is created with, so order matching knows the stride
-  manualPerShot: 1,
-  // Groq — free-tier accelerator for transcription, vision metadata and story breakdown
+  // Groq — the cheap-LLM accelerator. Scout's only remaining use is backend/distill.mjs, which
+  // turns a closed session transcript into durable learnings. See docs/03_MEMORY.md.
   groqApiKey: '',
-  // auto-initialize: analyze every new raster image on arrival (Finder drops included)
-  autoAnalyze: false,
   groqTextModel: 'llama-3.3-70b-versatile',
-  // llama-4 scout AND maverick were both deprecated on Groq (2026-07-17 / 2026-03-09). qwen3.6
-  // is Groq's remaining production vision model — do not "restore" a llama-4 id here, it 404s.
-  groqVisionModel: 'qwen/qwen3.6-27b',
-  groqWhisperModel: 'whisper-large-v3-turbo',
-  // Vision tier — 'groq' (free, fast, good enough to catalogue) or 'fal' (paid, Gemini-class,
-  // reads angle/lens/light well enough to regenerate the frame). Depth 'deep' additionally
-  // writes a full `reconstruct` prompt into the asset's sidecar. Both are per-call overridable;
-  // auto-analyze and bulk runs deliberately stay on these defaults so a library sweep can't
-  // silently run up a premium bill.
-  visionProvider: 'groq',
-  visionDepth: 'quick',
-  // fal has no native Gemini vision endpoint — this is an OpenRouter slug passed through
-  // `openrouter/router/vision`, so pointing at a newer Gemini needs no code change.
-  falVisionModel: 'google/gemini-2.5-flash',
-  // Transcription engine choice — 'groq' (cloud, needs groqApiKey) or 'local' (on-device,
-  // no key/cost). Whichever is preferred tries first; the transcribe route falls back to the
-  // other engine automatically on failure. localTranscriberCommand is resolved via resolveBin()
-  // at call time, same pattern as higgsfieldCommand/agentCommand below.
-  transcriber: 'groq',
-  localTranscriberCommand: 'parakeet-mlx',
-  // Remotion — external project this app can hand shots off to (Open in Remotion)
-  remotionProject: '',
-  // Optional explicit entry point, relative to remotionProject (e.g. 'src/remotion/index.ts').
-  // Empty = auto-detect via remotion.config.ts → package.json scripts → conventional layouts.
-  remotionEntry: '',
-  // FAL — lets any asset be pushed to fal storage so generation requests can reference it
-  falApiKey: '',
-  // Kie.ai — one Bearer key, 100+ models (flux-2, nano-banana-pro, kling, veo, sora…) via REST
-  kieApiKey: '',
-  // Higgsfield — driven through its local CLI (auth via `higgsfield auth login`); override the
-  // binary name/path here if it isn't plain `higgsfield` on PATH. Arcads needs no key — it's
-  // reached through the connected Claude CLI (agentCommand) via the Arcads MCP tool.
-  higgsfieldCommand: 'higgsfield',
-  // Generation model defaults (consumed by the Generate tool; editable in Model Catalog later)
-  // model ids hidden from generation pickers (toggled in Tools → Model Catalog)
-  disabledModels: [],
-  // extra models enabled from a synced provider catalog (Settings → FAL → Manage models);
-  // entries: { id, provider, kind, label, note } — for FAL the id IS the queue path
-  customModels: [],
-  modelDefaults: {
-    preview: DEFAULT_PREVIEW_MODEL,
-    render: 'fal-ai/nano-banana-pro',
-    edit: 'fal-ai/nano-banana-2/edit',
-    video: 'fal-ai/bytedance/seedance-2.0/image-to-video',
-    music: 'fal-ai/stable-audio-25/text-to-audio',
-    voice: 'fal-ai/elevenlabs/tts/turbo-v2.5',
-    sfx: 'fal-ai/elevenlabs/sound-effects/v2'
-  }
 };
 // Raw read: defaults + whatever is on disk, with NO migration side-effect. Both getSettings()
 // (which may persist a migration) and saveSettings() (which must not re-enter it) read through
@@ -208,7 +144,7 @@ export function getSettings() {
     // write directly — going through saveSettings() would re-enter getSettings() (see above)
     try {
       writeMd(paths.settings(), s,
-        'FrameForge settings. Edit here or in the app — both work; this file is the source of truth.\n');
+        'Scout settings. Edit here or in the app — both work; this file is the source of truth.\n');
     } catch { /* read-only root — the in-memory migration still stands for this call */ }
   }
   return s;
@@ -217,7 +153,7 @@ export function getSettings() {
 // publicSettings(), which swaps each set key for REDACTED. saveSettings() drops
 // REDACTED values from incoming patches so a round-tripped settings object can't
 // clobber the real keys on disk.
-export const SECRET_SETTING_KEYS = ['falApiKey', 'kieApiKey', 'groqApiKey'];
+export const SECRET_SETTING_KEYS = ['groqApiKey'];
 export const REDACTED = '••••••••';
 export function publicSettings() {
   const s = getSettings();
@@ -243,7 +179,7 @@ export function saveSettings(patch) {
   if (needsRepoMigration(base)) base.skillRepos = DEFAULT_SKILL_REPOS;
   const next = { ...base, ...patch };
   writeMd(paths.settings(), next,
-    'FrameForge settings. Edit here or in the app — both work; this file is the source of truth.\n');
+    'Scout settings. Edit here or in the app — both work; this file is the source of truth.\n');
   return next;
 }
 
@@ -409,7 +345,7 @@ export function appendActivity(ev) {
   let data = { events: [] };
   try { data = readMd(paths.activityMd()).data; } catch { /* none */ }
   const events = [{ ts: Date.now(), ...ev }, ...(data.events || [])].slice(0, 60);
-  writeMd(paths.activityMd(), { events }, 'Recent activity, newest first. Rendered on the FrameForge home page.\n');
+  writeMd(paths.activityMd(), { events }, 'Recent activity, newest first. Rendered on the Scout home page.\n');
 }
 export function getActivity() {
   try { return readMd(paths.activityMd()).data.events || []; } catch { return []; }

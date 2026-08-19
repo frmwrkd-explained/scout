@@ -17,8 +17,8 @@ import os from 'node:os';
 import path from 'node:path';
 
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'frfg-licence-'));
-process.env.FRFG_DATA = ROOT;
-process.env.FRFG_LICENCE_API = 'https://licence.test.invalid';
+process.env.SCOUT_DATA = ROOT;
+process.env.SCOUT_LICENCE_API = 'https://licence.test.invalid';
 
 const { signToken } = await import('../backend/licenceToken.mjs');
 const licence = await import('../backend/licence.mjs');
@@ -171,12 +171,12 @@ test('seats-full comes back intact so the app can name the machines', async () =
 });
 
 test('the escape hatch turns enforcement off entirely', () => {
-  process.env.FRFG_LICENCE_OFF = '1';
+  process.env.SCOUT_LICENCE_OFF = '1';
   try {
     assert.equal(licence.isEnforced(PUB), false);
     assert.equal(licence.licenceState({ now: NOW, publicKey: PUB }).status, 'off');
   } finally {
-    delete process.env.FRFG_LICENCE_OFF;
+    delete process.env.SCOUT_LICENCE_OFF;
   }
 });
 

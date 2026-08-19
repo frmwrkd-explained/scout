@@ -10,7 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'frfg-guards-'));
-process.env.FRFG_DATA = ROOT;
+process.env.SCOUT_DATA = ROOT;
 
 const store = await import('../backend/store.mjs');
 const lib = await import('../backend/library.mjs');

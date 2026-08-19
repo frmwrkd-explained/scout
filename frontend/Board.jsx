@@ -25,13 +25,9 @@ import { api } from './api';
 import { MONO } from './tokens';
 import { Btn, Empty } from './ui';
 import { RenderLightbox, mediaKind } from './RenderMedia';
-import { takesForShot, heroTake, isVideoFile } from './shotTakes';
-import { buildEntityPool } from './entities';
-import { assetKindOf, assetKindDef } from '../shared/assetKinds.mjs';
-import { ShotNode, AssetNode, TextNode, NoteNode, FrameNode, LockPip, TEXT_TONES } from './BoardNodes';
-import BoardInspector, { INSPECTOR_H } from './BoardInspector';
+import { AssetNode, TextNode, NoteNode, FrameNode, LockPip, TEXT_TONES } from './BoardNodes';
 import {
-  GRID, CARD, CAPTION_H, LAYOUTS,
+  GRID, CARD, LAYOUTS,
   clampZoom, snap, bounds, fitView, toBoard, arrowGeom, isRect, blankNode,
   alignNodes, distributeNodes, snapGuides
 } from './boardLayout';
@@ -61,13 +57,12 @@ export default class Board extends React.Component {
       sel: {},                   // id → true
       gesture: null,             // { kind, ... } — transient, never persisted
       edit: null,                // node id whose text is being edited
-      shelf: 'shots',            // 'shots' | 'assets' | 'refs' | 'library' | null
+      shelf: 'assets',            // 'assets' | 'refs' | 'library' | null
       folderKinds: {},           // per-folder References/Assets overrides (context/_folders.md)
       q: '',
       busy: '', err: '',
       lightbox: null,
       exported: null,
-      inspect: null,              // shot id whose side card is open
       guides: []                  // live snap lines, transient — never persisted
     };
     this.canvas = React.createRef();
@@ -108,12 +103,6 @@ export default class Board extends React.Component {
     catch { /* no manifest yet — the name-based defaults stand */ }
   }
   pdef() { return this.props.pdef || {}; }
-  shots() { return (this.props.app.state.shots || []).filter(s => s.proj === this.props.pid); }
-  shotById(id) { return this.shots().find(s => s.id === id) || null; }
-
-  // A take's URL. renders/ files are served per project; a take with no file yet (still rendering)
-  // has none, and the strip shows its status instead of a broken image.
-  takeUrl(t) { return t && t.file ? api.renderUrl(this.props.pid, t.file) : null; }
   assetUrl(n) {
     return n.scope === 'library' ? api.libraryUrl(n.name, n.folder) : api.contextUrl(n.scope, n.name, n.folder);
   }
@@ -305,14 +294,13 @@ export default class Board extends React.Component {
     e.stopPropagation();
     const p0 = this.pt(e);
     const w0 = node.w, h0 = node.h;
-    // A shot card is a fixed 16:9 plus its caption strip — resizing it freely would letterbox the
-    // take inside its own card. Shots and assets keep aspect; text, notes and frames are free.
-    const lock = node.t === 'shot' ? (CARD.w / CARD.h) : node.t === 'asset' ? (w0 / h0) : 0;
+    // Assets keep their own aspect ratio when resized; text, notes and frames are free.
+    const lock = node.t === 'asset' ? (w0 / h0) : 0;
     this.begin(e, { kind: 'resize' },
       ev => {
         const p = this.pt(ev);
         let w = Math.max(GRID * 3, snap(w0 + (p.x - p0.x)));
-        let h = lock ? Math.round(w / lock) + (node.t === 'shot' ? CAPTION_H : 0) : Math.max(GRID * 2, snap(h0 + (p.y - p0.y)));
+        let h = lock ? Math.round(w / lock) : Math.max(GRID * 2, snap(h0 + (p.y - p0.y)));
         this.setState(s => ({ doc: { ...s.doc, nodes: s.doc.nodes.map(n => (n.id === node.id ? { ...n, w, h } : n)) } }));
       },
       () => this.queueSave('resized a node'));
@@ -362,7 +350,6 @@ export default class Board extends React.Component {
       // peel one layer at a time — Escape out of a full-screen canvas straight to nothing selected
       // loses two states at once and feels like the app dropped your place
       if (this.state.lightbox) return this.setState({ lightbox: null });
-      if (this.state.inspect) return this.setState({ inspect: null });
       if (this.props.app.state.boardFull) return this.props.app.setState({ boardFull: false });
       this.setState({ sel: {}, edit: null });
       return;
@@ -382,7 +369,6 @@ export default class Board extends React.Component {
     else if (k === '-') { mine(); this.zoomBy(0.8); }
     else if (k === '0') { mine(); this.fit(); }
     else if (k === 'f') { mine(); this.props.app.setState(st => ({ boardFull: !st.boardFull })); }
-    else if (k === 'v') { mine(); this.toggleShow(); }
     else if (k === 'g') { mine(); this.align(this.state.doc ? this.state.doc.layout : 'scene-grid'); }
     else if (ids.length && (k === 'ArrowLeft' || k === 'ArrowRight' || k === 'ArrowUp' || k === 'ArrowDown')) {
       // Nudge by one grid cell, or by one pixel with shift for the last hair of alignment.
@@ -444,20 +430,6 @@ export default class Board extends React.Component {
       this.props.app.showToast('Aligned · ' + (LAYOUTS.find(l => l.id === layout) || {}).label, 'green');
     } catch (e) { this.setState({ err: e.message, busy: '' }); }
   }
-  async toggleShow() {
-    const next = this.state.doc.show === 'all' ? 'selected' : 'all';
-    this.setState(s => ({ doc: { ...s.doc, show: next } }));
-    try { await api.setBoardShow(this.props.pid, next); } catch (e) { this.setState({ err: e.message }); }
-  }
-  async syncShots() {
-    this.setState({ busy: 'sync' });
-    try {
-      const { board, added } = await api.syncBoardShots(this.props.pid);
-      this.setState({ doc: board, busy: '' });
-      this.props.app.showToast(added.length ? 'Pulled in ' + added.length + ' shot' + (added.length === 1 ? '' : 's') : 'Every shot is already on the board', added.length ? 'green' : 'amber');
-      if (added.length) setTimeout(() => this.fit(), 30);
-    } catch (e) { this.setState({ err: e.message, busy: '' }); }
-  }
   async syncAssets() {
     this.setState({ busy: 'assets' });
     try {
@@ -478,16 +450,6 @@ export default class Board extends React.Component {
       this.setState({ busy: '', exported: r });
       this.props.app.showToast('Board exported · ' + r.width + '×' + r.height, 'green');
     } catch (e) { this.setState({ err: e.message, busy: '' }); }
-  }
-
-  // Clicking a take in the filmstrip SETS it. The board is a decision surface: a version toggle
-  // that only displays would make you leave the board to act on what it just showed you.
-  async pickTake(shot, take) {
-    try {
-      await api.patchShot(this.props.pid, shot.id, { selectedCandidate: take.id, selectedAt: Date.now() }, 'selected ' + take.id + ' from the board');
-      this.props.app.sync && this.props.app.sync();
-      this.props.app.showToast('Take selected · ' + (shot.title || shot.id), 'green');
-    } catch (e) { this.setState({ err: e.message }); }
   }
 
   // ── bringing assets in ───────────────────────────────────────────────────────────────────────
@@ -556,41 +518,27 @@ export default class Board extends React.Component {
     const { q, shelf } = this.state;
     const needle = q.trim().toLowerCase();
     const match = s => !needle || s.toLowerCase().includes(needle);
-    if (shelf === 'shots') {
-      const on = new Set((this.state.doc.nodes || []).filter(n => n.t === 'shot').map(n => n.shot));
-      return this.shots().filter(s => match((s.title || '') + ' ' + s.id))
-        .map(s => {
-          const hero = heroTake(this.pdef(), s);
-          return {
-            key: s.id, label: s.title || s.id,
-            sub: [s.scene ? 'sc ' + s.scene : '', s.type, s.status].filter(Boolean).join(' · '),
-            url: this.takeUrl(hero), video: hero && hero.video, dim: on.has(s.id),
-            spec: { t: 'shot', shot: s.id }
-          };
-        });
-    }
     const src = shelf === 'library'
       ? ((this.props.app.state.library || {}).items || []).map(c => ({ ...c, scope: 'library' }))
       : (((this.pdef().context || {}).items) || []).map(c => ({ ...c, scope: this.props.pid }));
 
-    // ASSETS and REFS are not the same material and must not share a list. Everything that is not
-    // in a production folder — the moodboard, the references board, and anything dropped at the
-    // context root (which is where a mood import lands) — is a REFERENCE. Mixing them buried the
-    // cast under twenty frames of scraped mood the moment a project had any.
-    const ov = this.state.folderKinds || {};
-    const isProduction = c => c.scope !== 'library' && !!assetKindOf(c.folder, ov);
+    // ASSETS and REFS are not the same material and must not share a list. Anything dropped at the
+    // context root is a REFERENCE; anything filed into a folder is an ASSET. The film vocabulary
+    // (cast / locations / wardrobe / props) that used to decide this went with the film domain, so
+    // the folder name IS the kind now — the same rule backend/board.mjs's syncAssets applies, and
+    // deliberately not a second table. T15 replaces both with Scout's own node kinds.
+    const isProduction = c => c.scope !== 'library' && !!c.folder;
 
     return src
       .filter(c => (c.type === 'image' || c.type === 'video') && match(c.name + ' ' + (c.folder || '')))
       .filter(c => (shelf === 'assets' ? isProduction(c) : shelf === 'refs' ? !isProduction(c) : true))
       .slice(0, 200)
       .map(c => {
-        const kind = c.scope === 'library' ? '' : assetKindOf(c.folder, ov);
+        const kind = c.scope === 'library' ? '' : (c.folder || '');
         return {
           key: (c.folder || '') + '/' + c.name, label: c.name,
-          // the KIND leads when there is one — "Cast" is what the card is, the folder is just where
-          // it happens to sit — and a root-level reference reads as "unfiled", never as a blank dash
-          sub: kind ? ((assetKindDef(kind) || {}).label || kind) : (c.folder || 'unfiled'),
+          // a root-level reference reads as "unfiled", never as a blank dash
+          sub: kind || (c.folder || 'unfiled'),
           url: c.scope === 'library' ? api.libraryUrl(c.name, c.folder) : api.contextUrl(c.scope, c.name, c.folder),
           video: c.type === 'video',
           spec: { t: 'asset', scope: c.scope, folder: c.folder || '', name: c.name, kind }
@@ -613,7 +561,7 @@ export default class Board extends React.Component {
           border: '1px solid var(--border-2)', boxShadow: '0 18px 44px rgba(0,0,0,.5)'
         }}>
         <div style={sx('flex:none;display:flex;border-bottom:1px solid var(--border)')}>
-          {[['shots', 'Shots'], ['assets', 'Assets'], ['refs', 'Refs'], ['library', 'Library']].map(([id, label]) => (
+          {[['assets', 'Assets'], ['refs', 'Refs'], ['library', 'Library']].map(([id, label]) => (
             <div key={id} onClick={() => this.setState({ shelf: id })} className={shelf === id ? '' : 'hFg'}
               title={id === 'assets' ? 'cast · locations · wardrobe · props' : id === 'refs' ? 'moodboards, references and anything unfiled' : undefined}
               style={{ ...sx('flex:1;text-align:center;padding:9px 0;font-size:10.5px;font-weight:600;cursor:pointer'), color: shelf === id ? 'var(--fg)' : 'var(--fg-faint)', boxShadow: shelf === id ? 'inset 0 -2px 0 var(--accent)' : 'none' }}>
@@ -657,7 +605,6 @@ export default class Board extends React.Component {
   // ── render: the toolbar ──────────────────────────────────────────────────────────────────────
   renderBar() {
     const { doc, busy, shelf } = this.state;
-    const all = doc.show === 'all';
     const full = !!this.props.app.state.boardFull;
     const pill = (label, on, onClick, title) => (
       <div key={label} onClick={onClick} title={title} className={on ? '' : 'hBd'}
@@ -667,22 +614,11 @@ export default class Board extends React.Component {
     );
     return (
       <div style={sx('flex:none;display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap;background:var(--surface)')}>
-        <div onClick={() => this.setState({ shelf: shelf ? null : 'shots' })} className="hBd" title="toggle the shelf"
+        <div onClick={() => this.setState({ shelf: shelf ? null : 'assets' })} className="hBd" title="toggle the shelf"
           style={{ ...sx('padding:4px 9px;border-radius:7px;cursor:pointer;font-size:11px;font-weight:600'), color: 'var(--fg-soft)', border: '1px solid var(--border-2)' }}>☰</div>
 
         <span style={{ fontFamily: MONO, fontSize: 9.5, color: 'var(--fg-faint)', letterSpacing: '.1em', marginLeft: 4 }}>ALIGN</span>
         {LAYOUTS.map(l => pill(l.label, doc.layout === l.id && busy !== 'align', () => this.align(l.id), l.hint))}
-
-        <div style={sx('width:1px;height:18px;background:var(--border-2);margin:0 4px')} />
-
-        {/* THE version toggle. Named for what it means to a director — the plan versus the takes —
-            rather than for the field it flips. */}
-        <div onClick={() => this.toggleShow()} title="V — switch between the approved plan and every take"
-          style={{ ...sx('display:flex;border-radius:7px;overflow:hidden;cursor:pointer'), border: '1px solid ' + (all ? 'var(--marked)' : 'var(--border-2)') }}>
-          {[['Selected plan', !all], ['All takes', all]].map(([label, on]) => (
-            <span key={label} style={{ ...sx('padding:4px 10px;font-size:11px;font-weight:600;white-space:nowrap'), background: on ? (all ? 'var(--marked)' : 'var(--raise)') : 'transparent', color: on ? (all ? 'var(--on-accent)' : 'var(--fg)') : 'var(--fg-faint)' }}>{label}</span>
-          ))}
-        </div>
 
         <div style={sx('width:1px;height:18px;background:var(--border-2);margin:0 4px')} />
 
@@ -696,7 +632,6 @@ export default class Board extends React.Component {
         {this.state.err && <span style={{ fontSize: 10.5, color: 'var(--danger)', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={this.state.err}>{this.state.err}</span>}
         {busy && <span style={{ fontFamily: MONO, fontSize: 9.5, color: 'var(--accent)', animation: 'dl-pulse 1.1s infinite' }}>{busy.toUpperCase()}…</span>}
 
-        <Btn variant="ghost" size="sm" onClick={() => this.syncShots()} title="put every shot on the board without moving anything">+ Shots</Btn>
         <Btn variant="ghost" size="sm" onClick={() => this.syncAssets()} title="put the project's cast, locations, wardrobe and props on the board">+ Assets</Btn>
         <Btn variant="ghost" size="sm" onClick={() => this.exportPng()} title="flatten the board to a PNG in the project's export folder">Export</Btn>
 
@@ -754,7 +689,6 @@ export default class Board extends React.Component {
     const v = this.view();
     const b = bounds(nodes);
     const one = nodes.length === 1 ? nodes[0] : null;
-    const kinds = new Set(nodes.map(n => n.t));
     const locked = nodes.every(n => n.locked);
 
     // Positioned in SCREEN space above the selection, clamped into the viewport so a bar for a card
@@ -808,9 +742,6 @@ export default class Board extends React.Component {
     bits.push(btn('⤓', () => this.reorderSel(false), false, 'send to back'));
     bits.push(btn(locked ? '🔒' : '🔓', () => this.patchSel({ locked: !locked }, locked ? 'unlocked' : 'locked'), locked, locked ? 'unlock' : 'lock in place'));
     bits.push(sep(6));
-    if (kinds.has('shot') && nodes.length === 1) {
-      bits.push(btn('Open', () => this.setState({ inspect: nodes[0].shot }), false, 'open the shot inspector'));
-    }
     bits.push(btn('⧉', () => this.duplicateSelected(), false, '⌘D — duplicate'));
     bits.push(<span key="del" onClick={e => { e.stopPropagation(); this.removeSelected(); }} className="hBgRed" title="⌫ — delete"
       style={sx('display:flex;align-items:center;justify-content:center;min-width:24px;height:24px;border-radius:6px;cursor:pointer;font-size:11px;color:var(--danger)')}>✕</span>);
@@ -832,7 +763,7 @@ export default class Board extends React.Component {
 
   // ── render: one node ─────────────────────────────────────────────────────────────────────────
   renderNode(n) {
-    const { sel, edit, doc } = this.state;
+    const { sel, edit } = this.state;
     const on = !!sel[n.id];
     const editing = edit === n.id;
     const setText = v => this.setState(s => ({ doc: { ...s.doc, nodes: s.doc.nodes.map(x => (x.id === n.id ? { ...x, text: v } : x)) } }));
@@ -840,18 +771,10 @@ export default class Board extends React.Component {
     const commit = () => { this.setState({ edit: null }); this.queueSave('edited text'); };
 
     let body = null;
-    if (n.t === 'shot') {
-      const shot = this.shotById(n.shot);
-      const takes = shot ? takesForShot(this.pdef(), shot).map(t => ({ ...t, url: this.takeUrl(t) })) : [];
-      const hero = shot ? heroTake(this.pdef(), shot) : null;
-      body = <ShotNode node={n} shot={shot} takes={takes} showAll={doc.show === 'all'} selected={on}
-        hero={hero ? { ...hero, url: this.takeUrl(hero) } : null}
-        onOpen={s => this.setState({ inspect: s.id, sel: { [n.id]: true } })}
-        onPickTake={(s, t) => this.pickTake(s, t)} />;
-    } else if (n.t === 'asset') {
+    if (n.t === 'asset') {
       const url = this.assetUrl(n);
-      body = <AssetNode node={n} url={url} kind={mediaKind ? mediaKind(n.name) : (isVideoFile(n.name) ? 'video' : 'image')} selected={on}
-        onOpen={() => this.setState({ lightbox: { url, kind: isVideoFile(n.name) ? 'video' : 'image', name: n.name } })} />;
+      body = <AssetNode node={n} url={url} kind={mediaKind(n.name)} selected={on}
+        onOpen={() => this.setState({ lightbox: { url, kind: mediaKind(n.name), name: n.name } })} />;
     } else if (n.t === 'text') {
       body = <TextNode node={n} selected={on} editing={editing} onEdit={() => this.setState({ edit: n.id })} onChange={setText} onCommit={commit} />;
     } else if (n.t === 'note') {
@@ -904,8 +827,6 @@ export default class Board extends React.Component {
     const arrows = doc.nodes.filter(n => n.t === 'arrow');
     const rest = doc.nodes.filter(n => n.t !== 'frame' && n.t !== 'arrow');
     const b = bounds(doc.nodes);
-
-    const inspected = this.state.inspect ? this.shotById(this.state.inspect) : null;
 
     return (
       <div style={sx('flex:1;display:flex;min-height:0;overflow:hidden')}>
@@ -993,14 +914,14 @@ export default class Board extends React.Component {
             {!doc.nodes.length && (
               <div data-bg="1" style={sx('position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none')}>
                 <Empty size="page" title="Nothing on the board yet"
-                  body="Pull in your shots and hit an align, or just drop files straight onto the canvas — they upload where you drop them. Double-click anywhere to write." />
+                  body="Hit an align, or just drop files straight onto the canvas — they upload where you drop them. Double-click anywhere to write." />
               </div>
             )}
 
             {/* Hints stay on the canvas rather than in a help modal: this is a surface where
                 nobody reads documentation, and the four keys below are the whole interaction. */}
-            <div style={{ ...sx('position:absolute;display:flex;gap:12px;pointer-events:none'), left: (shelf ? SHELF_W + 22 : 12), right: 12, bottom: inspected ? INSPECTOR_H + 26 : 10, flexWrap: 'wrap' }}>
-              {[['space / ⌥ drag', 'pan'], ['⌘ scroll', 'zoom'], ['V', 'plan ↔ takes'], ['G', 'align'], ['F', 'full screen'], ['0', 'fit']].map(([k, what]) => (
+            <div style={{ ...sx('position:absolute;display:flex;gap:12px;pointer-events:none'), left: (shelf ? SHELF_W + 22 : 12), right: 12, bottom: 10, flexWrap: 'wrap' }}>
+              {[['space / ⌥ drag', 'pan'], ['⌘ scroll', 'zoom'], ['G', 'align'], ['F', 'full screen'], ['0', 'fit']].map(([k, what]) => (
                 <span key={k} style={{ fontFamily: MONO, fontSize: 9, color: 'var(--fg-faint)' }}>
                   <span style={{ color: 'var(--fg-muted)' }}>{k}</span> {what}
                 </span>
@@ -1011,16 +932,8 @@ export default class Board extends React.Component {
 
             {shelf && this.renderShelf()}
 
-            {inspected && (
-              <BoardInspector app={this.props.app} pid={this.props.pid} pdef={this.pdef()} shot={inspected}
-                // THE resolver for "what can @ tag" — never a pool built or re-sorted here
-                entities={buildEntityPool(this.props.app, this.props.pid)}
-                onClose={() => this.setState({ inspect: null })}
-                onPickTake={(sh, t) => this.pickTake(sh, t)} />
-            )}
-
             {this.state.exported && (
-              <div style={{ ...sx('position:absolute;display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;z-index:31'), right: 12, bottom: (inspected ? INSPECTOR_H + 26 : 12), background: 'var(--surface-2)', border: '1px solid var(--border-2)' }}>
+              <div style={{ ...sx('position:absolute;display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;z-index:31'), right: 12, bottom: 12, background: 'var(--surface-2)', border: '1px solid var(--border-2)' }}>
                 <span style={{ fontFamily: MONO, fontSize: 9.5, color: 'var(--fg-muted)' }}>{this.state.exported.width}×{this.state.exported.height}</span>
                 <a href={api.boardExportUrl(this.props.pid)} target="_blank" rel="noreferrer" style={sx('font-size:11px;font-weight:600')}>Open PNG</a>
                 <span onClick={() => this.setState({ exported: null })} className="hFg" style={sx('cursor:pointer;font-size:12px;color:var(--fg-faint)')}>✕</span>

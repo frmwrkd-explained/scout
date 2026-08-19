@@ -11,77 +11,13 @@ import React from 'react';
 import { sx } from './sx';
 import { MONO } from './tokens';
 import { RenderMedia } from './RenderMedia';
-import { TEXT_SIZES, CAPTION_H, STRIP_H } from './boardLayout';
+import { TEXT_SIZES } from './boardLayout';
 
 const TONE = { accent: 'var(--accent)', ok: 'var(--ok)', warn: 'var(--warn)', danger: 'var(--danger)', neutral: 'var(--border-3)' };
 
 // Selection is one visual language across every kind: an accent ring OUTSIDE the box (box-shadow,
 // not border) so selecting never changes a node's layout size by a pixel.
 export const ring = on => (on ? { boxShadow: '0 0 0 2px var(--accent), 0 8px 28px rgba(0,0,0,.5)' } : {});
-
-const STATUS = { done: 'var(--ok)', todo: 'var(--fg-faint)', running: 'var(--marked)', failed: 'var(--danger)' };
-
-// ── shot ───────────────────────────────────────────────────────────────────────────────────────
-// The card that makes this a production board rather than a mood wall. It stores nothing: title,
-// status and picture are read live from the shot record and its takes, so re-picking a take
-// anywhere in the app updates this card with no sync step.
-export function ShotNode({ node, shot, hero, takes, showAll, selected, onOpen, onPickTake }) {
-  const picH = node.h - CAPTION_H;
-  if (!shot) {
-    return (
-      <div style={{ ...sx('width:100%;height:100%;border-radius:10px;display:flex;align-items:center;justify-content:center;box-sizing:border-box'), border: '1px dashed var(--danger)', background: 'var(--surface)', ...ring(selected) }}>
-        <span style={{ fontFamily: MONO, fontSize: 10.5, color: 'var(--danger)' }}>MISSING · {node.shot}</span>
-      </div>
-    );
-  }
-  return (
-    <div className="rvH" style={{ ...sx('width:100%;height:100%;border-radius:10px;overflow:visible;box-sizing:border-box'), background: 'var(--raise)', border: '1px solid var(--border)', ...ring(selected) }}>
-      <div style={{ ...sx('position:relative;width:100%;border-radius:9px 9px 0 0;overflow:hidden;background:var(--sunk)'), height: picH }}>
-        {hero
-          ? <RenderMedia src={hero.url} kind={hero.video ? 'video' : 'image'} fit="cover" hoverPlay alt={shot.title || shot.id} style={sx('width:100%;height:100%;display:block')} />
-          : <div style={sx('width:100%;height:100%;display:flex;align-items:center;justify-content:center')}>
-            <span style={{ fontFamily: MONO, fontSize: 10, color: 'var(--fg-faint)', letterSpacing: '.08em' }}>NO TAKE</span>
-          </div>}
-        {/* An unapproved stand-in says so. A provisional picture presented as the plan is the one
-            way this board could lie about where a project stands. */}
-        {hero && !hero.approved && (
-          <span style={{ ...sx('position:absolute;top:7px;left:7px;border-radius:4px;padding:2px 6px;backdrop-filter:blur(6px)'), fontFamily: MONO, fontSize: 8.5, fontWeight: 800, letterSpacing: '.07em', color: 'var(--warn)', background: 'rgba(6,7,10,.72)', border: '1px solid rgba(240,178,58,.4)' }}>UNAPPROVED</span>
-        )}
-        <span style={{ ...sx('position:absolute;top:7px;right:7px;border-radius:4px;padding:2px 6px;backdrop-filter:blur(6px)'), fontFamily: MONO, fontSize: 9, fontWeight: 700, color: STATUS[shot.status] || 'var(--fg-faint)', background: 'rgba(6,7,10,.72)' }}>{shot.no != null ? shot.no : '·'}</span>
-        <span className="rv" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onOpen && onOpen(shot); }}
-          style={{ ...sx('position:absolute;bottom:7px;right:7px;border-radius:5px;padding:3px 8px;cursor:pointer;backdrop-filter:blur(6px)'), fontSize: 9.5, fontWeight: 700, color: 'var(--accent)', background: 'rgba(6,7,10,.78)', border: '1px solid var(--accent-35)' }}>OPEN</span>
-      </div>
-      <div style={{ ...sx('display:flex;flex-direction:column;justify-content:center;gap:2px;padding:0 10px;box-sizing:border-box'), height: CAPTION_H }}>
-        <div style={sx('font-size:11.5px;font-weight:600;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{shot.title || shot.id}</div>
-        <div style={{ fontFamily: MONO, fontSize: 9, color: 'var(--fg-faint)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {[shot.type, shot.dur ? shot.dur + 's' : '', shot.status].filter(Boolean).join(' · ')}
-        </div>
-      </div>
-
-      {/* ── the takes filmstrip ──
-          Only in `show:'all'`. It hangs BELOW the card in space the scene-grid layout already
-          reserved (ROW_GAP = GAP + STRIP_H), so flipping the version toggle never reflows the
-          board and never overlaps the row underneath. Clicking a take SETS it — the board decides,
-          it does not merely display. */}
-      {showAll && takes.length > 0 && (
-        <div onPointerDown={e => e.stopPropagation()}
-          style={{ ...sx('position:absolute;left:0;right:0;display:flex;gap:5px;overflow-x:auto;overflow-y:hidden;padding:6px 2px 0;box-sizing:border-box'), top: node.h + 4, height: STRIP_H }}>
-          {takes.map(t => (
-            <div key={t.key} title={(t.hero ? 'selected · ' : '') + (t.model || '') + (t.rating ? ' · ' + t.rating + '★' : '')}
-              onClick={e => { e.stopPropagation(); if (t.file) onPickTake && onPickTake(shot, t); }}
-              style={{ ...sx('flex:none;width:78px;height:44px;border-radius:5px;overflow:hidden;position:relative;cursor:pointer;background:var(--sunk)'), border: '1.5px solid ' + (t.hero ? 'var(--accent)' : t.kept ? 'var(--ok)' : 'var(--border-2)') }}>
-              {t.url
-                ? <RenderMedia src={t.url} kind={t.video ? 'video' : 'image'} fit="cover" alt="" style={sx('width:100%;height:100%;display:block')} />
-                : <div style={sx('width:100%;height:100%;display:flex;align-items:center;justify-content:center')}>
-                  <span style={{ fontFamily: MONO, fontSize: 8, color: 'var(--marked)' }}>{String(t.status || '').toUpperCase().slice(0, 4)}</span>
-                </div>}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ── asset ──────────────────────────────────────────────────────────────────────────────────────
 export function AssetNode({ node, url, kind, selected, onOpen }) {

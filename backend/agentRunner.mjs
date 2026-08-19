@@ -34,7 +34,7 @@ import { getStorageRoot, getSettings } from './store.mjs';
 import { prepareAgentHome, indexInjection, selfApiBase } from './agentHome.mjs';
 import { providerById, providerFor, resolveSessionModel } from './agentProviders.mjs';
 
-const TURN_TIMEOUT_MS = Number(process.env.FRFG_CHAT_TIMEOUT_MS) || 300_000;
+const TURN_TIMEOUT_MS = Number(process.env.SCOUT_CHAT_TIMEOUT_MS) || 300_000;
 
 // Which runner a command drives. Claude Code speaks stream-json + --resume; everything else
 // degrades to one-shot. Keyed on the binary's basename so an absolute path still classifies.
@@ -45,11 +45,11 @@ export function runnerKind(command) {
 // Per-session allowed tools → a claude `--allowedTools` value. In headless -p mode every
 // non-pre-approved tool call is auto-DENIED (there is no prompt), so an empty value bricks the
 // session: the agent can't even curl the local API the router skill tells it to operate, and it
-// starts narrating permission walls at a filmmaker. The baseline below is the minimum a FrameForge
+// starts narrating permission walls at a filmmaker. The baseline below is the minimum a Scout
 // session needs — local API calls, pack scripts (node/python), and reading its own home/skills.
 // "Chat tools ship OFF" is enforced by the Index (disabled tools are absent), NOT by tool denial.
 export const BASELINE_ALLOWED_TOOLS = [
-  'Bash(curl:*)',      // the FrameForge HTTP API on 127.0.0.1
+  'Bash(curl:*)',      // the Scout HTTP API on 127.0.0.1
   'Bash(node:*)',      // router + pack scripts (probe.mjs, scaffold.mjs, …)
   'Bash(python3:*)', 'Bash(python:*)', // user packs (e.g. shot-builder) ship python scripts
   'Read', 'Glob', 'Grep'               // the mounted skills/references in the isolated home
@@ -93,18 +93,18 @@ export function transcriptTail(history = [], max = 6) {
 
 // ── the directive protocol (ticket 12) ──
 //
-// A `frameforge` fenced JSON block is the structured channel the agent uses to place a rich card in
+// A `scout` fenced JSON block is the structured channel the agent uses to place a rich card in
 // the conversation without restating stored data. parseDirectives() is the canonical detector: it
 // pulls EVERY fence out of the assistant text and replaces it, IN PLACE, with a stable placeholder
-// marker (⟦frameforge:N⟧) that the frontend maps to the card slot — so the prose around a card keeps
+// marker (⟦scout:N⟧) that the frontend maps to the card slot — so the prose around a card keeps
 // its order. Fence bodies that don't parse to a JSON object degrade to a `malformed` directive that
 // carries the raw text, so the UI can show it as plain text + a subtle warning instead of crashing.
 //
 // The marker is a plain-text sentinel (unicode math brackets — never produced by markdown, safe in
 // YAML/JSON frontmatter) so the client can split the persisted text on it and interleave cards. The
-// directive at list index N corresponds to marker ⟦frameforge:N⟧.
-const DIRECTIVE_FENCE_RE = /```frameforge[ \t]*\r?\n([\s\S]*?)```/g;
-export function directiveMarker(i) { return '⟦frameforge:' + i + '⟧'; }
+// directive at list index N corresponds to marker ⟦scout:N⟧.
+const DIRECTIVE_FENCE_RE = /```scout[ \t]*\r?\n([\s\S]*?)```/g;
+export function directiveMarker(i) { return '⟦scout:' + i + '⟧'; }
 
 // Parse every fence → { text: prose with fences replaced by markers, directives: [obj | {type:'malformed',raw}] }.
 export function parseDirectives(text) {

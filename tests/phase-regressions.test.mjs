@@ -187,7 +187,7 @@ test('resolveBin caches without changing the answer, and clearBinCache re-probes
   assert.equal(resolveBin('node'), cold, 'still correct after a bust');
 
   clearBinCache();
-  const missing = 'frameforge-definitely-not-installed-xyz';
+  const missing = 'scout-definitely-not-installed-xyz';
   assert.equal(resolveBin(missing), null);
   assert.equal(resolveBin(missing), null, 'negative results cache too — that is the slow path');
   assert.equal(resolveBin(''), null, 'empty command short-circuits');

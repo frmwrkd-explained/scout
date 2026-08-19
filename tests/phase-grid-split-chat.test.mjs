@@ -22,7 +22,7 @@ seedChatTools();
 
 // ── unit: a split proposal fence parses to a typed directive carrying the card's pre-fill inputs ──
 test('parseDirectives parses a `proposal.split` fence into a directive with ref, rows/cols and shot mapping', () => {
-  const fence = '```frameforge\n' +
+  const fence = '```scout\n' +
     JSON.stringify({ type: 'proposal.split', ref: 'sheet-1', project: 'p', rows: 3, cols: 3, shots: { '0-0': 'SH010', '1-2': 'SH020' } }) +
     '\n```';
   const { directives } = parseDirectives('here is the split\n' + fence);

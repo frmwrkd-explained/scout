@@ -5,7 +5,7 @@
 // the right order, and that the payload the review step shows is the payload that gets sent.
 // A perfect redactor that the envelope builder forgets to call is worth nothing.
 //
-// No FRFG_FEEDBACK_URL is set under test, so nothing is ever transmitted: every report lands in
+// No SCOUT_FEEDBACK_URL is set under test, so nothing is ever transmitted: every report lands in
 // the outbox, which is also the failure mode we want to prove works.
 import './_env.mjs';
 import { test } from 'node:test';
@@ -25,7 +25,7 @@ const loaded = extra => ({
   body: 'pressed reroll, nothing happened',
   kind: 'bug', severity: 'blocks-me',
   client: {
-    errors: [{ kind: 'uncaught', t: 10, message: 'undefined is not an object', stack: 'at reroll (/Users/ada/FrameForge/frontend/ShotWorkspace.jsx:212:14)' }],
+    errors: [{ kind: 'uncaught', t: 10, message: 'undefined is not an object', stack: 'at reroll (/Users/ada/Scout/frontend/ShotWorkspace.jsx:212:14)' }],
     console: [{ level: 'error', t: 9, msg: 'POST /api/generate 401 Authorization: Bearer gsk_LiveKeyAbCdEfGhIjKlMnOp1234' }],
     network: [{ t: 8, method: 'GET', url: 'https://fal.media/files/x/out.png?X-Amz-Signature=deadbeef', status: 403, ms: 12 }],
     interactions: [{ t: 7, kind: 'click', what: 'reroll' }],
@@ -164,12 +164,12 @@ test('the context route leaks no secret and reports providers as booleans', asyn
 
 test('a placeholder or malformed feedback URL behaves as unset, not as a broken service', async () => {
   freshRoot();
-  const original = process.env.FRFG_FEEDBACK_URL;
+  const original = process.env.SCOUT_FEEDBACK_URL;
   try {
     // The value the setup docs ship verbatim. Pasting it must not turn every status lookup into a
     // 502 that surfaces as "not found" beside the user's own report code.
     for (const bad of ['https://<your-deployment>.convex.site', 'not-a-url', 'ftp://example.com', '   ']) {
-      process.env.FRFG_FEEDBACK_URL = bad;
+      process.env.SCOUT_FEEDBACK_URL = bad;
       const status = await req('GET', '/api/feedback/report/FF-4P9H');
       assert.equal(status.status, 200, `${bad} produced HTTP ${status.status}`);
       assert.equal(status.body.status, 'local-only', `${bad} did not degrade to local-only`);
@@ -178,8 +178,8 @@ test('a placeholder or malformed feedback URL behaves as unset, not as a broken 
       assert.equal(sent.body.queued, true, `${bad} did not queue to the outbox`);
     }
   } finally {
-    if (original === undefined) delete process.env.FRFG_FEEDBACK_URL;
-    else process.env.FRFG_FEEDBACK_URL = original;
+    if (original === undefined) delete process.env.SCOUT_FEEDBACK_URL;
+    else process.env.SCOUT_FEEDBACK_URL = original;
   }
 });
 

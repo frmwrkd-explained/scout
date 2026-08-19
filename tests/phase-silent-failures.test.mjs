@@ -11,7 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'frfg-silent-'));
-process.env.FRFG_DATA = ROOT;
+process.env.SCOUT_DATA = ROOT;
 
 const { writeMd } = await import('../backend/store.mjs');
 const { setInOut, buildManifest } = await import('../backend/manifest.mjs');

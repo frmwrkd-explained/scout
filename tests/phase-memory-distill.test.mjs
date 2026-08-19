@@ -31,7 +31,7 @@ test('session start injects brief + memory into the executor context (only on th
   });
 
   const s = createSession({ project: 'p', title: 'Direction', executor: 'capture20' });
-  assert.equal(s.executor, 'capture20', 'explicit executor should win even under FRFG_TEST');
+  assert.equal(s.executor, 'capture20', 'explicit executor should win even under SCOUT_TEST');
 
   await runTurn(s.id, 'open on a rooftop');
   assert.ok(captured.includes('desaturated teal'), 'brief missing from injected context');

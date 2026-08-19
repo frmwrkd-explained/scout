@@ -105,7 +105,7 @@ test('a small data URL is left alone', () => {
 test('the home directory is collapsed to ~ on both platforms', () => {
   const out = clean([
     'ENOENT: /Users/theova/Projects/FAL HACKATON/workspace/settings.md',
-    'at readFile (C:\\Users\\theova\\AppData\\frameforge\\store.mjs:12:9)'
+    'at readFile (C:\\Users\\theova\\AppData\\scout\\store.mjs:12:9)'
   ]);
   assert.ok(!out.join(' ').includes('theova'), 'the reporter\'s name survived in a path');
   assert.ok(out[0].startsWith('ENOENT: ~/Projects'), 'lost the rest of the path: ' + out[0]);
@@ -210,7 +210,7 @@ test('two runs of the same crash share a signature', () => {
     version: '0.1.0'
   });
   const b = signature({
-    frame: 'at reroll (/Users/bob/FrameForge/frontend/ShotWorkspace.jsx:219:9)',
+    frame: 'at reroll (/Users/bob/Scout/frontend/ShotWorkspace.jsx:219:9)',
     message: "Cannot read properties of undefined (reading 'params') for gen-2044",
     route: '/api/generations/proj-z/gen-2044/reroll',
     version: '0.1.0'

@@ -140,11 +140,11 @@ export async function sweepIdleSessions({ now = Date.now() } = {}) {
 }
 
 // Lazy, throttled idle sweep hooked onto chat traffic. Fire-and-forget so it never delays a request.
-// Skipped under FRFG_TEST so unrelated tests stay hermetic — tests drive sweepIdleSessions directly.
+// Skipped under SCOUT_TEST so unrelated tests stay hermetic — tests drive sweepIdleSessions directly.
 let lastSweep = 0;
 const SWEEP_EVERY_MS = 60_000;
 function lazySweep() {
-  if (process.env.FRFG_TEST === '1') return;
+  if (process.env.SCOUT_TEST === '1') return;
   const now = Date.now();
   if (now - lastSweep < SWEEP_EVERY_MS) return;
   lastSweep = now;

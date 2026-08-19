@@ -4,7 +4,7 @@
 // session_id), one stream_event per token, then a result line. Honours --resume by echoing the id
 // back and marking the reply, so a test can prove CLI-side conversation state carried across turns.
 //
-// Env knobs (inherited from the FrameForge process, which is the test process):
+// Env knobs (inherited from the Scout process, which is the test process):
 //   STUB_DELAY_MS  ms to sleep between tokens (default 0)  — used to make a turn cancellable
 //   STUB_CHUNKS    number of filler tokens (default 5)
 const argv = process.argv.slice(2);

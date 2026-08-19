@@ -1,5 +1,5 @@
 // Ticket 25 — user-authored tools. The filmmaker builds their own tool by conversation
-// (backend/skills/frameforge-toolsmith), and it lands here as portable markdown.
+// (backend/skills/scout-toolsmith), and it lands here as portable markdown.
 //
 // ONE artifact, three roles. A user tool is a single directory in the storage root:
 //
@@ -83,7 +83,7 @@ export function validateDraft(draft = {}) {
   if (!id) return bad('id', 'a tool needs an id');
   if (!ID_RE.test(id)) return bad('id', 'id must be lowercase letters, numbers and dashes, start with a letter, and be 2–40 characters');
   if (safe(id) !== id) return bad('id', 'id contains characters that are not filename-safe');
-  if (RESERVED_TOOL_IDS.has(id)) return bad('id', '"' + id + '" is a built-in FrameForge tool — pick another id');
+  if (RESERVED_TOOL_IDS.has(id)) return bad('id', '"' + id + '" is a built-in Scout tool — pick another id');
 
   if (!name) return bad('name', 'a tool needs a name');
   if (name.length > MAX_NAME) return bad('name', 'name must be ' + MAX_NAME + ' characters or fewer');

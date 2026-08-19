@@ -21,7 +21,6 @@ import {
   toBoard, toScreen, isRect, isAutoFrame, isUserFrame,
   production, alignNodes, distributeNodes, snapGuides, ALIGN_EDGES, SNAP_TOL
 } from '../frontend/boardLayout.js';
-import { assetKindOf, ASSET_KIND_FOLDERS, folderKind } from '../shared/assetKinds.mjs';
 
 // deterministic id minter — the module takes one by injection precisely so tests need no stubbing
 const minter = () => { let i = 0; return () => 'x' + (++i); };
@@ -417,88 +416,7 @@ test('snap ignores arrows — they have no rect to snap to', () => {
   assert.equal(g.guides.length, 0);
 });
 
-// ── the asset-kind vocabulary ───────────────────────────────────────────────────────────────────
-// It moved to shared/ so backend/board.mjs could group a canvas by cast/location/prop. These guard
-// the contract AssetBoards.jsx and the board now both depend on.
-test('folder names map to kinds case-insensitively and across synonyms', () => {
-  assert.equal(assetKindOf('cast'), 'cast');
-  assert.equal(assetKindOf('Characters'), 'cast');
-  assert.equal(assetKindOf('ACTORS'), 'cast');
-  assert.equal(assetKindOf('locations'), 'locations');
-  assert.equal(assetKindOf('Sets'), 'locations');
-  assert.equal(assetKindOf('props'), 'props');
-  assert.equal(assetKindOf('Wardrobe'), 'wardrobe');
-  assert.equal(assetKindOf('moodboard'), '', 'a reference board is not a production kind');
-});
-
-test('a per-folder override beats the name, in both directions', () => {
-  assert.equal(assetKindOf('cast', { cast: 'reference' }), '', 'demoted to a reference board');
-  assert.equal(assetKindOf('vehicles', { vehicles: 'asset' }), 'vehicles', 'promoted under its own name');
-});
-
-test('folderKind still splits References from Assets the way AssetBoards expects', () => {
-  assert.equal(folderKind('cast'), 'asset');
-  assert.equal(folderKind('moodboard'), 'reference');
-  assert.equal(folderKind('moodboard', { moodboard: 'asset' }), 'asset');
-  assert.equal(ASSET_KIND_FOLDERS.length, 4);
-});
-
-// ── the AssetBoards facade is actually wired ────────────────────────────────────────────────────
-// `shared/assetKinds.mjs` holds the table; `frontend/AssetBoards.jsx` re-exports it so its existing
-// importers keep working. The first version wrote that as a bare `export … from`, which re-exports
-// the names WITHOUT binding them in the module's own scope — and AssetBoards calls assetFoldersOf()
-// itself, so the Assets tab died at render with "assetFoldersOf is not defined". `npm run build`
-// was perfectly happy: a bundler resolves the re-export, and nothing here renders React. These two
-// static checks are what stands between that class of bug and a shipped white screen.
-import fsx from 'node:fs';
-import pathx from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const FRONTEND = pathx.join(pathx.dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
-const readFrontend = f => fsx.readFileSync(pathx.join(FRONTEND, f), 'utf8');
-
-test('every name AssetBoards uses from shared/assetKinds is imported, not just re-exported', () => {
-  const src = readFrontend('AssetBoards.jsx');
-  const shared = fsx.readFileSync(pathx.join(FRONTEND, '..', 'shared', 'assetKinds.mjs'), 'utf8');
-  const exported = [...shared.matchAll(/export (?:const|function) (\w+)/g)].map(m => m[1]);
-  assert.ok(exported.length >= 6, 'found the shared exports: ' + exported.join(','));
-
-  // the LOCAL import statement (an `export … from` line does not bind anything)
-  const imp = src.match(/import\s*\{([^}]*)\}\s*from\s*['"]\.\.\/shared\/assetKinds\.mjs['"]/);
-  assert.ok(imp, 'AssetBoards imports from shared/assetKinds.mjs with a real import statement');
-  const bound = imp[1].split(',').map(x => x.trim()).filter(Boolean);
-
-  // strip every import/export statement, then look for bare uses in the body
-  const body = src
-    .replace(/import[\s\S]*?from\s*['"][^'"]+['"];?/g, '')
-    .replace(/export\s*\{[^}]*\};?/g, '');
-
-  for (const name of exported) {
-    const used = new RegExp('(?<![\\w.])' + name + '\\s*[(.\\[]').test(body);
-    if (used) assert.ok(bound.includes(name), name + ' is used in AssetBoards.jsx but not locally imported');
-  }
-});
-
-test('every name imported FROM AssetBoards is actually exported by it', () => {
-  const src = readFrontend('AssetBoards.jsx');
-  const exportedNames = new Set();
-  for (const m of src.matchAll(/export\s*\{([^}]*)\}/g)) {
-    for (const n of m[1].split(',')) { const t = n.trim().split(/\s+as\s+/).pop(); if (t) exportedNames.add(t); }
-  }
-  for (const m of src.matchAll(/export\s+(?:async\s+)?(?:const|function|class)\s+(\w+)/g)) exportedNames.add(m[1]);
-
-  const consumers = fsx.readdirSync(FRONTEND).filter(f => /\.jsx?$/.test(f) && f !== 'AssetBoards.jsx');
-  let checked = 0;
-  for (const f of consumers) {
-    const text = fsx.readFileSync(pathx.join(FRONTEND, f), 'utf8');
-    for (const m of text.matchAll(/import\s*\{([^}]*)\}\s*from\s*['"]\.\/AssetBoards['"]/g)) {
-      for (const raw of m[1].split(',')) {
-        const name = raw.trim().split(/\s+as\s+/)[0].trim();
-        if (!name) continue;
-        checked++;
-        assert.ok(exportedNames.has(name), f + ' imports { ' + name + ' } from ./AssetBoards, which does not export it');
-      }
-    }
-  }
-  assert.ok(checked >= 4, 'actually inspected some importers (' + checked + ')');
-});
+// The asset-kind vocabulary (cast / locations / props / wardrobe) and the AssetBoards facade tests
+// that used to close this file went with the film domain on 2026-08-19. What they guarded — one
+// table, no second copy, and a facade that actually binds what it re-exports — is a rule Scout
+// still keeps; it just has no asset vocabulary to apply it to yet. See docs/decisions.md.

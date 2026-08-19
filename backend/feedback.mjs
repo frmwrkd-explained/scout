@@ -1,9 +1,9 @@
 // Beta feedback — assembly and egress.  docs/specs/beta-feedback/spec.md
 //
-// ⚠ THIS FILE IS THE ONLY PLACE FRAMEFORGE SENDS ANYTHING TO A SERVER WE OWN. ⚠
+// ⚠ THIS FILE IS THE ONLY PLACE SCOUT SENDS ANYTHING TO A SERVER WE OWN. ⚠
 //
-// Everything else in this app talks to providers the user chose and paid for (fal, groq, kie) or
-// to nothing at all. If a second outbound call to a FrameForge endpoint ever appears somewhere
+// Everything else in this app talks to providers the user chose and paid for (the ones it still uses) or
+// to nothing at all. If a second outbound call to a Scout endpoint ever appears somewhere
 // else in this repo, the privacy claim in the panel stops being checkable — one file to audit is
 // the whole point. Add to this one; do not add another.
 //
@@ -22,8 +22,6 @@ import os from 'node:os';
 import { createRequire } from 'node:module';
 import { getSettings, getStorageRoot, writeMd, readMd, SECRET_SETTING_KEYS } from './store.mjs';
 import { redact, signature } from '../shared/redact.mjs';
-import { resolveModules } from '../shared/integrations.mjs';
-import { providersStatus } from './providers.mjs';
 import { listJobs } from './jobs.mjs';
 
 const require = createRequire(import.meta.url);
@@ -87,8 +85,6 @@ export function recordApiCall(rec) {
 
 export function envFacts() {
   const s = getSettings();
-  let providers = {};
-  try { providers = providersStatus(s); } catch { /* a probe failure is not worth failing a report */ }
 
   return {
     app: pkg.version,
@@ -103,8 +99,6 @@ export function envFacts() {
     // Redaction turns this into ~/… — the shape of someone's storage layout is occasionally the
     // bug (a path with a '#' in it, an external volume), the name in it never is.
     storageRoot: getStorageRoot(),
-    providers,      // { fal: true, groq: false, … } — configured-ness, never the key
-    modules: resolveModules(s),
     locale: Intl.DateTimeFormat().resolvedOptions().locale,
     tz: Intl.DateTimeFormat().resolvedOptions().timeZone
   };
@@ -132,7 +126,7 @@ function mintCode() {
   const bytes = new Uint8Array(4);
   (globalThis.crypto || require('node:crypto').webcrypto).getRandomValues(bytes);
   for (const b of bytes) out += ALPHABET[b % ALPHABET.length];
-  return 'FF-' + out;
+  return 'SC-' + out;
 }
 
 // A stable-per-machine, meaningless-off-machine id, so repeat reports from one tester can be
@@ -164,6 +158,9 @@ const outboxDir = () => path.join(getStorageRoot(), 'feedback', 'outbox');
 function knownSecrets() {
   const s = getSettings();
   const values = SECRET_SETTING_KEYS.map(k => s[k]);
+  // FAL_KEY and KIE_API_KEY are dead in Scout — their providers went with the film domain. They
+  // stay on this list anyway: a superset costs nothing, and a user forking from FrameForge may
+  // still have them exported. Redaction is the one place to prefer over-reaching to under-reaching.
   values.push(process.env.FAL_KEY, process.env.GROQ_API_KEY, process.env.KIE_API_KEY, process.env.ANTHROPIC_API_KEY);
   // A redacted sentinel is not a secret, and treating it as one would replace every '••••••••'
   // in the report with a different placeholder for no reason.
@@ -245,7 +242,7 @@ export function buildEnvelope(input = {}) {
 // `https://<your-deployment>.convex.site` verbatim — into a 502 that reaches the user as
 // "not found" next to their own report code, which reads as "we lost it".
 function endpoint() {
-  const raw = (process.env.FRFG_FEEDBACK_URL || '').trim().replace(/\/+$/, '');
+  const raw = (process.env.SCOUT_FEEDBACK_URL || '').trim().replace(/\/+$/, '');
   if (!raw) return '';
   if (/[<>]/.test(raw)) return '';                       // an unfilled placeholder from the docs
   try {
@@ -266,7 +263,7 @@ function toOutbox(envelope, reason) {
 
 async function transmit(envelope, screenshot) {
   const url = endpoint();
-  if (!url) return { ok: false, reason: 'FRFG_FEEDBACK_URL is not set — the report was saved locally' };
+  if (!url) return { ok: false, reason: 'SCOUT_FEEDBACK_URL is not set — the report was saved locally' };
 
   // 12s: long enough for a slow connection with a screenshot attached, short enough that a
   // tester does not sit watching a spinner wondering whether it worked.
@@ -375,7 +372,7 @@ export function registerFeedbackRoutes(app) {
       // FAIL CLOSED. If the redactor threw we do not know what is in the payload, so nothing
       // leaves — not to the network, not to the outbox.
       console.error('[feedback] redaction failed, send aborted:', e);
-      return res.status(500).json({ error: 'Could not prepare the report safely, so nothing was sent. This is a bug in FrameForge itself.', code: 'redaction-failed' });
+      return res.status(500).json({ error: 'Could not prepare the report safely, so nothing was sent. This is a bug in Scout itself.', code: 'redaction-failed' });
     }
 
     const result = await transmit(envelope, b.screenshot || null);
@@ -387,7 +384,7 @@ export function registerFeedbackRoutes(app) {
       ok: queued, code: envelope.code, queued,
       // Never a silent success. The tester is told exactly where their report is.
       error: queued ? null : 'Could not send or save the report: ' + result.reason,
-      note: queued ? 'Saved on this machine and sent automatically next time FrameForge starts — ' + result.reason : null
+      note: queued ? 'Saved on this machine and sent automatically next time Scout starts — ' + result.reason : null
     });
   });
 
