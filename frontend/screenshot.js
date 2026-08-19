@@ -1,7 +1,7 @@
 // One screenshot API, two paths underneath. The panel never branches on which one it got.
 //
 //   shipped app  → window.scout.capture() → webContents.capturePage()
-//                  Real compositor output: WebGL (the 3D stage), <video>, everything. Captures
+//                  Real compositor output: WebGL, <video>, everything. Captures
 //                  the Scout window only, so nothing else on the tester's screen can be
 //                  caught by accident. No permission prompt.
 //
@@ -12,6 +12,8 @@
 // Deliberately no html2canvas fallback. It would add a dependency to a four-dependency app and
 // return a picture that disagrees with what the user saw — which, for a bug report, is worse than
 // no picture. If neither path works, the report sends without a screenshot and says so.
+
+import { ACCENT } from './tokens';
 
 export const isDesktopCapture = () => !!(typeof window !== 'undefined' && window.scout && window.scout.capture);
 
@@ -129,8 +131,11 @@ export function flatten(dataUrl, marks) {
       }
 
       g.lineWidth = Math.max(2, Math.round(c.width / 400));
-      g.strokeStyle = '#E3FF32';   // the accent — see docs/DESIGN.md; do not swap this for red
-      g.fillStyle = '#E3FF32';
+      // the accent — see docs/DESIGN.md; do not swap this for red. Read from tokens.js rather
+      // than written as a literal: a canvas cannot resolve var(--accent), which is the whole
+      // reason tokens.js exists. CLAUDE.md: never a raw hex in component code.
+      g.strokeStyle = ACCENT;
+      g.fillStyle = ACCENT;
       for (const m of marks.filter(m => m.kind !== 'blur')) {
         const r = px(m);
         if (m.kind === 'box') { g.strokeRect(r.x, r.y, r.w, r.h); continue; }

@@ -111,7 +111,7 @@ export function MediaAction({ label, hotkey, tone = 'neutral', fill = false, onC
 export function RenderTile({
   src, kind, poster, fit = 'cover', hoverPlay = true, aspect = '16/9',
   selected = false, marked = false,
-  selectedColor = 'var(--accent)', markedColor = '#5B9DFF', idleColor = 'var(--border)',
+  selectedColor = 'var(--accent)', markedColor = 'var(--marked)', idleColor = 'var(--border)',
   draggable, onDragStart, onClick, onDoubleClick, title,
   onMediaLoad, placeholder, overlay, footer,
   className = 'hBd rvH', style, mediaStyle

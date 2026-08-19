@@ -1,8 +1,8 @@
-# FrameForge design system
+# Scout design system
 
 **Binding.** `frontend/styles.css` `:root` is the machine-readable copy; this file explains
 it. Where they disagree, `:root` wins and this file is the bug. `frontend/tokens.js`
-mirrors `:root` for JS sinks (Three.js, canvas) — `tests/phase-design-tokens.test.mjs`
+mirrors `:root` for JS sinks (canvas, exported swatches) — `tests/phase-design-tokens.test.mjs`
 fails the suite if the two drift.
 
 **The palette is the brand and does not change without an explicit request.** A 2026-07-20
@@ -12,8 +12,12 @@ the owner's call.
 
 ## What this app is
 
-A dense, professional shot-list tool for filmmakers. It is **scanned and operated**, not
-read top to bottom.
+A dense, professional tool for someone who spends hours a day deciding. It is **scanned and
+operated**, not read top to bottom.
+
+*Inherited from FrameForge verbatim on 2026-08-19 — every token, hue and rule below is
+byte-identical. Only the product it describes changed. Where a call site named here no longer
+exists, the rule it illustrated still holds.*
 
 **Density is a choice, not a defect.** The tight padding, the 9–13px type, the packed
 grids are correct and deliberate. Do not make this app more spacious. When something feels
@@ -22,7 +26,7 @@ wrong, the bug is almost always *inconsistency*, not tightness.
 ## Tokens
 
 Defined in `frontend/styles.css` `:root`. Available to `sx()` strings and inline styles as
-`var(--x)`. Available to JS sinks that cannot resolve CSS (Three.js materials, canvas) via
+`var(--x)`. Available to JS sinks that cannot resolve CSS (canvas drawing, exported swatches) via
 `frontend/tokens.js` `TOKENS`. **Never write a raw hex in component code** — if no token
 fits, add one deliberately (`:root` + `tokens.js` + this file, same commit).
 
@@ -81,9 +85,9 @@ Anything between these is noise, not a decision.
 - `--marked #5B9DFF` — the **marked/running** blue (marked ≠ selected, running ≠ done).
   **Promoted from a literal to a token on 2026-07-20**, which is what this entry always
   said to do once its uses grew: they reached 17 raw `#5B9DFF` literals across
-  `RenderMedia` (`markedColor` default), `ShotWorkspace` (`stC.running`),
-  `chat/generationCards`, and `ProjectGenerate`'s marked band, before the composer added
-  more. Named `--marked`, **not** the `--busy` this entry originally proposed: the channel
+  `RenderMedia` (`markedColor` default) and three film surfaces that have since been
+  deleted, before the composer added more. The last of those literals — `RenderMedia`'s
+  default — was finally converted to `var(--marked)` in the Scout fork. Named `--marked`, **not** the `--busy` this entry originally proposed: the channel
   carries ProjectGenerate's marked-selection band as well as running state, and `--busy`
   would misname half of its call sites. No further blues.
 
@@ -121,7 +125,7 @@ digits stack.
 
 Display moments (empty states, project headers) may use Schibsted Grotesk at 18–24px
 weight 500 — the one place type gets room. System/empty states speak in short mono
-uppercase status lines (`NO SHOTS — IMPORT A SCRIPT OR ADD ONE`), not friendly
+uppercase status lines (`NO QUESTIONS — YOUR ASSISTANTS ARE CLEAR`), not friendly
 sentence-case filler.
 
 ## Radius, spacing, motion
@@ -133,8 +137,9 @@ sentence-case filler.
   per-child margins.
 - **Motion ceiling:** 120–150ms controls, 200–250ms panels/overlays, plain `ease` or the
   house cubic-bezier(.2,.8,.2,1) for media tiles. Hover feedback is text color, border
-  color, or background — **no lifts or scales in dense grids** (the moodboard masonry
-  tile is the one sanctioned lift). `prefers-reduced-motion` collapses everything —
+  color, or background — **no lifts or scales in dense grids**. FrameForge sanctioned exactly
+  one exception (its moodboard masonry tile) and that surface is gone; Scout currently has no
+  sanctioned lift, and adding one is a deliberate decision, not a styling default. `prefers-reduced-motion` collapses everything —
   already global in styles.css.
 - Ambient flourishes (grain, gradient glows behind previews) stay **behind** content and
   never carry information.
@@ -165,13 +170,13 @@ Surface the summary; put the detail one click away.
   rest waits behind one `ADVANCED` disclosure with a count.
 - The QUEUE dock and the Production Panel sections are the precedent: a collapsed line
   carrying a mono summary plus a state dot/count, expanding on click.
-- Each screen keeps **one focal object** (the active shot, the running render); density
+- Each screen keeps **one focal object** (the open record, the decision in hand); density
   everywhere else.
 
 ## Anti-generic guardrails
 
-- Do not flatten distinct surfaces into a generic card grid. The shot list, the boards,
-  the chat, and the moodboard have different structures *on purpose*.
+- Do not flatten distinct surfaces into a generic card grid. The collection table, the
+  decision card, the whiteboard and the document surface have different structures *on purpose*.
 - Do not add a second accent hue. Emphasis comes from the accent steps, form, or surface
   nesting — never a new color.
 - Do not lighten the app or widen its spacing to feel "modern". Density is the brand.
