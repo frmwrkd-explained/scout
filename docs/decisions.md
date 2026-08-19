@@ -156,3 +156,9 @@ Unlike `guest.platform`, which §1 spells out. **Choice:** `[facebook, instagram
 
 ### And the gate holds in the data
 Every `contacted` / `replied` / `won` record carries `updated_by: crystal`. Nothing agent-authored sits past `shortlist`. Verified programmatically, because seed data that modelled a Law 4 violation would teach the wrong shape to everything built on top of it.
+
+### Trap, hit and fixed · a NUL byte made `documents.mjs` invisible to grep
+**What happened:** `globToRe` used a raw `\x00` as a sentinel to protect `**` from the `*` rule during glob→regex translation. That single control byte made `file` classify the module as `data`, so **grep skipped it entirely — silently, exit 1**. Every `grep -rn … backend/` I ran during the strip had a hole in it and I did not know.
+**Caught by:** a zero-hit search on a symbol I could see on the line with `sed`. The positive control returned nothing either, which is the tell — a broken pattern fails one way, an unreadable file fails both.
+**Fix:** one-pass replacer, no sentinel. `esc.replace(/\*\*|\*/g, m => m === '**' ? '.*' : '[^/]*')`.
+**Why it matters beyond this file:** `docs/FRAMEFORGE_CLAUDE.md` documents this exact bug costing hours in `backend/store.mjs`, and its rule — *never re-introduce a raw control byte; write the escape* — is one I broke within hours of reading it. Grep cannot police this, because grep is what is broken. Every source file is now scanned with a byte-level check instead; all clean.
