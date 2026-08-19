@@ -33,7 +33,7 @@ import { registerUserToolRoutes } from './userTools.mjs';
 import { search as structuredSearch } from './search.mjs';
 import { registerFeedbackRoutes, installLogRing, recordApiCall, flushOutbox } from './feedback.mjs';
 import { listCollections, getCollection, saveCollection, addField, FIELD_TYPE_NAMES } from './collections.mjs';
-import { documentsFor, documentAt, collectionsOf, allDocuments } from './documents.mjs';
+import { documentsFor, documentAt, collectionsOf, allDocuments, referencesTo } from './documents.mjs';
 import { listViews, getView, saveView, deleteView, applyView, defaultView } from './views.mjs';
 
 const APP_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -262,6 +262,23 @@ app.get('/api/document', (req, res) => {
   const doc = documentAt(String(req.query.path || ''));
   if (!doc) return res.status(404).json({ error: 'no document at that path' });
   res.json({ ...doc, collections: collectionsOf(doc) });
+});
+
+// REFERENCED BY (T05 §2) — every document whose frontmatter points at this one, with the pointing
+// field and the source collection. Deliberately NOT folded into /api/document: it walks the whole
+// store, and the inspector section is collapsed until someone opens it, so the document surface
+// must not pay for it on open. Takes `path` (what the UI has) or `slug` (what a relation value is).
+app.get('/api/document/references', (req, res) => {
+  const relPath = String(req.query.path || '');
+  const slug = String(req.query.slug || '');
+  if (!relPath && !slug) return res.status(400).json({ error: 'path or slug is required' });
+  let target = slug;
+  if (relPath) {
+    target = documentAt(relPath);
+    if (!target) return res.status(404).json({ error: 'no document at that path' });
+  }
+  const references = referencesTo(target);
+  res.json({ references, total: references.length });
 });
 
 // ── dictation ──────────────────────────────────────────────────────────────────────────────────

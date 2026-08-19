@@ -96,6 +96,18 @@ They regenerate within minutes. Deleting is hygiene, not a fix.
 
 **Run a positive control before believing any negative result.**
 
+
+### A control byte makes a file invisible to grep — and I did it, after reading the warning
+`backend/documents.mjs` carried a raw `\x00` used as a glob-translation sentinel. That one byte made `file(1)` classify the module as `data`, so **grep skipped it entirely — silently, exit 1**. Every `grep -rn … backend/` run during the strip had a hole in it.
+
+The tell: a zero-hit search whose **positive control also returns nothing**. A broken pattern fails one way; an unreadable file fails both.
+
+`docs/FRAMEFORGE_CLAUDE.md` documents this exact bug costing hours in `backend/store.mjs`, and its rule is *never re-introduce a raw control byte — write the escape*. I broke it within hours of reading it. Grep cannot police this, because grep is what breaks. Use a byte-level scan:
+```bash
+node -e 'const fs=require("fs"),p=require("path");const walk=d=>fs.readdirSync(d,{withFileTypes:true}).flatMap(e=>{const f=p.join(d,e.name);if(e.isDirectory())return ["node_modules",".git","dist"].includes(e.name)?[]:walk(f);return /\.(mjs|js|jsx|cjs|json|md|css|html)$/.test(e.name)&&!e.name.startsWith("._")?[f]:[];});for(const f of walk(".")){const b=fs.readFileSync(f);for(let i=0;i<b.length;i++){const c=b[i];if(c<9||(c>13&&c<32)){console.log(f,"control byte 0x"+c.toString(16),"at",i);break;}}}'
+```
+All files are clean as of handover.
+
 ### Static imports of deleted modules fail at boot, not at use
 Three keeper modules (`search.mjs`, `feedback.mjs`, `distill.mjs`) statically imported from the delete-set. A static import of a missing module throws at *import* time, so any one of them would have taken the whole server down rather than degrading a feature. If you delete a module, grep for its importers **first**.
 

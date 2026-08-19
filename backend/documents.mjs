@@ -211,3 +211,88 @@ function writeComputedCache(collectionId, shaped) {
 export function collectionsOf(doc) {
   return listCollections().filter(c => matchesQuery(doc, c.query)).map(c => c.id);
 }
+
+// ── REFERENCED BY ──────────────────────────────────────────────────────────────────────────────
+// Which documents point AT this one through their frontmatter (T05 §2).
+//
+// SCOPE, decided deliberately (docs/decisions.md · D4): this scans frontmatter VALUES, not only the
+// fields a collection declares as `type: relation`. T05's Demonstrate is "a guest referenced by a
+// territory, a learning and a project brief" — and `territory/` and `learnings/` are MEMORY objects
+// (docs/03_MEMORY.md §1), not collection documents, so they have no schema and therefore no
+// declared relation field. A declared-relations-only scan could never satisfy that Demonstrate.
+// Every entry carries `declared`, so the surface can still render a typed relation differently
+// from a loose pointer — which is what T05 means by "structured and typed".
+//
+// The match is EXACT against the names a document answers to. A substring test would turn every
+// prose field that happens to contain a slug into a false backlink, and a backlink nobody can
+// explain is worse than a missing one.
+
+// `id`/`slug` are what a document IS, not what it points at. The provenance pair `created_by` /
+// `updated_by` is answered by HISTORY (T05 §4) — listing them here would bury the three real
+// references under one row per document the same agent ever touched.
+const NON_REFERENCE_KEYS = new Set(['id', 'slug', ...AUTO_FIELDS]);
+
+// Relation values are filename slugs — that is what rollup() resolves through — but a memory object
+// also declares an `id:` and the two are allowed to differ, so a document answers to both.
+function namesOf(doc) {
+  return new Set([doc.slug, doc.data && doc.data.id].filter(Boolean).map(String));
+}
+
+function titleOf(doc, inCollections, schemas) {
+  for (const id of inCollections) {
+    const c = schemas.find(x => x.id === id);
+    const p = c && primaryField(c);
+    if (p && doc.data[p.key]) return String(doc.data[p.key]);
+  }
+  // Memory objects have no primary field; territory calls it `label`, most others `name`.
+  return String(doc.data.label || doc.data.name || doc.data.title || doc.slug);
+}
+
+export function referencesTo(target, { docs = null, collections = null } = {}) {
+  const all = docs || allDocuments();
+  const schemas = collections || listCollections();
+
+  const self = typeof target === 'string'
+    ? (all.find(d => d.slug === target || String(d.data.id || '') === target) || { slug: target, path: null, data: {} })
+    : target;
+  const names = namesOf(self);
+  if (!names.size) return [];
+
+  // Which keys each collection declares as a relation — computed once, not once per document.
+  const relKeys = new Map(schemas.map(c =>
+    [c.id, new Set((c.fields || []).filter(f => f.type === 'relation').map(f => f.key))]));
+
+  const out = [];
+  for (const d of all) {
+    if (d.path === self.path) continue; // a document never references itself
+    const inCollections = schemas.filter(c => matchesQuery(d, c.query)).map(c => c.id);
+    for (const [key, raw] of Object.entries(d.data || {})) {
+      if (NON_REFERENCE_KEYS.has(key)) continue;
+      const vals = Array.isArray(raw) ? raw : [raw];
+      if (!vals.some(v => (typeof v === 'string' || typeof v === 'number') && names.has(String(v)))) continue;
+      const declaredIn = inCollections.filter(id => relKeys.get(id).has(key));
+      const collection = declaredIn[0] || inCollections[0] || null;
+      out.push({
+        slug: d.slug,
+        path: d.path,
+        title: titleOf(d, inCollections, schemas),
+        field: key,                 // T05: show the pointing field name
+        collection,                 // T05: and the source collection
+        // Where it came from, for a document that is in no collection at all: its declared `type`,
+        // else its top folder. A memory object must still say "territory" rather than nothing.
+        source: collection || String(d.data.type || (d.path || '').split('/')[0] || ''),
+        declared: declaredIn.length > 0,
+        many: Array.isArray(raw),
+      });
+    }
+  }
+
+  // Typed relations first, then by source, title and field — a stable total order, so the section
+  // does not reshuffle between two identical reads.
+  out.sort((a, b) =>
+    (Number(b.declared) - Number(a.declared)) ||
+    a.source.localeCompare(b.source) ||
+    a.title.localeCompare(b.title) ||
+    a.field.localeCompare(b.field));
+  return out;
+}
