@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --ink:#0D0E11; --surface:#101115; --surface-2:#14161B;
+  --raise:#1C1F26; --sunk:#0A0B0E; --void:#0B0C0E;
+  --line:#1B1E24; --border:#22252C; --border-2:#2A2E36; --border-3:#3A3F49;
+  --fg:#ECEEF2; --fg-soft:#C9CFD8; --fg-muted:#9AA3AF; --fg-faint:#7B8797;
+  --accent:#E3FF32; --accent-hover:#EEFF66; --accent-deep:#B8CC28; --on-accent:#141519;
+  --accent-05:rgba(227,255,50,.05);
+  --accent-12:rgba(227,255,50,.12);
+  --accent-35:rgba(227,255,50,.35);
+  --accent-60:rgba(227,255,50,.6);
+  --sand:#C9CFD8;
+  --ok:#3FCF8E; --warn:#F0B23A; --danger:#F05B54;
+  --marked:#5B9DFF;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--ink)}
+body{font-family:'Schibsted Grotesk',system-ui,sans-serif;color:var(--fg);-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+a:hover{color:var(--accent-hover)}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;text-align:left}
+input{font:inherit;color:inherit;background:none;border:none}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:9999px;border:3px solid var(--ink)}
+::-webkit-scrollbar-track{background:transparent}
+</style>
+</helmet>
+
+<div style="width:100%; height:900px; display:flex; flex-direction:column; background:var(--ink); font-family:'Schibsted Grotesk',system-ui,sans-serif; overflow:hidden">
+
+  <div style="flex:1; min-height:0; display:flex">
+
+    <aside style="width:210px; flex:none; background:var(--surface); border-right:1px solid var(--line); display:flex; flex-direction:column; overflow:hidden">
+      <div style="flex:none; padding:10px 12px; border-bottom:1px solid var(--line)">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:7px 10px; border-radius:6px; background:var(--raise); border:1px solid var(--border-3)">
+          <span style="display:flex; flex-direction:column; gap:3px; min-width:0">
+            <span style="font-size:8.5px; font-weight:800; letter-spacing:.16em; color:var(--fg-faint)">PROJECT</span>
+            <span style="font-size:12.5px; font-weight:600; color:var(--fg); overflow:hidden; text-overflow:ellipsis; white-space:nowrap">2026-08 hazing</span>
+          </span>
+          <span style="font-family:'Spline Sans Mono',monospace; font-size:9px; color:var(--fg-muted)">&#9662;</span>
+        </div>
+      </div>
+
+      <div style="flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column">
+        <div style="padding:10px 12px; display:flex; flex-direction:column; gap:2px">
+          <a href="Decide.dc.html" style="display:flex; align-items:center; justify-content:space-between; gap:8px; height:30px; padding:0 10px; border-radius:6px; color:var(--fg-muted); font-size:12px; font-weight:500; transition:background 130ms ease, color 130ms ease" style-hover="background:var(--surface-2); color:var(--fg-soft)">
+            <span>Needs you</span>
+            <span style="display:inline-flex; align-items:center; height:17px; padding:0 6px; border-radius:9999px; border:1px solid var(--warn); font-family:'Spline Sans Mono',monospace; font-size:9.5px; font-weight:600; color:var(--warn)">6</span>
+          </a>
+          <a href="Today.dc.html" style="display:flex; align-items:center; height:30px; padding:0 10px; border-radius:6px; color:var(--fg-muted); font-size:12px; font-weight:500; transition:background 130ms ease, color 130ms ease" style-hover="background:var(--surface-2); color:var(--fg-soft)">Today</a>
+          <span style="display:flex; align-items:center; justify-content:space-between; gap:8px; height:30px; padding:0 10px; border-radius:6px; background:var(--raise); border:1px solid var(--border-3); color:var(--fg); font-size:12px; font-weight:600">
+            <span>Project</span>
+            <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:var(--fg-faint)">8</span>
+          </span>
+        </div>
+
+        <div style="padding:6px 12px 10px; display:flex; flex-direction:column; gap:2px; border-top:1px solid var(--line)">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 10px 6px">
+            <span style="font-size:8.5px; font-weight:800; letter-spacing:.18em; color:var(--fg-muted)">COLLECTIONS</span>
+            <span style="font-family:'Spline Sans Mono',monospace; font-size:9px; font-weight:500; color:var(--fg-faint)">SAVED QUERIES</span>
+          </div>
+          <sc-for list="{{ collections }}" as="c" hint-placeholder-count="5">
+            <a href="Scout.dc.html" style="display:flex; align-items:center; justify-content:space-between; gap:8px; height:29px; padding:0 10px; border-radius:6px; transition:background 130ms ease" style-hover="background:var(--surface-2)">
+              <span style="font-family:'Spline Sans Mono',monospace; font-size:11.5px; font-weight:500; color:var(--fg-muted)">{{ c.name }}</span>
+              <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:var(--fg-faint); font-variant-numeric:tabular-nums">{{ c.count }}</span>
+            </a>
+          </sc-for>
+          <a href="Scout.dc.html" style="display:flex; align-items:center; height:29px; padding:0 10px; border-radius:6px; color:var(--accent); font-family:'Spline Sans Mono',monospace; font-size:11.5px; font-weight:600" style-hover="background:var(--surface-2)">+ new collection</a>
+        </div>
+
+        <div style="padding:6px 12px 12px; display:flex; flex-direction:column; gap:2px; border-top:1px solid var(--line)">
+          <span style="font-size:8.5px; font-weight:800; letter-spacing:.18em; color:var(--fg-muted); padding:10px 10px 6px">ASSISTANTS</span>
+          <sc-for list="{{ railAgents }}" as="a" hint-placeholder-count="3">
+            <div style="display:flex; align-items:center; gap:9px; height:28px; padding:0 10px">
+              <span style="flex:none; width:6px; height:6px; border-radius:9999px; background:{{ a.dot }}; border:1px solid {{ a.dotBd }}"></span>
+              <span style="flex:1; font-family:'Spline Sans Mono',monospace; font-size:11px; font-weight:500; color:{{ a.fg }}">{{ a.name }}</span>
+              <span style="font-family:'Spline Sans Mono',monospace; font-size:8.5px; font-weight:700; letter-spacing:.1em; color:{{ a.stateFg }}">{{ a.state }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="flex:none; border-top:1px solid var(--line); padding:8px 12px">
+        <span style="display:flex; align-items:center; height:28px; padding:0 10px; color:var(--fg-faint); font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600; letter-spacing:.1em">FILES ON DISK</span>
+      </div>
+    </aside>
+
+    <main style="flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden">
+
+      <div style="flex:none; padding:20px 24px 18px; border-bottom:1px solid var(--line); display:flex; align-items:flex-start; justify-content:space-between; gap:28px">
+        <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:12px">
+          <div style="display:flex; align-items:center; gap:10px">
+            <span style="font-size:9px; font-weight:800; letter-spacing:.18em; color:var(--fg-muted)">THE GOAL</span>
+            <span style="display:inline-flex; align-items:center; gap:6px; height:18px; padding:0 8px 0 7px; border-radius:9999px; border:1px solid var(--border-2); font-size:8.5px; font-weight:800; letter-spacing:.12em; color:var(--fg-muted)">
+              <span style="width:5px; height:5px; border-radius:9999px; background:var(--ok)"></span>
+              <span>RUNNING</span>
+            </span>
+          </div>
+          <h1 style="margin:0; font-size:24px; font-weight:500; letter-spacing:-.015em; line-height:1.3; color:var(--fg); text-wrap:pretty">Find 6 people with a first-hand hazing story by 30 August.</h1>
+          <div style="display:flex; align-items:center; gap:16px">
+            <div style="display:flex; align-items:baseline; gap:7px">
+              <span style="font-family:'Spline Sans Mono',monospace; font-size:22px; font-weight:600; color:var(--fg); font-variant-numeric:tabular-nums">2</span>
+              <span style="font-family:'Spline Sans Mono',monospace; font-size:12px; font-weight:500; color:var(--fg-faint)">/ 6 FOUND</span>
+            </div>
+            <div style="flex:1; max-width:320px; height:4px; background:var(--line); border-radius:2px">
+              <div style="height:4px; border-radius:2px; background:var(--fg-soft); width:33%"></div>
+            </div>
+            <span style="font-family:'Spline Sans Mono',monospace; font-size:11px; font-weight:500; letter-spacing:.06em; color:var(--fg-muted); font-variant-numeric:tabular-nums">11 DAYS LEFT</span>
+            <span style="width:1px; height:14px; background:var(--border)"></span>
+            <span style="font-family:'Spline Sans Mono',monospace; font-size:11px; font-weight:500; color:var(--fg-faint)">2026-08-hazing/brief.md</span>
+          </div>
+        </div>
+        <button style="flex:none; display:flex; align-items:center; gap:10px; height:40px; padding:0 18px; border-radius:6px; background:var(--accent); color:var(--on-accent); font-size:13px; font-weight:600; transition:background 130ms ease" style-hover="background:var(--accent-hover)">
+          <span>Put the team to work</span>
+          <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600; background:rgba(20,21,25,.16); border-radius:4px; padding:2px 6px">&#8629;</span>
+        </button>
+      </div>
+
+      <div style="flex:1; min-height:0; display:flex; overflow:hidden">
+
+        <div style="flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; border-right:1px solid var(--line)">
+
+          <div style="flex:none; padding:14px 24px 12px; display:flex; align-items:center; justify-content:space-between; gap:12px">
+            <span style="font-size:9px; font-weight:800; letter-spacing:.18em; color:var(--fg-muted)">THE WORK</span>
+            <div style="display:flex; align-items:center; gap:6px">
+              <sc-for list="{{ lanes }}" as="l" hint-placeholder-count="4">
+                <span style="display:inline-flex; align-items:center; gap:7px; height:20px; padding:0 9px 0 8px; border-radius:9999px; border:1px solid var(--border-2)">
+                  <span style="width:5px; height:5px; border-radius:9999px; background:{{ l.dot }}"></span>
+                  <span style="font-size:8.5px; font-weight:800; letter-spacing:.12em; color:var(--fg-muted)">{{ l.name }}</span>
+                  <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600; color:var(--fg-soft); font-variant-numeric:tabular-nums">{{ l.n }}</span>
+                </span>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="flex:none; padding:0 24px 12px">
+            <div style="display:flex; align-items:center; gap:10px; height:40px; padding:0 12px; background:var(--surface-2); border:1px solid var(--border); border-radius:6px; transition:border-color 130ms ease" style-hover="border-color:var(--border-2)">
+              <span style="font-family:'Spline Sans Mono',monospace; font-size:12px; color:var(--fg-faint)">+</span>
+              <input value="{{ draft }}" onChange="{{ onDraft }}" placeholder="Ask someone to do something \u2014 plain language is fine" style="flex:1; min-width:0; height:38px; font-size:12.5px; color:var(--fg)" />
+              <button onClick="{{ onAssign }}" style="display:flex; align-items:center; gap:7px; height:26px; padding:0 10px; border-radius:6px; background:var(--raise); border:1px solid var(--border-2); font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600; letter-spacing:.06em; color:var(--fg-soft); transition:border-color 130ms ease" style-hover="border-color:var(--border-3)">
+                <span style="width:5px; height:5px; border-radius:9999px; background:{{ assignDot }}"></span>
+                <span>{{ assignee }}</span>
+                <span style="font-size:8px; color:var(--fg-faint)">&#9662;</span>
+              </button>
+              <button onClick="{{ onAdd }}" style="height:26px; padding:0 12px; border-radius:6px; border:1px solid var(--accent-35); color:var(--accent); font-size:11.5px; font-weight:600; transition:border-color 130ms ease, background 130ms ease" style-hover="border-color:var(--accent-60); background:var(--accent-05)">Add task</button>
+            </div>
+          </div>
+
+          <div style="flex:1; min-height:0; overflow-y:auto; padding:0 24px 20px; display:flex; flex-direction:column; gap:16px">
+            <sc-for list="{{ groups }}" as="g" hint-placeholder-count="4">
+              <div style="display:flex; flex-direction:column; gap:7px">
+                <div style="display:flex; align-items:center; gap:9px">
+                  <span style="width:5px; height:5px; border-radius:9999px; background:{{ g.dot }}"></span>
+                  <span style="font-size:8.5px; font-weight:800; letter-spacing:.18em; color:{{ g.fg }}">{{ g.name }}</span>
+                  <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600; color:var(--fg-faint); font-variant-numeric:tabular-nums">{{ g.n }}</span>
+                  <span style="flex:1; height:1px; background:var(--line)"></span>
+                </div>
+                <sc-for list="{{ g.tasks }}" as="t" hint-placeholder-count="3">
+                  <div style="display:flex; align-items:center; gap:12px; padding:9px 12px; background:{{ t.bg }}; border:1px solid {{ t.bd }}; border-left:2px solid {{ t.stripe }}; border-radius:6px; transition:border-color 130ms ease" style-hover="border-color:var(--border-3)">
+                    <span style="flex:1; min-width:0; font-size:12.5px; font-weight:500; color:{{ t.fg }}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ t.text }}</span>
+                    <sc-if value="{{ t.hasNote }}" hint-placeholder-val="{{ false }}">
+                      <span style="flex:none; font-size:11.5px; font-weight:500; color:var(--warn)">{{ t.note }}</span>
+                    </sc-if>
+                    <span style="flex:none; display:inline-flex; align-items:center; gap:6px; height:20px; padding:0 8px 0 7px; border-radius:6px; background:var(--raise); border:1px solid var(--border-2)">
+                      <span style="width:5px; height:5px; border-radius:9999px; background:{{ t.whoDot }}"></span>
+                      <span style="font-family:'Spline Sans Mono',monospace; font-size:9.5px; font-weight:600; color:var(--fg-muted)">{{ t.who }}</span>
+                    </span>
+                    <span style="flex:none; width:56px; text-align:right; font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:var(--fg-faint); font-variant-numeric:tabular-nums">{{ t.age }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <aside style="width:352px; flex:none; display:flex; flex-direction:column; overflow-y:auto">
+
+          <div style="padding:14px 20px 16px; border-bottom:1px solid var(--line); display:flex; flex-direction:column; gap:11px">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:10px">
+              <span style="font-size:9px; font-weight:800; letter-spacing:.18em; color:var(--fg-muted)">NEEDS YOU</span>
+              <span style="font-family:'Spline Sans Mono',monospace; font-size:11px; font-weight:600; color:var(--warn); font-variant-numeric:tabular-nums">3</span>
+            </div>
+            <sc-for list="{{ needs }}" as="n" hint-placeholder-count="3">
+              <a href="Decide.dc.html" style="display:flex; align-items:center; gap:11px; padding:10px 12px; background:var(--surface-2); border:1px solid var(--border); border-radius:6px; transition:border-color 130ms ease" style-hover="border-color:var(--border-3)">
+                <span style="flex:1; min-width:0; display:flex; flex-direction:column; gap:3px">
+                  <span style="font-size:12.5px; font-weight:500; color:var(--fg-soft); line-height:1.35">{{ n.text }}</span>
+                  <span style="font-family:'Spline Sans Mono',monospace; font-size:9.5px; font-weight:600; letter-spacing:.08em; color:var(--fg-faint)">{{ n.meta }}</span>
+                </span>
+                <span style="flex:none; font-family:'Spline Sans Mono',monospace; font-size:11px; color:var(--accent)">&#8594;</span>
+              </a>
+            </sc-for>
+          </div>
+
+          <div style="padding:14px 20px 16px; border-bottom:1px solid var(--line); display:flex; flex-direction:column; gap:11px">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:10px">
+              <span style="font-size:9px; font-weight:800; letter-spacing:.18em; color:var(--fg-muted)">WHO&#8217;S ON IT</span>
+              <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:var(--fg-faint)">3 OF YOUR 5</span>
+            </div>
+            <sc-for list="{{ crew }}" as="c" hint-placeholder-count="3">
+              <div style="display:flex; gap:11px; padding:11px 12px; background:{{ c.bg }}; border:1px solid {{ c.bd }}; border-radius:6px">
+                <span style="flex:none; margin-top:5px; width:7px; height:7px; border-radius:9999px; background:{{ c.dot }}; border:1px solid {{ c.dotBd }}; box-shadow:0 0 0 {{ c.ring }} {{ c.ringColor }}"></span>
+                <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:4px">
+                  <div style="display:flex; align-items:center; justify-content:space-between; gap:8px">
+                    <span style="font-family:'Spline Sans Mono',monospace; font-size:11.5px; font-weight:600; color:{{ c.nameFg }}">{{ c.name }}</span>
+                    <span style="font-family:'Spline Sans Mono',monospace; font-size:8.5px; font-weight:700; letter-spacing:.1em; color:{{ c.stateFg }}">{{ c.state }}</span>
+                  </div>
+                  <span style="font-size:12px; font-weight:400; color:{{ c.doingFg }}; line-height:1.45">{{ c.doing }}</span>
+                  <span style="font-family:'Spline Sans Mono',monospace; font-size:9.5px; font-weight:500; color:var(--fg-faint); font-variant-numeric:tabular-nums">{{ c.stat }}</span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="padding:14px 20px 20px; display:flex; flex-direction:column; gap:11px">
+            <span style="font-size:9px; font-weight:800; letter-spacing:.18em; color:var(--fg-muted)">WHAT THEY&#8217;VE TURNED UP</span>
+            <sc-for list="{{ findings }}" as="f" hint-placeholder-count="3">
+              <a href="Scout.dc.html" style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:11px 12px; background:var(--surface-2); border:1px solid var(--border); border-radius:6px; transition:border-color 130ms ease" style-hover="border-color:var(--border-3)">
+                <span style="display:flex; flex-direction:column; gap:3px; min-width:0">
+                  <span style="font-family:'Spline Sans Mono',monospace; font-size:11.5px; font-weight:600; color:var(--fg-soft)">{{ f.coll }}</span>
+                  <span style="font-size:11.5px; font-weight:400; color:var(--fg-muted)">{{ f.what }}</span>
+                </span>
+                <span style="flex:none; display:flex; align-items:baseline; gap:6px">
+                  <span style="font-family:'Spline Sans Mono',monospace; font-size:18px; font-weight:600; color:var(--fg); font-variant-numeric:tabular-nums">{{ f.n }}</span>
+                  <span style="font-family:'Spline Sans Mono',monospace; font-size:11px; color:var(--accent)">&#8594;</span>
+                </span>
+              </a>
+            </sc-for>
+          </div>
+        </aside>
+      </div>
+    </main>
+  </div>
+
+  <footer style="flex:none; height:38px; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:0 18px; background:var(--surface); border-top:1px solid var(--border)">
+    <div style="display:flex; align-items:center; gap:11px; min-width:0">
+      <span style="flex:none; width:7px; height:7px; border-radius:9999px; background:var(--ok); box-shadow:0 0 0 3px rgba(63,207,142,.14)"></span>
+      <span style="font-family:'Spline Sans Mono',monospace; font-size:11px; font-weight:600; color:var(--fg-soft)">scout-fb</span>
+      <span style="font-size:12px; font-weight:400; color:var(--fg-muted)">sweeping Nurses PH</span>
+      <span style="font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:500; color:var(--fg-faint); font-variant-numeric:tabular-nums">12 MIN / 8 FOUND</span>
+      <span style="width:1px; height:13px; background:var(--border)"></span>
+      <span style="font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:500; color:var(--fg-faint)">writer &#183; WAITING ON YOU</span>
+    </div>
+    <a href="Scout.dc.html" style="flex:none; display:flex; align-items:center; gap:8px; height:26px; padding:0 11px; border-radius:6px; border:1px solid var(--border-2); color:var(--fg-muted); font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:700; letter-spacing:.1em" style-hover="border-color:var(--border-3); color:var(--fg-soft)">
+      <span>ACTIVITY</span>
+      <span style="font-size:9px">&#9652;</span>
+    </a>
+  </footer>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  state = { draft: '', assignee: 'scout-fb', tasks: [] };
+
+  base = [
+    { lane:'blocked', text:'Post the intro in Nurses PH', who:'writer', age:'3h', note:'needs your approval' },
+    { lane:'claimed', text:'Sweep Nurses PH for hazing threads', who:'scout-fb', age:'12 min' },
+    { lane:'claimed', text:'Check the two Cebu stories are first-hand', who:'vetter', age:'40 min' },
+    { lane:'open', text:'Find a fraternity alumnus willing to speak', who:'unassigned', age:'1d' },
+    { lane:'open', text:'Ask Ramon Dizon for two referrals', who:'crystal', age:'2d' },
+    { lane:'open', text:'Draft the questions for the first recording', who:'crystal', age:'2d' },
+    { lane:'done', text:'Join Nurses PH', who:'scout-fb', age:'6d' },
+    { lane:'done', text:'Write the project brief', who:'crystal', age:'8d' }
+  ];
+
+  laneMeta = {
+    blocked: { name:'BLOCKED ON YOU', dot:'var(--warn)', fg:'var(--warn)', stripe:'var(--warn)' },
+    claimed: { name:'BEING WORKED', dot:'var(--marked)', fg:'var(--fg-soft)', stripe:'var(--marked)' },
+    open:    { name:'OPEN', dot:'var(--border-3)', fg:'var(--fg-muted)', stripe:'transparent' },
+    done:    { name:'DONE', dot:'var(--ok)', fg:'var(--fg-faint)', stripe:'transparent' }
+  };
+
+  renderVals(){
+    const all = this.state.tasks.concat(this.base);
+    const order = ['blocked','claimed','open','done'];
+    const groups = order.map(k => {
+      const m = this.laneMeta[k];
+      const tasks = all.filter(t => t.lane === k).map(t => ({
+        text: t.text, who: t.who, age: t.age,
+        hasNote: !!t.note, note: t.note || '',
+        bg: k === 'done' ? 'var(--surface)' : 'var(--surface-2)',
+        bd: k === 'done' ? 'var(--line)' : 'var(--border)',
+        stripe: m.stripe,
+        fg: k === 'done' ? 'var(--fg-faint)' : 'var(--fg-soft)',
+        whoDot: t.who === 'crystal' ? 'var(--marked)' : t.who === 'unassigned' ? 'var(--border-3)' : 'var(--ok)'
+      }));
+      return { name: m.name, dot: m.dot, fg: m.fg, n: String(tasks.length), tasks };
+    });
+
+    const count = k => all.filter(t => t.lane === k).length;
+
+    return {
+      collections: [
+        { name:'#guest', count:'147' }, { name:'#group', count:'12' },
+        { name:'#task', count:String(all.length) }, { name:'#topic', count:'5' }, { name:'#learning', count:'24' }
+      ],
+      railAgents: [
+        { name:'scout-fb', state:'SWEEPING', dot:'var(--ok)', dotBd:'var(--ok)', fg:'var(--fg-soft)', stateFg:'var(--ok)' },
+        { name:'vetter', state:'CHECKING', dot:'var(--ok)', dotBd:'var(--ok)', fg:'var(--fg-soft)', stateFg:'var(--ok)' },
+        { name:'writer', state:'BLOCKED', dot:'var(--warn)', dotBd:'var(--warn)', fg:'var(--fg-soft)', stateFg:'var(--warn)' }
+      ],
+
+      lanes: [
+        { name:'OPEN', n:String(count('open')), dot:'var(--border-3)' },
+        { name:'WORKING', n:String(count('claimed')), dot:'var(--marked)' },
+        { name:'BLOCKED', n:String(count('blocked')), dot:'var(--warn)' },
+        { name:'DONE', n:String(count('done')), dot:'var(--ok)' }
+      ],
+      groups,
+
+      draft: this.state.draft,
+      onDraft: (e) => this.setState({ draft: e.target.value }),
+      assignee: this.state.assignee,
+      assignDot: this.state.assignee === 'crystal' ? 'var(--marked)' : 'var(--ok)',
+      onAssign: () => {
+        const list = ['scout-fb','vetter','writer','crystal'];
+        const i = list.indexOf(this.state.assignee);
+        this.setState({ assignee: list[(i + 1) % list.length] });
+      },
+      onAdd: () => {
+        const t = this.state.draft.trim();
+        if (!t) return;
+        this.setState(s => ({
+          draft: '',
+          tasks: [{ lane: s.assignee === 'crystal' ? 'open' : 'claimed', text: t, who: s.assignee, age: 'just now' }].concat(s.tasks)
+        }));
+      },
+
+      needs: [
+        { text:'Approve the intro post for Nurses PH', meta:'WRITER / WAITING 3H' },
+        { text:'Say yes or no to Cebu Nurses Network', meta:'SCOUT-FB / WAITING 4H' },
+        { text:'6 people found overnight need a decision', meta:'VETTER / OLDEST 2D' }
+      ],
+
+      crew: [
+        { name:'scout-fb', state:'WORKING', doing:'Reading post 61 of 88 in Nurses PH, looking for hazing threads.',
+          stat:'12 MIN IN / 8 FOUND / \u20B16 TODAY',
+          bg:'var(--surface-2)', bd:'var(--border)', dot:'var(--ok)', dotBd:'var(--ok)', ring:'3px', ringColor:'rgba(63,207,142,.14)',
+          nameFg:'var(--fg)', stateFg:'var(--ok)', doingFg:'var(--fg-soft)' },
+        { name:'vetter', state:'WORKING', doing:'Checking whether the two Cebu stories are first-hand.',
+          stat:'40 MIN IN / 2 OF 6 CHECKED / \u20B13 TODAY',
+          bg:'var(--surface-2)', bd:'var(--border)', dot:'var(--ok)', dotBd:'var(--ok)', ring:'0', ringColor:'transparent',
+          nameFg:'var(--fg)', stateFg:'var(--ok)', doingFg:'var(--fg-soft)' },
+        { name:'writer', state:'BLOCKED', doing:'Stopped. It won\u2019t post anything until you approve the wording.',
+          stat:'IDLE 3H / \u20B10 TODAY',
+          bg:'var(--surface-2)', bd:'var(--border-2)', dot:'var(--warn)', dotBd:'var(--warn)', ring:'3px', ringColor:'rgba(240,178,58,.14)',
+          nameFg:'var(--fg)', stateFg:'var(--warn)', doingFg:'var(--fg-soft)' }
+      ],
+
+      findings: [
+        { coll:'#guest', what:'people found for this project', n:'34' },
+        { coll:'#topic', what:'angles worth an episode', n:'5' },
+        { coll:'#learning', what:'corrections you\u2019ve made here', n:'7' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

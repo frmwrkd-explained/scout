@@ -1,0 +1,159 @@
+# Desktop packaging. One runner per platform ON PURPOSE.
+#
+# sharp is a native module: `npm ci` resolves exactly one of the @img/sharp-<platform>-<arch>
+# optional packages — the one matching the host. Cross-building (say, --win from macOS) copies
+# the host's binary into the bundle and ships an app that throws on first image op. The lockfile
+# carries every platform's entry, so each runner installs its own correct binary.
+#
+# macOS used to be built twice (arm64 + x64) for the same reason: @img/sharp-darwin-arm64 will
+# not load on an Intel Mac.
+#
+# The x64 leg is GONE as of 2026-08-07, because `macos-13` no longer exists. GitHub retired the
+# Intel runner image, and a job requesting a label with no runner behind it does not fail — it
+# QUEUES, for GitHub's maximum of 24 hours, and is then cancelled. Evidence, from the mac-x64 job
+# of run 30767942348:
+#     runner:    (never assigned)
+#     started:   2026-08-02T21:28:00Z
+#     completed: 2026-08-03T21:28:00Z   ← exactly 24h
+# That is why this workflow's runs show durations of "24h0m2s" and why it had never once completed:
+# three legs finished in minutes and the fourth held the run open for a day. It also blocks
+# `gh run rerun --failed`, which needs a completed run.
+#
+# ⚠️ OPEN QUESTION, deliberately not answered here. release.yml still ships an Intel DMG,
+# cross-built from the macos-14 arm64 runner ("electron-builder cross-builds x64 from here").
+# The paragraph above says that is exactly what produces a broken bundle: `npm ci` on an arm64
+# host installs @img/sharp-darwin-arm64 and NOT -x64, because npm filters optional deps by
+# cpu/os. So the Intel DMG may ship the wrong native binary and throw on the first image
+# operation. The two workflows disagree, and this comment is not the place to settle it — see
+# docs/RELEASE.md. Do not re-add an x64 leg here until that is resolved; a second broken build
+# is not better than none.
+#
+# Signing and notarisation ARE wired up — in release.yml, which reads five Apple secrets and
+# falls back to an unsigned build when they are absent. This workflow never signs: it packages
+# on every push to prove the build still works, and its artifacts are for inspection, not for
+# shipping. See docs/RELEASE.md.
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: ${{ matrix.platform }}-${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14        # Apple silicon runner
+            platform: mac
+            arch: arm64
+          # NO mac/x64 leg — `macos-13` is retired and its jobs queue for 24h, never run, and
+          # hold the whole workflow open. See the header. Re-adding it needs a live Intel label
+          # AND an answer to the cross-build sharp question, not just a new string here.
+          - os: windows-latest
+            platform: win
+            arch: x64
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          cache: npm
+
+      # electron-builder's dmg target shells out to `which python`, and macOS ships only
+      # `python3`. Without this the mac legs fail after the zip is written, with
+      # "Command failed: which python".
+      - uses: actions/setup-python@v7
+        if: matrix.platform == 'mac'
+        with:
+          python-version: '3.12'
+
+      - name: Install
+        run: npm ci
+
+      - name: Verify the native binary matches this runner
+        shell: bash
+        run: node -e "const s=require('sharp');s({create:{width:8,height:8,channels:3,background:{r:1,g:2,b:3}}}).png().toBuffer().then(b=>console.log('sharp ok on '+process.platform+'/'+process.arch+', libvips '+s.versions.vips+', '+b.length+' bytes'))"
+
+      # `npm test`, the same spelling release.yml uses. Two spellings is how this drifted:
+      # package.json used to say `node --test tests/`, which Node >= 22 resolves as a MODULE
+      # path and dies with MODULE_NOT_FOUND, while this leg passed because bash expanded a
+      # glob. Bare `node --test` uses Node's own discovery — no shell globbing, no directory
+      # argument, and it skips dot-prefixed files so exFAT `._*.test.mjs` sidecars are ignored.
+      - name: Test
+        run: npm test
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Package
+        shell: bash
+        env:
+          # Optional repo variable. Set it to override the update feed baked into the build
+          # (package.json → build.publish.url). Leave unset to use the committed default.
+          FRFG_UPDATE_URL: ${{ vars.FRFG_UPDATE_URL }}
+        run: |
+          set -euo pipefail
+          args=(--${{ matrix.platform }} --${{ matrix.arch }} --publish never)
+          if [ -n "${FRFG_UPDATE_URL:-}" ]; then
+            args+=("-c.publish.url=${FRFG_UPDATE_URL}")
+          fi
+          npx electron-builder "${args[@]}"
+
+      # The real check, and it costs nothing. `if-no-files-found: error` used to be what caught a
+      # build that produced no installer — but that guard lives inside a step which now fails for a
+      # reason that has nothing to do with this repo (see below), so it could no longer be trusted
+      # to mean what it says. Assert on disk instead: this fails the job when the BUILD produced
+      # nothing, and is unaffected by anything to do with artifact storage.
+      - name: Verify the build produced an installer and a feed index
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          installers=(release/*.dmg release/*.exe release/*.AppImage)
+          feeds=(release/latest*.yml)
+          [ ${#installers[@]} -gt 0 ] || { echo "::error::no installer in release/"; ls -la release/ || true; exit 1; }
+          [ ${#feeds[@]} -gt 0 ]      || { echo "::error::no latest*.yml — electron-updater fetches this before any installer, so publishing without it ships a dead feed"; exit 1; }
+          echo "ok: ${#installers[@]} installer(s), ${#feeds[@]} feed index file(s)"
+
+      # continue-on-error, because this step's failure is not this repo's failure.
+      #
+      # Actions artifact storage is billed PER ACCOUNT, not per repository, and a sibling repo under
+      # the same owner holds several GB of month-old Electron builds. That exhausts the shared quota,
+      # so every upload here fails with "Artifact storage quota has been hit" no matter what this
+      # workflow does — turning every push red for a reason no one reading this repo could diagnose.
+      #
+      # A red X that does not mean "your build is broken" is worse than no X: it trains you to ignore
+      # the one signal that should stop a merge. The build result now reflects the build, the
+      # artifacts upload whenever quota exists, and release.yml's `github_release` input is the route
+      # that bypasses this entirely when you actually need the installers in hand.
+      - uses: actions/upload-artifact@v7
+        continue-on-error: true
+        with:
+          name: frameforge-${{ matrix.platform }}-${{ matrix.arch }}
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            release/*.dmg
+            release/*.zip
+            release/*.exe
+            release/*.AppImage
+            release/*.blockmap
+            release/latest*.yml

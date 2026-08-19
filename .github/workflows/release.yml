@@ -1,0 +1,277 @@
+# Build FrameForge for every platform and publish to the R2 update feed.
+#
+# Exists because Windows and Linux cannot be built from a Mac: the NSIS installer needs
+# Wine and the AppImage needs Docker. A matrix of real runners is cheaper than either.
+#
+# macOS is in the matrix too, even though it CAN be built locally, so that a release is
+# one action rather than "run this locally, then trigger that" — a split release process
+# is how a platform silently gets left a version behind.
+#
+# Trigger: push a tag (`git tag v0.1.1 && git push --tags`) or run it by hand from the
+# Actions tab. Manual runs upload nothing unless you tick `publish`.
+
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Upload to the R2 feed (otherwise just build and keep artifacts)'
+        type: boolean
+        default: false
+      github_release:
+        description: 'Attach installers to a GitHub prerelease (routes around the Actions storage quota)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write        # needed to attach installers to the GitHub Release
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false   # a broken Windows build must not throw away a good Linux one
+      matrix:
+        include:
+          # `dist:mac:ci`, NOT `dist:mac` — the latter sets CSC_IDENTITY_AUTO_DISCOVERY=false,
+          # which is right for a local throwaway build and catastrophic here: it tells
+          # electron-builder not to look for a signing identity at all, so the release
+          # build came out unsigned no matter how many Apple secrets were configured.
+          # `dist:mac:ci` drops the flag, so electron-builder signs when CSC_LINK is
+          # present and falls back to an unsigned build when it is not.
+          # `artifacts` MUST be newline-separated. actions/upload-artifact takes a
+          # multiline `path`, never a space-separated list — given
+          # 'release/*.AppImage release/latest-linux.yml' it looks for one path with a
+          # space in it, finds nothing, and fails on `if-no-files-found: error` even
+          # though the build succeeded. That is exactly how a green Linux build still
+          # produced no downloadable AppImage.
+          - os: macos-14      # arm64 runner; electron-builder cross-builds x64 from here
+            script: dist:mac:ci
+            artifacts: |
+              release/*.dmg
+              release/*.zip
+              release/*.blockmap
+              release/latest-mac.yml
+          - os: windows-latest
+            script: dist:win
+            artifacts: |
+              release/*.exe
+              release/*.blockmap
+              release/latest.yml
+          - os: ubuntu-latest
+            script: dist:linux
+            artifacts: |
+              release/*.AppImage
+              release/latest-linux.yml
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          cache: npm
+
+      # `npm ci`, not `npm install` — the lockfile is committed and a release must build
+      # the exact tree that was tested, not whatever resolved today.
+      - run: npm ci
+
+      - run: npm test
+
+      # ── macOS signing ────────────────────────────────────────────────────────────
+      # Without a certificate the mac build is unsigned, which means Gatekeeper blocks it
+      # AND auto-update silently fails (Squirrel.Mac will not update an app it cannot
+      # verify). See docs/RELEASE.md.
+      #
+      # No explicit keychain-import step: electron-builder imports the certificate itself
+      # from CSC_LINK into a temporary keychain it creates and destroys per build. The
+      # step that used to sit here only echoed a string and imported nothing, which read
+      # like the signing was handled when it was not.
+      #
+      # CSC_LINK must be the **base64 of the .p12**, not the raw file:
+      #   base64 -i cert.p12 | pbcopy   →  paste as the MAC_CERT_P12 secret
+      #
+      # An UNSET secret arrives as the empty string, not as nothing — and electron-builder
+      # treats an empty CSC_LINK as a path, resolves it against the repo root, and dies
+      # with `⨯ /path/to/repo not a file`. So the empty case has to be actively unset
+      # rather than passed through, and auto-discovery turned off to get the intended
+      # unsigned fallback. `shell: bash` because windows-latest defaults to pwsh.
+      # ── notarisation credentials: API key preferred, Apple ID as fallback ────────
+      # electron-builder checks the two routes IN ORDER and does not fall through
+      # (app-builder-lib/out/macPackager.js):
+      #
+      #   option 1  APPLE_ID set        -> REQUIRES APPLE_APP_SPECIFIC_PASSWORD, else it THROWS
+      #   option 2  APPLE_API_KEY set   -> requires APPLE_API_KEY_ID and APPLE_API_ISSUER too
+      #   neither                       -> notarisation is skipped silently
+      #
+      # So the routes are mutually exclusive in practice: leaving APPLE_ID in the environment
+      # while intending to use an API key fails the build with a message about a password you
+      # deliberately do not have. The script below picks ONE and unsets the other.
+      #
+      # APPLE_API_KEY is a PATH to the .p8, not its contents — notarytool receives it as
+      # `--key <path>`. The secret holds the base64 of the file (a .p8 is multi-line PEM and
+      # does not survive a secret cleanly otherwise), so it is decoded to a file under
+      # RUNNER_TEMP, which is scoped to this job and destroyed with the runner.
+      - name: Build
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -z "${CSC_LINK:-}" ]; then
+            unset CSC_LINK CSC_KEY_PASSWORD
+            export CSC_IDENTITY_AUTO_DISCOVERY=false
+            echo "::notice::No macOS signing certificate configured — building UNSIGNED."
+          fi
+
+          if [ -n "${APPLE_API_KEY_P8:-}" ] && [ -n "${APPLE_API_KEY_ID:-}" ] && [ -n "${APPLE_API_ISSUER:-}" ]; then
+            keydir="${RUNNER_TEMP}/apple-api-key"
+            mkdir -p "$keydir"
+            printf '%s' "$APPLE_API_KEY_P8" | base64 --decode > "$keydir/AuthKey.p8"
+            # A truncated or wrongly-encoded secret produces a file that notarytool rejects with a
+            # generic auth error much later, after the whole build. Check the shape now.
+            head -1 "$keydir/AuthKey.p8" | grep -q "BEGIN PRIVATE KEY" \
+              || { echo "::error::APPLE_API_KEY_P8 did not decode to a PEM private key — re-check the base64."; exit 1; }
+            export APPLE_API_KEY="$keydir/AuthKey.p8"
+            unset APPLE_ID APPLE_APP_SPECIFIC_PASSWORD
+            echo "::notice::Notarising with an App Store Connect API key."
+          elif [ -n "${APPLE_ID:-}" ] && [ -n "${APPLE_APP_SPECIFIC_PASSWORD:-}" ]; then
+            unset APPLE_API_KEY APPLE_API_KEY_ID APPLE_API_ISSUER
+            echo "::notice::Notarising with an Apple ID and app-specific password."
+          else
+            unset APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_API_KEY APPLE_API_KEY_ID APPLE_API_ISSUER
+            if [ -n "${CSC_LINK:-}" ]; then
+              # SIGNED but NOT notarised is the trap. It looks like a proper release — the app is
+              # signed, the build is green — and Gatekeeper still blocks it, so the only symptom
+              # is a user reporting "damaged" for something you believe you shipped correctly.
+              # On a tag push that is a broken release, so refuse; elsewhere warn loudly.
+              if [[ "${GITHUB_REF:-}" == refs/tags/v* ]]; then
+                echo "::error::Signing certificate present but NO notarisation credentials. A signed, un-notarised build is still blocked by Gatekeeper. Set APPLE_API_KEY_P8 + APPLE_API_KEY_ID + APPLE_API_ISSUER, or APPLE_ID + APPLE_APP_SPECIFIC_PASSWORD."
+                exit 1
+              fi
+              echo "::warning::Signed but NOT notarised — Gatekeeper will still block this build. Fine for a test dispatch, never for a release."
+            else
+              echo "::notice::No signing certificate and no notarisation credentials — building UNSIGNED."
+            fi
+          fi
+
+          npm run ${{ matrix.script }}
+        env:
+          CSC_LINK: ${{ secrets.MAC_CERT_P12 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # route 2 — App Store Connect API key (preferred: survives an Apple ID password
+          # change, does not depend on a personal account's 2FA, revocable on its own)
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          # route 1 — Apple ID + app-specific password
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── the way out when Actions storage is full ─────────────────────────────────
+      # GitHub Release assets and Actions artifacts are DIFFERENT storage with different
+      # quotas. Artifacts count against the account-wide Actions allowance (500 MB on the
+      # free plan, shared across every repo the account owns — a sibling project's builds
+      # can and did exhaust it, blocking releases here for reasons nothing in this repo
+      # could explain). Release assets do not come out of that budget.
+      #
+      # So this step publishes the installers directly and never touches the artifact
+      # store. It runs BEFORE upload-artifact deliberately: when the quota is full that
+      # step fails the job, and a later step would never run.
+      #
+      # Authenticates as GITHUB_TOKEN with the workflow-level `contents: write`, NOT as
+      # the person who clicked run — so it works for a collaborator without admin.
+      #
+      # ⚠️ The tag must NOT match `v*`. This workflow triggers on `push: tags: ['v*']`,
+      # and creating a v-tag here would re-trigger it, which re-creates the tag, which
+      # re-triggers it. `test-<run_id>` is outside the pattern and unique per run.
+      - name: Attach to a GitHub prerelease
+        if: inputs.github_release
+        shell: bash                      # windows-latest defaults to pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: test-${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          # `|| true` because three matrix legs race to create the same release and
+          # exactly one wins; the losers must carry on to the upload rather than die.
+          gh release create "$TAG" \
+            --prerelease \
+            --target "${{ github.sha }}" \
+            --title "Test build ${{ github.ref_name }} ($TAG)" \
+            --notes "Unsigned test build from \`${{ github.ref_name }}\`, run ${{ github.run_id }}.
+
+          **Unsigned.** macOS will call it damaged — it is not:
+          \`xattr -dr com.apple.quarantine /Applications/FrameForge.app\`
+          Windows will show a SmartScreen warning. Auto-update does not work on an
+          unsigned build. Not for distribution." || true
+
+          # -maxdepth 1 -type f: release/ also holds mac-arm64/, win-unpacked/ and
+          # linux-unpacked/ — hundreds of MB of loose files that must never be uploaded.
+          # -print0/-0 because the Windows installer is literally named
+          # "FrameForge Setup 0.1.0.exe", spaces and all.
+          find release -maxdepth 1 -type f -print0 \
+            | xargs -0 gh release upload "$TAG" --clobber
+
+          echo "::notice::Assets at https://github.com/${{ github.repository }}/releases/tag/$TAG"
+
+      # Kept, and kept LAST, so the normal tag-driven path still feeds `publish` via
+      # download-artifact. Expected to fail while the account storage quota is exhausted;
+      # that failure no longer costs you the installers.
+      # Fatal ONLY when something downstream actually needs these files. The `publish` job below
+      # feeds R2 via download-artifact, so for a tag push or an explicit publish a failed upload
+      # must stop the run — publishing an incomplete feed is worse than not publishing.
+      #
+      # For a build-only dispatch nothing consumes them, and the account-wide artifact quota (shared
+      # with a sibling repo, and currently exhausted by it) would otherwise fail a run whose
+      # installers all built fine and are already attached to the GitHub prerelease above. That is
+      # how run 31372492309 reported "failure" on all three legs while publishing every installer
+      # correctly, including the Intel sharp fix.
+      - uses: actions/upload-artifact@v7
+        continue-on-error: ${{ !inputs.publish && !startsWith(github.ref, 'refs/tags/v') }}
+        with:
+          name: frameforge-${{ matrix.os }}
+          path: ${{ matrix.artifacts }}
+          if-no-files-found: error      # a silently empty artifact is worse than a red X
+          retention-days: 14
+
+  # Separate job so the feed is only ever written once every platform has succeeded.
+  # Publishing per-matrix-leg would let a green Linux build push a manifest while the
+  # Windows leg is still running — clients would see a release with missing binaries.
+  publish:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          path: staged
+          merge-multiple: true          # collapse the three per-OS folders into one
+
+      - run: mkdir -p release && find staged -type f -exec mv {} release/ \;
+
+      - uses: actions/setup-node@v7
+        with: { node-version: 20 }
+
+      # R2 needs an S3-style API token here — the OAuth login that `wrangler` uses on a
+      # developer's laptop does not exist on a runner. Create one at:
+      #   Cloudflare dashboard → R2 → Manage API tokens → Object Read & Write
+      - name: Upload to R2
+        run: npx wrangler@4 r2 object put --help > /dev/null && node scripts/release-upload.mjs
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: gh release create "${GITHUB_REF_NAME}" release/* --generate-notes || \
+             gh release upload "${GITHUB_REF_NAME}" release/* --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

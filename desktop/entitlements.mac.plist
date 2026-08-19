@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Hardened-runtime entitlements. Required for notarization: Apple will not notarize a
+  build without hardened runtime, and hardened runtime without these exceptions breaks
+  Electron on launch.
+
+  Every entry below is here because something in THIS app needs it. Do not copy-paste
+  extra entitlements in "just in case" — each one is an attack surface Apple asks you
+  to justify, and an unused one is a weaker app for no benefit.
+
+    allow-jit / allow-unsigned-executable-memory
+      V8 compiles JavaScript to machine code at runtime. Without both of these the
+      renderer crashes immediately on launch.
+
+    allow-dyld-environment-variables
+      backend/index.mjs runs as an Electron utilityProcess and the agent layer
+      (backend/agentProviders.mjs) spawns the `claude` CLI as a child process. Both
+      inherit a modified environment.
+
+    disable-library-validation
+      sharp loads platform-native .node binaries from app.asar.unpacked (@img/*).
+      Those are signed by us, not by Apple, so library validation rejects them.
+
+    device.audio-input
+      Voice dictation (frontend/VoiceInput.jsx). Pairs with the
+      NSMicrophoneUsageDescription string in package.json `build.mac.extendInfo` —
+      the entitlement grants the capability, the string is what the user is asked.
+-->
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+  <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+  <true/>
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
+  <key>com.apple.security.device.audio-input</key>
+  <true/>
+</dict>
+</plist>

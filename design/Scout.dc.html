@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --ink:#0D0E11; --surface:#101115; --surface-2:#14161B;
+  --raise:#1C1F26; --sunk:#0A0B0E; --void:#0B0C0E;
+  --line:#1B1E24; --border:#22252C; --border-2:#2A2E36; --border-3:#3A3F49;
+  --fg:#ECEEF2; --fg-soft:#C9CFD8; --fg-muted:#9AA3AF; --fg-faint:#7B8797;
+  --accent:#E3FF32; --accent-hover:#EEFF66; --accent-deep:#B8CC28; --on-accent:#141519;
+  --accent-05:rgba(227,255,50,.05);
+  --accent-12:rgba(227,255,50,.12);
+  --accent-35:rgba(227,255,50,.35);
+  --accent-60:rgba(227,255,50,.6);
+  --sand:#C9CFD8;
+  --ok:#3FCF8E; --warn:#F0B23A; --danger:#F05B54;
+  --marked:#5B9DFF;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--ink)}
+body{font-family:'Schibsted Grotesk',system-ui,sans-serif;color:var(--fg);-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+a:hover{color:var(--accent-hover)}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;text-align:left}
+input,textarea{font:inherit;color:inherit;background:none;border:none;resize:none}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:9999px;border:3px solid var(--ink)}
+::-webkit-scrollbar-track{background:transparent}
+</style>
+</helmet>
+
+<div style="width:100%; height:900px; display:flex; flex-direction:column; background:var(--ink); font-family:'Schibsted Grotesk',system-ui,sans-serif; overflow:hidden">
+
+  <div style="flex:1; min-height:0; display:flex">
+
+    <aside style="width:210px; flex:none; background:var(--surface); border-right:1px solid var(--line); display:flex; flex-direction:column; overflow:hidden">
+
+      <div style="flex:none; padding:10px 12px; border-bottom:1px solid var(--line); position:relative">
+        <button onClick="{{ onProjMenu }}" style="width:100%; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:7px 10px; border-radius:6px; background:var(--raise); border:1px solid var(--border-2); transition:border-color 130ms ease" style-hover="border-color:var(--border-3)">
+          <span style="display:flex; flex-direction:column; gap:3px; min-width:0; align-items:flex-start">
+            <span style="font-size:8.5px; font-weight:800; letter-spacing:.16em; color:var(--fg-faint)">PROJECT</span>
+            <span style="font-size:12.5px; font-weight:600; color:var(--fg); overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ projName }}</span>
+          </span>
+          <span style="font-family:'Spline Sans Mono',monospace; font-size:9px; color:var(--fg-muted); flex:none">{{ projCaret }}</span>
+        </button>
+        <sc-if value="{{ projOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute; left:12px; right:12px; top:64px; z-index:20; background:var(--raise); border:1px solid var(--border-3); border-radius:6px; padding:4px; display:flex; flex-direction:column; gap:2px; box-shadow:0 12px 28px rgba(0,0,0,.5)">
+            <sc-for list="{{ projects }}" as="p" hint-placeholder-count="3">
+              <button onClick="{{ p.pick }}" style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 8px; border-radius:6px; color:{{ p.fg }}; font-size:11.5px; font-weight:500; transition:background 130ms ease" style-hover="background:var(--surface-2)">
+                <span>{{ p.name }}</span>
+                <span style="font-family:'Spline Sans Mono',monospace; font-size:9px; letter-spacing:.08em; color:var(--fg-faint)">{{ p.state }}</span>
+              </button>
+            </sc-for>
+            <span style="height:1px; background:var(--border); margin:3px 0"></span>
+            <button style="padding:6px 8px; border-radius:6px; color:var(--accent); font-size:11.5px; font-weight:600" style-hover="background:var(--surface-2)">Start a project</button>
+          </div>
+        </sc-if>
+      </div>
+
+      <div style="flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column">
+
+        <div style="padding:10px 12px; display:flex; flex-direction:column; gap:2px">
+          <sc-for list="{{ workflow }}" as="w" hint-placeholder-count="2">
+            <a href="{{ w.href }}" style="display:flex; align-items:center; justify-content:space-between; gap:8px; height:30px; padding:0 10px; border-radius:6px; color:{{ w.fg }}; font-size:12px; font-weight:{{ w.fw }}; transition:background 130ms ease, color 130ms ease" style-hover="background:var(--surface-2); color:var(--fg-soft)">
+              <span>{{ w.name }}</span>
+              <sc-if value="{{ w.hasCount }}" hint-placeholder-val="{{ true }}">
+                <span style="display:inline-flex; align-items:center; height:17px; padding:0 6px; border-radius:9999px; border:1px solid {{ w.countBd }}; font-family:'Spline Sans Mono',monospace; font-size:9.5px; font-weight:600; color:{{ w.countFg }}; font-variant-numeric:tabular-nums">{{ w.count }}</span>
+              </sc-if>
+            </a>
+          </sc-for>
+        </div>
+
+        <div style="padding:6px 12px 10px; display:flex; flex-direction:column; gap:2px; border-top:1px solid var(--line)">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 10px 6px">
+            <span style="font-size:8.5px; font-weight:800; letter-spacing:.18em; color:var(--fg-muted)">COLLECTIONS</span>
+            <span style="font-family:'Spline Sans Mono',monospace; font-size:9px; font-weight:500; color:var(--fg-faint)">SAVED QUERIES</span>
+          </div>
+          <sc-for list="{{ collections }}" as="c" hint-placeholder-count="5">
+            <button onClick="{{ c.pick }}" style="display:flex; align-items:center; justify-content:space-between; gap:8px; height:29px; padding:0 10px; border-radius:6px; background:{{ c.bg }}; border:1px solid {{ c.bd }}; transition:background 130ms ease, border-color 130ms ease" style-hover="border-color:var(--border-2)">
+              <span style="font-family:'Spline Sans Mono',monospace; font-size:11.5px; font-weight:{{ c.fw }}; color:{{ c.fg }}">{{ c.name }}</span>
+              <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:var(--fg-faint); font-variant-numeric:tabular-nums">{{ c.count }}</span>
+            </button>
+          </sc-for>
+          <button style="display:flex; align-items:center; height:29px; padding:0 10px; border-radius:6px; color:var(--accent); font-family:'Spline Sans Mono',monospace; font-size:11.5px; font-weight:600; transition:background 130ms ease" style-hover="background:var(--surface-2)">+ new collection</button>
+        </div>
+
+        <div style="padding:6px 12px 12px; display:flex; flex-direction:column; gap:2px; border-top:1px solid var(--line)">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 10px 6px">
+            <span style="font-size:8.5px; font-weight:800; letter-spacing:.18em; color:var(--fg-muted)">ASSISTANTS</span>
+            <span style="font-family:'Spline Sans Mono',monospace; font-size:9px; font-weight:500; color:var(--fg-faint)">GLOBAL</span>
+          </div>
+          <sc-for list="{{ assistants }}" as="a" hint-placeholder-count="3">
+            <div style="display:flex; align-items:center; gap:9px; height:28px; padding:0 10px; border-radius:6px">
+              <span style="flex:none; width:6px; height:6px; border-radius:9999px; background:{{ a.dot }}; border:1px solid {{ a.dotBd }}"></span>
+              <span style="flex:1; font-family:'Spline Sans Mono',monospace; font-size:11px; font-weight:500; color:{{ a.fg }}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ a.name }}</span>
+              <span style="font-family:'Spline Sans Mono',monospace; font-size:8.5px; font-weight:700; letter-spacing:.1em; color:{{ a.stateFg }}">{{ a.state }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="flex:none; border-top:1px solid var(--line); padding:8px 12px">
+        <button onClick="{{ onFiles }}" style="display:flex; align-items:center; justify-content:space-between; gap:8px; width:100%; height:28px; padding:0 10px; border-radius:6px; color:var(--fg-faint); font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600; letter-spacing:.1em; transition:color 130ms ease, background 130ms ease" style-hover="color:var(--fg-muted); background:var(--surface-2)">
+          <span>FILES ON DISK</span>
+          <span style="font-size:9px">{{ filesCaret }}</span>
+        </button>
+        <sc-if value="{{ filesOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex; flex-direction:column; gap:3px; padding:8px 10px 4px">
+            <sc-for list="{{ tree }}" as="t" hint-placeholder-count="5">
+              <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:var(--fg-faint); padding-left:{{ t.pad }}">{{ t.name }}</span>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+    </aside>
+
+    <main style="flex:1; min-width:0; display:flex; flex-direction:column; background:var(--ink)">
+
+      <div style="flex:none; height:40px; display:flex; align-items:stretch; gap:0; padding:0 10px; background:var(--surface); border-bottom:1px solid var(--line)">
+        <div style="flex:1; min-width:0; display:flex; align-items:center; gap:4px; overflow:hidden">
+          <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+            <button onClick="{{ t.pick }}" style="display:flex; align-items:center; gap:9px; height:28px; max-width:250px; padding:0 10px; border-radius:6px; background:{{ t.bg }}; border:1px solid {{ t.bd }}; transition:border-color 130ms ease, background 130ms ease" style-hover="border-color:var(--border-2)">
+              <span style="font-family:'Spline Sans Mono',monospace; font-size:8.5px; font-weight:700; letter-spacing:.1em; color:var(--fg-faint); flex:none">{{ t.kind }}</span>
+              <span style="font-size:11.5px; font-weight:{{ t.fw }}; color:{{ t.fg }}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ t.label }}</span>
+              <span style="font-family:'Spline Sans Mono',monospace; font-size:11px; color:var(--fg-faint); flex:none" style-hover="color:var(--fg-soft)">&#215;</span>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+
+      <sc-if value="{{ isTable }}" hint-placeholder-val="{{ true }}">
+        <div style="flex:none; padding:12px 18px 10px; display:flex; align-items:center; justify-content:space-between; gap:16px; border-bottom:1px solid var(--line)">
+          <div style="display:flex; align-items:center; gap:5px; min-width:0; flex-wrap:wrap">
+            <sc-for list="{{ views }}" as="v" hint-placeholder-count="4">
+              <button onClick="{{ v.pick }}" style="display:flex; align-items:center; gap:8px; height:28px; padding:0 12px; border-radius:6px; background:{{ v.bg }}; border:1px solid {{ v.bd }}; color:{{ v.fg }}; font-size:11.5px; font-weight:{{ v.fw }}; transition:border-color 130ms ease, color 130ms ease" style-hover="border-color:var(--border-2); color:var(--fg-soft)">
+                <span>{{ v.name }}</span>
+                <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:var(--fg-faint); font-variant-numeric:tabular-nums">{{ v.count }}</span>
+              </button>
+            </sc-for>
+            <sc-if value="{{ dirty }}" hint-placeholder-val="{{ false }}">
+              <button onClick="{{ onSaveView }}" style="display:flex; align-items:center; gap:8px; height:28px; padding:0 12px; margin-left:5px; border-radius:6px; border:1px solid var(--accent-35); color:var(--accent); font-size:11.5px; font-weight:600; transition:border-color 130ms ease, background 130ms ease" style-hover="border-color:var(--accent-60); background:var(--accent-05)">
+                <span>Save this view</span>
+                <span style="font-family:'Spline Sans Mono',monospace; font-size:9px; border:1px solid var(--accent-35); border-radius:4px; padding:1px 4px">&#8984;&#8629;</span>
+              </button>
+            </sc-if>
+          </div>
+          <button style="flex:none; display:flex; align-items:center; gap:10px; height:32px; padding:0 15px; border-radius:6px; background:var(--accent); color:var(--on-accent); font-size:12.5px; font-weight:600; transition:background 130ms ease" style-hover="background:var(--accent-hover)">
+            <span>{{ tablePrimary }}</span>
+            <span style="font-family:'Spline Sans Mono',monospace; font-size:9.5px; font-weight:600; background:rgba(20,21,25,.16); border-radius:4px; padding:2px 5px">D</span>
+          </button>
+        </div>
+
+        <div style="flex:none; padding:9px 18px; display:flex; align-items:center; gap:8px; border-bottom:1px solid var(--line); background:var(--surface-2)">
+          <span style="font-size:8.5px; font-weight:800; letter-spacing:.16em; color:var(--fg-muted); flex:none">QUERY</span>
+          <sc-for list="{{ query }}" as="q" hint-placeholder-count="3">
+            <span style="display:inline-flex; align-items:center; gap:6px; height:22px; padding:0 8px; border-radius:6px; background:var(--sunk); border:1px solid var(--border); font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:{{ q.fg }}">{{ q.text }}</span>
+          </sc-for>
+          <button style="height:22px; padding:0 8px; border-radius:6px; color:var(--fg-faint); font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600; transition:color 130ms ease" style-hover="color:var(--fg-muted)">+ FILTER</button>
+          <span style="flex:1"></span>
+          <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:var(--fg-faint); font-variant-numeric:tabular-nums">{{ rowCount }} ROWS / {{ srcGlob }}</span>
+        </div>
+
+        <div style="flex:none; display:flex; align-items:center; gap:0; height:30px; padding:0 18px; border-bottom:1px solid var(--border); background:var(--surface)">
+          <sc-for list="{{ cols }}" as="c" hint-placeholder-count="6">
+            <button onClick="{{ c.sort }}" style="display:flex; align-items:center; gap:6px; width:{{ c.w }}; flex:{{ c.flex }}; min-width:0; padding-right:12px; font-size:8.5px; font-weight:800; letter-spacing:.16em; color:{{ c.fg }}; transition:color 130ms ease" style-hover="color:var(--fg-soft)">
+              <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ c.name }}</span>
+              <span style="font-family:'Spline Sans Mono',monospace; font-size:8px; color:var(--fg-faint)">{{ c.arrow }}</span>
+            </button>
+          </sc-for>
+        </div>
+
+        <div style="flex:1; min-height:0; overflow-y:auto">
+          <sc-for list="{{ rows }}" as="r" hint-placeholder-count="10">
+            <div onClick="{{ r.select }}" style="display:flex; align-items:center; height:36px; padding:0 18px; border-bottom:1px solid var(--line); background:{{ r.bg }}; cursor:pointer; transition:background 130ms ease" style-hover="background:var(--surface-2)">
+              <sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="6">
+                <div style="display:flex; align-items:center; gap:8px; width:{{ c.w }}; flex:{{ c.flex }}; min-width:0; padding-right:12px">
+                  <sc-if value="{{ c.isChip }}" hint-placeholder-val="{{ false }}">
+                    <span style="display:inline-flex; align-items:center; gap:6px; height:19px; padding:0 8px 0 7px; border-radius:9999px; border:1px solid var(--border-2); color:{{ c.chipFg }}; font-size:9px; font-weight:800; letter-spacing:.1em; white-space:nowrap">
+                      <span style="width:5px; height:5px; border-radius:9999px; background:{{ c.chipBd }}"></span>
+                      <span>{{ c.v }}</span>
+                    </span>
+                  </sc-if>
+                  <sc-if value="{{ c.isMeter }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex; align-items:center; gap:8px; min-width:0">
+                      <div style="display:flex; gap:2px; height:3px; width:32px; flex:none">
+                        <sc-for list="{{ c.meter }}" as="m" hint-placeholder-count="5">
+                          <span style="flex:1; border-radius:1px; background:{{ m.bg }}"></span>
+                        </sc-for>
+                      </div>
+                      <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:{{ c.fg }}; white-space:nowrap; font-variant-numeric:tabular-nums">{{ c.v }}</span>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ c.isName }}" hint-placeholder-val="{{ true }}">
+                    <button onClick="{{ r.open }}" style="font-size:12.5px; font-weight:600; color:{{ c.fg }}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; transition:color 130ms ease" style-hover="color:var(--accent)">{{ c.v }}</button>
+                  </sc-if>
+                  <sc-if value="{{ c.isPlain }}" hint-placeholder-val="{{ false }}">
+                    <span style="font-family:'Spline Sans Mono',monospace; font-size:11px; font-weight:500; color:{{ c.fg }}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-variant-numeric:tabular-nums">{{ c.v }}</span>
+                  </sc-if>
+                  <sc-if value="{{ c.isRel }}" hint-placeholder-val="{{ false }}">
+                    <span style="display:inline-flex; align-items:center; height:20px; padding:0 8px; border-radius:6px; background:var(--raise); border:1px solid var(--border-2); font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:{{ c.fg }}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:border-color 130ms ease" style-hover="border-color:var(--border-3)">{{ c.v }}</span>
+                  </sc-if>
+                  <sc-if value="{{ c.isTags }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex; gap:4px; min-width:0; overflow:hidden">
+                      <sc-for list="{{ c.tags }}" as="tg" hint-placeholder-count="2">
+                        <span style="font-family:'Spline Sans Mono',monospace; font-size:9.5px; font-weight:500; color:var(--fg-faint); background:var(--surface-2); border:1px solid var(--border); border-radius:6px; padding:2px 6px; white-space:nowrap">{{ tg }}</span>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ c.isYield }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex; align-items:center; gap:8px; min-width:0">
+                      <div style="height:4px; width:40px; flex:none; border-radius:2px; background:var(--line); overflow:hidden">
+                        <span style="display:block; height:4px; border-radius:2px; background:{{ c.yFg }}; width:{{ c.yPct }}"></span>
+                      </div>
+                      <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:{{ c.fg }}; white-space:nowrap; font-variant-numeric:tabular-nums">{{ c.v }}</span>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </sc-for>
+
+          <sc-if value="{{ noRows }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex; align-items:center; justify-content:center; padding:60px 20px">
+              <span style="font-family:'Spline Sans Mono',monospace; font-size:11px; font-weight:600; letter-spacing:.14em; color:var(--fg-faint)">{{ emptyLine }}</span>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isDoc }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:none; padding:12px 22px 10px; display:flex; align-items:center; justify-content:space-between; gap:16px; border-bottom:1px solid var(--line)">
+          <div style="display:flex; align-items:center; gap:12px; min-width:0">
+            <h1 style="margin:0; font-size:19px; font-weight:500; letter-spacing:-.01em; color:var(--fg); overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ docTitle }}</h1>
+            <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:var(--fg-faint); flex:none">{{ docPath }}</span>
+          </div>
+          <div style="flex:none; display:flex; align-items:center; gap:10px">
+            <div style="display:flex; gap:3px; padding:3px; background:var(--sunk); border:1px solid var(--border); border-radius:8px">
+              <button onClick="{{ onEditor }}" style="height:24px; padding:0 12px; border-radius:6px; background:{{ edBg }}; border:1px solid {{ edBd }}; color:{{ edFg }}; font-size:11px; font-weight:{{ edFw }}">Editor</button>
+              <button onClick="{{ onRaw }}" style="height:24px; padding:0 12px; border-radius:6px; background:{{ rawBg }}; border:1px solid {{ rawBd }}; color:{{ rawFg }}; font-size:11px; font-weight:{{ rawFw }}">Raw</button>
+            </div>
+            <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:{{ saveFg }}; font-variant-numeric:tabular-nums">{{ saveState }}</span>
+            <button style="display:flex; align-items:center; gap:9px; height:32px; padding:0 15px; border-radius:6px; background:var(--accent); color:var(--on-accent); font-size:12.5px; font-weight:600; transition:background 130ms ease" style-hover="background:var(--accent-hover)">
+              <span>Shortlist</span>
+              <span style="font-family:'Spline Sans Mono',monospace; font-size:9.5px; font-weight:600; background:rgba(20,21,25,.16); border-radius:4px; padding:2px 5px">A</span>
+            </button>
+          </div>
+        </div>
+
+        <sc-if value="{{ conflict }}" hint-placeholder-val="{{ false }}">
+          <div style="flex:none; display:flex; align-items:center; gap:14px; padding:11px 22px; background:var(--surface-2); border-bottom:1px solid var(--border); border-left:2px solid var(--marked)">
+            <span style="flex:1; min-width:0; font-size:12.5px; font-weight:500; color:var(--fg-soft)">{{ conflictText }}</span>
+            <div style="flex:none; display:flex; align-items:center; gap:6px">
+              <button onClick="{{ onResolve }}" style="height:28px; padding:0 12px; border-radius:6px; border:1px solid var(--accent-35); color:var(--accent); font-size:11.5px; font-weight:600; transition:border-color 130ms ease, background 130ms ease" style-hover="border-color:var(--accent-60); background:var(--accent-05)">Merge both</button>
+              <button onClick="{{ onResolve }}" style="height:28px; padding:0 12px; border-radius:6px; background:var(--raise); border:1px solid var(--border-2); color:var(--fg-soft); font-size:11.5px; font-weight:500" style-hover="border-color:var(--border-3)">Take disk</button>
+              <button onClick="{{ onResolve }}" style="height:28px; padding:0 12px; border-radius:6px; color:var(--fg-muted); font-size:11.5px; font-weight:500" style-hover="color:var(--fg-soft)">Keep mine</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <div style="flex:1; min-height:0; overflow-y:auto">
+          <sc-if value="{{ showEditor }}" hint-placeholder-val="{{ true }}">
+            <div style="padding:18px 22px 10px; display:flex; flex-direction:column">
+              <sc-for list="{{ props }}" as="p" hint-placeholder-count="7">
+                <div style="display:flex; align-items:center; gap:12px; min-height:32px; padding:4px 8px; border-radius:6px; transition:background 130ms ease" style-hover="background:var(--surface-2)">
+                  <span style="flex:none; width:30px; font-family:'Spline Sans Mono',monospace; font-size:8.5px; font-weight:700; letter-spacing:.06em; color:var(--fg-faint)">{{ p.type }}</span>
+                  <span style="flex:none; width:104px; font-size:9px; font-weight:800; letter-spacing:.16em; color:var(--fg-muted)">{{ p.key }}</span>
+                  <div style="flex:1; min-width:0; display:flex; align-items:center; gap:6px; flex-wrap:wrap">
+                    <sc-if value="{{ p.isText }}" hint-placeholder-val="{{ true }}">
+                      <input value="{{ p.v }}" onChange="{{ p.edit }}" style="width:100%; max-width:420px; height:26px; padding:0 8px; border-radius:6px; border:1px solid transparent; font-size:12.5px; color:var(--fg-soft); transition:border-color 130ms ease, background 130ms ease" style-hover="border-color:var(--border); background:var(--sunk)" style-focus="border-color:var(--border-3); background:var(--sunk)" />
+                    </sc-if>
+                    <sc-if value="{{ p.isStatus }}" hint-placeholder-val="{{ false }}">
+                      <button onClick="{{ p.cycle }}" style="display:inline-flex; align-items:center; gap:8px; height:24px; padding:0 11px; border-radius:9999px; border:1px solid {{ p.chipBd }}; color:{{ p.chipFg }}; font-size:10px; font-weight:800; letter-spacing:.1em; transition:background 130ms ease" style-hover="background:var(--surface-2)">
+                        <span>{{ p.v }}</span>
+                        <span style="font-family:'Spline Sans Mono',monospace; font-size:8px; opacity:.7">&#9662;</span>
+                      </button>
+                    </sc-if>
+                    <sc-if value="{{ p.isTags }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:flex; align-items:center; gap:5px; flex-wrap:wrap">
+                        <sc-for list="{{ p.tags }}" as="tg" hint-placeholder-count="3">
+                          <button onClick="{{ tg.drop }}" style="display:inline-flex; align-items:center; gap:7px; height:22px; padding:0 8px; border-radius:6px; background:var(--raise); border:1px solid var(--border-2); font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:var(--fg-soft); transition:border-color 130ms ease" style-hover="border-color:var(--border-3)">
+                            <span>{{ tg.name }}</span>
+                            <span style="color:var(--fg-faint); font-size:10px">&#215;</span>
+                          </button>
+                        </sc-for>
+                        <button style="height:22px; padding:0 8px; border-radius:6px; color:var(--fg-faint); font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600; transition:color 130ms ease" style-hover="color:var(--fg-muted)">+ tag</button>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ p.isRel }}" hint-placeholder-val="{{ false }}">
+                      <button style="display:inline-flex; align-items:center; gap:8px; height:24px; padding:0 10px; border-radius:6px; background:var(--raise); border:1px solid var(--border-2); font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:500; color:var(--fg-soft); transition:border-color 130ms ease, color 130ms ease" style-hover="border-color:var(--border-3); color:var(--accent)">
+                        <span style="font-size:9px; color:var(--fg-faint)">&#8599;</span>
+                        <span>{{ p.v }}</span>
+                      </button>
+                    </sc-if>
+                    <sc-if value="{{ p.isBool }}" hint-placeholder-val="{{ false }}">
+                      <button onClick="{{ p.cycle }}" style="display:inline-flex; align-items:center; gap:8px; height:22px; padding:0 9px; border-radius:6px; border:1px solid var(--border-2); font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600; letter-spacing:.08em; color:{{ p.chipFg }}; transition:border-color 130ms ease" style-hover="border-color:var(--border-3)">
+                        <span style="width:5px; height:5px; border-radius:9999px; background:{{ p.chipFg }}"></span>
+                        <span>{{ p.v }}</span>
+                      </button>
+                    </sc-if>
+                    <sc-if value="{{ p.isDate }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:flex; align-items:center; gap:9px">
+                        <span style="font-family:'Spline Sans Mono',monospace; font-size:11.5px; font-weight:500; color:var(--fg-soft); font-variant-numeric:tabular-nums">{{ p.v }}</span>
+                        <div style="display:flex; gap:2px; height:3px; width:32px">
+                          <sc-for list="{{ p.meter }}" as="m" hint-placeholder-count="5">
+                            <span style="flex:1; border-radius:1px; background:{{ m.bg }}"></span>
+                          </sc-for>
+                        </div>
+                        <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:var(--fg-faint)">{{ p.sub }}</span>
+                      </div>
+                    </sc-if>
+                  </div>
+                </div>
+              </sc-for>
+              <button style="display:flex; align-items:center; gap:12px; height:30px; padding:0 8px; border-radius:6px; transition:background 130ms ease" style-hover="background:var(--surface-2)">
+                <span style="flex:none; width:30px; font-family:'Spline Sans Mono',monospace; font-size:11px; color:var(--fg-faint)">+</span>
+                <span style="font-size:11.5px; font-weight:600; color:var(--accent)">Add property</span>
+              </button>
+            </div>
+
+            <div style="padding:6px 22px 0"><span style="display:block; height:1px; background:var(--border)"></span></div>
+
+            <div style="padding:18px 22px; display:flex; flex-direction:column; gap:10px">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:12px">
+                <span style="font-size:9px; font-weight:800; letter-spacing:.18em; color:var(--fg-muted)">SUMMARY</span>
+                <button onClick="{{ onBody }}" style="display:flex; align-items:center; gap:8px; font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:700; letter-spacing:.12em; color:var(--fg-faint); transition:color 130ms ease" style-hover="color:var(--fg-soft)">
+                  <span style="display:inline-flex; align-items:center; justify-content:center; width:15px; height:15px; border:1px solid var(--border-2); border-radius:4px; font-size:8px">{{ bodyCaret }}</span>
+                  <span>{{ bodyLabel }}</span>
+                </button>
+              </div>
+              <p style="margin:0; max-width:70ch; font-size:16px; font-weight:400; line-height:1.55; color:var(--fg-soft); text-wrap:pretty">{{ docSummary }}</p>
+              <span style="font-family:'Spline Sans Mono',monospace; font-size:9.5px; font-weight:500; letter-spacing:.08em; color:var(--fg-faint)">WRITTEN BY VETTER / 06:12 / FROM 40 POSTS</span>
+            </div>
+
+            <sc-if value="{{ bodyOpen }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:0 22px 6px"><span style="display:block; height:1px; background:var(--border)"></span></div>
+              <div style="padding:18px 22px 30px; display:flex; flex-direction:column; gap:14px">
+                <sc-for list="{{ body }}" as="b" hint-placeholder-count="4">
+                  <p style="margin:0; max-width:74ch; font-size:13.5px; line-height:1.7; color:{{ b.fg }}; font-weight:{{ b.fw }}; text-wrap:pretty">{{ b.text }}</p>
+                </sc-for>
+              </div>
+            </sc-if>
+          </sc-if>
+
+          <sc-if value="{{ showRaw }}" hint-placeholder-val="{{ false }}">
+            <pre style="margin:0; padding:20px 22px; font-family:'Spline Sans Mono',monospace; font-size:11.5px; font-weight:500; line-height:1.8; color:var(--fg-soft); white-space:pre-wrap">{{ rawText }}</pre>
+          </sc-if>
+        </div>
+      </sc-if>
+    </main>
+
+    <aside style="width:302px; flex:none; background:var(--surface); border-left:1px solid var(--line); display:flex; flex-direction:column; overflow:hidden">
+      <div style="flex:none; height:40px; display:flex; align-items:center; justify-content:space-between; gap:10px; padding:0 16px; border-bottom:1px solid var(--line)">
+        <span style="font-size:8.5px; font-weight:800; letter-spacing:.18em; color:var(--fg-muted)">INSPECTOR</span>
+        <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:var(--fg-faint); overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ inspSubject }}</span>
+      </div>
+
+      <div style="flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column">
+        <sc-for list="{{ sections }}" as="s" hint-placeholder-count="5">
+          <div style="border-bottom:1px solid var(--line)">
+            <button onClick="{{ s.toggle }}" style="width:100%; display:flex; align-items:center; gap:9px; height:34px; padding:0 16px; transition:background 130ms ease" style-hover="background:var(--surface-2)">
+              <span style="font-family:'Spline Sans Mono',monospace; font-size:8px; color:var(--fg-faint); width:9px">{{ s.caret }}</span>
+              <span style="flex:1; font-size:9px; font-weight:800; letter-spacing:.18em; color:{{ s.fg }}">{{ s.name }}</span>
+              <sc-if value="{{ s.hasCount }}" hint-placeholder-val="{{ true }}">
+                <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600; color:var(--fg-faint); font-variant-numeric:tabular-nums">{{ s.count }}</span>
+              </sc-if>
+            </button>
+
+            <sc-if value="{{ s.isProps }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:2px 16px 14px; display:flex; flex-direction:column; gap:1px">
+                <sc-for list="{{ inspProps }}" as="p" hint-placeholder-count="6">
+                  <div style="display:flex; align-items:center; gap:10px; min-height:26px; padding:3px 0">
+                    <span style="flex:none; width:74px; font-family:'Spline Sans Mono',monospace; font-size:9.5px; font-weight:500; color:var(--fg-faint)">{{ p.k }}</span>
+                    <sc-if value="{{ p.chip }}" hint-placeholder-val="{{ false }}">
+                      <span style="display:inline-flex; align-items:center; height:19px; padding:0 8px; border-radius:9999px; border:1px solid {{ p.bd }}; color:{{ p.fg }}; font-size:9px; font-weight:800; letter-spacing:.1em">{{ p.v }}</span>
+                    </sc-if>
+                    <sc-if value="{{ p.plain }}" hint-placeholder-val="{{ true }}">
+                      <span style="flex:1; min-width:0; font-family:'Spline Sans Mono',monospace; font-size:11px; font-weight:500; color:{{ p.fg }}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-variant-numeric:tabular-nums">{{ p.v }}</span>
+                    </sc-if>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ s.isRefs }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:2px 16px 14px; display:flex; flex-direction:column; gap:6px">
+                <span style="font-size:10.5px; line-height:1.5; color:var(--fg-faint); padding-bottom:2px">Documents whose frontmatter points at this one.</span>
+                <sc-for list="{{ refs }}" as="r" hint-placeholder-count="4">
+                  <button style="display:flex; flex-direction:column; gap:4px; padding:8px 10px; border-radius:6px; background:var(--surface-2); border:1px solid var(--border); transition:border-color 130ms ease" style-hover="border-color:var(--border-3)">
+                    <div style="display:flex; align-items:center; gap:8px; width:100%">
+                      <span style="flex:1; min-width:0; font-size:11.5px; font-weight:600; color:var(--fg-soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left">{{ r.name }}</span>
+                      <span style="flex:none; font-family:'Spline Sans Mono',monospace; font-size:9px; font-weight:600; color:var(--fg-faint)">{{ r.coll }}</span>
+                    </div>
+                    <span style="font-family:'Spline Sans Mono',monospace; font-size:9.5px; font-weight:500; color:var(--marked)">{{ r.key }}</span>
+                  </button>
+                </sc-for>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ s.isLinks }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:2px 16px 14px; display:flex; flex-direction:column; gap:12px">
+                <span style="font-size:10.5px; line-height:1.5; color:var(--fg-faint)">Plain mentions written in the text, not typed relations.</span>
+                <div style="display:flex; flex-direction:column; gap:6px">
+                  <span style="font-family:'Spline Sans Mono',monospace; font-size:8.5px; font-weight:700; letter-spacing:.14em; color:var(--fg-faint)">OUT / WRITTEN HERE</span>
+                  <sc-for list="{{ linksOut }}" as="l" hint-placeholder-count="1">
+                    <span style="font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:500; color:var(--fg-soft); padding:5px 8px; background:var(--surface-2); border:1px solid var(--border); border-radius:6px">{{ l }}</span>
+                  </sc-for>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:6px">
+                  <span style="font-family:'Spline Sans Mono',monospace; font-size:8.5px; font-weight:700; letter-spacing:.14em; color:var(--fg-faint)">IN / MENTIONS THIS</span>
+                  <sc-for list="{{ linksIn }}" as="l" hint-placeholder-count="1">
+                    <span style="font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:500; color:var(--fg-soft); padding:5px 8px; background:var(--surface-2); border:1px solid var(--border); border-radius:6px">{{ l }}</span>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ s.isHistory }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:2px 16px 14px; display:flex; flex-direction:column; gap:10px">
+                <sc-for list="{{ history }}" as="h" hint-placeholder-count="5">
+                  <div style="display:flex; gap:10px">
+                    <span style="flex:none; width:38px; font-family:'Spline Sans Mono',monospace; font-size:9.5px; font-weight:600; color:var(--fg-faint); font-variant-numeric:tabular-nums">{{ h.t }}</span>
+                    <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:2px">
+                      <span style="font-size:11px; font-weight:500; color:var(--fg-soft); line-height:1.4">{{ h.what }}</span>
+                      <span style="font-family:'Spline Sans Mono',monospace; font-size:9px; font-weight:700; letter-spacing:.1em; color:{{ h.byFg }}">{{ h.by }}</span>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ s.isGraph }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:6px 16px 16px; display:flex; flex-direction:column; gap:10px">
+                <div style="position:relative; height:170px; background:var(--sunk); border:1px solid var(--border); border-radius:8px; display:flex; flex-direction:column; align-items:center; justify-content:space-between; padding:12px 10px">
+                  <span style="position:absolute; left:50%; top:34px; bottom:34px; width:1px; background:var(--border-2)"></span>
+                  <span style="position:absolute; left:22%; right:22%; top:50%; height:1px; background:var(--border-2)"></span>
+                  <span style="position:relative; display:inline-flex; align-items:center; max-width:88%; height:20px; padding:0 9px; border-radius:6px; background:var(--surface-2); border:1px solid var(--border-2); font-family:'Spline Sans Mono',monospace; font-size:9px; color:var(--fg-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ graphN }}</span>
+                  <div style="position:relative; width:100%; display:flex; align-items:center; justify-content:space-between; gap:6px">
+                    <span style="display:inline-flex; align-items:center; max-width:34%; height:20px; padding:0 8px; border-radius:6px; background:var(--surface-2); border:1px solid var(--border-2); font-family:'Spline Sans Mono',monospace; font-size:9px; color:var(--fg-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ graphW }}</span>
+                    <span style="display:inline-flex; align-items:center; max-width:44%; height:24px; padding:0 11px; border-radius:6px; background:var(--raise); border:1px solid var(--border-3); font-size:10.5px; font-weight:600; color:var(--fg); overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ graphC }}</span>
+                    <span style="display:inline-flex; align-items:center; max-width:34%; height:20px; padding:0 8px; border-radius:6px; background:var(--surface-2); border:1px solid var(--border-2); font-family:'Spline Sans Mono',monospace; font-size:9px; color:var(--fg-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ graphE }}</span>
+                  </div>
+                  <span style="position:relative; display:inline-flex; align-items:center; max-width:88%; height:20px; padding:0 9px; border-radius:6px; background:var(--surface-2); border:1px solid var(--border-2); font-family:'Spline Sans Mono',monospace; font-size:9px; color:var(--fg-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ graphS }}</span>
+                </div>
+                <button style="font-size:11.5px; font-weight:600; color:var(--accent); align-self:flex-start" style-hover="color:var(--accent-hover)">Open the full graph</button>
+              </div>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+    </aside>
+  </div>
+
+  <footer style="flex:none; border-top:1px solid var(--border); background:var(--surface)">
+    <sc-if value="{{ logOpen }}" hint-placeholder-val="{{ false }}">
+      <div style="max-height:180px; overflow-y:auto; padding:12px 18px; border-bottom:1px solid var(--line); display:flex; flex-direction:column; gap:6px; background:var(--sunk)">
+        <sc-for list="{{ log }}" as="l" hint-placeholder-count="6">
+          <div style="display:flex; gap:12px; align-items:baseline">
+            <span style="flex:none; width:44px; font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600; color:var(--fg-faint); font-variant-numeric:tabular-nums">{{ l.t }}</span>
+            <span style="flex:none; width:72px; font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600; color:{{ l.whoFg }}">{{ l.who }}</span>
+            <span style="flex:1; min-width:0; font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:500; color:var(--fg-soft); line-height:1.5">{{ l.what }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+    <div style="height:38px; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:0 18px">
+      <div style="display:flex; align-items:center; gap:11px; min-width:0">
+        <span style="flex:none; width:7px; height:7px; border-radius:9999px; background:var(--ok); box-shadow:0 0 0 3px rgba(63,207,142,.14)"></span>
+        <span style="font-family:'Spline Sans Mono',monospace; font-size:11px; font-weight:600; color:var(--fg-soft)">scout-fb</span>
+        <span style="font-size:12px; font-weight:400; color:var(--fg-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap">sweeping Nurses PH</span>
+        <span style="font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:500; color:var(--fg-faint); font-variant-numeric:tabular-nums">12 MIN / 8 FOUND</span>
+        <span style="width:1px; height:13px; background:var(--border)"></span>
+        <span style="font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:500; color:var(--fg-faint)">writer &#183; IDLE</span>
+      </div>
+      <button onClick="{{ onLog }}" style="flex:none; display:flex; align-items:center; gap:8px; height:26px; padding:0 11px; border-radius:6px; border:1px solid var(--border-2); color:var(--fg-muted); font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:700; letter-spacing:.1em; transition:border-color 130ms ease, color 130ms ease" style-hover="border-color:var(--border-3); color:var(--fg-soft)">
+        <span>ACTIVITY</span>
+        <span style="font-size:9px">{{ logCaret }}</span>
+      </button>
+    </div>
+  </footer>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  state = {
+    tab: 'guest', view: { guest:'Needs review', group:'My best' },
+    sort: { guest:'score', group:'yield' }, dirty: false,
+    projOpen: false, filesOpen: false, logOpen: false,
+    section: 'props', selected: 'maria-santos', docSlug: 'maria-santos', raw: false, bodyOpen: false,
+    edits: 0, conflict: false, saved: true,
+    docName: 'Maria Santos', status: 'needs review',
+    tags: ['guest','manila','storyteller'], onCamera: true
+  };
+
+  statuses = ['needs review','shortlisted','contacted','gone cold','rejected'];
+  statusColor = { 'needs review':'var(--warn)', 'shortlisted':'var(--ok)', 'contacted':'var(--marked)', 'gone cold':'var(--fg-faint)', 'rejected':'var(--danger)' };
+
+  guests = [
+    { id:'maria-santos', name:'Maria Santos', handle:'@mariacooks', status:'needs review', score:9, from:'nurses-ph', days:2, tags:['manila','storyteller'],
+      summary:'A nurse who started cooking on camera during the pandemic and tells her own story rather than reviewing other people\u2019s. No brand deals in the last 40 posts, and the comments are people answering her.',
+      note:'Found in Nurses PH on 17 August, in a thread about night shifts. Her sister runs the account\u2019s messages, so a reply may not come from her. Two posts name the hospital, which the show would need to clear.' },
+    { id:'ferdie-lim', name:'Ferdie Lim', handle:'ferdie.lim.94', status:'needs review', score:8, from:'health-workers', days:3, tags:['cainta','repair'],
+      summary:'Repairs donated wheelchairs in his garage in Cainta and posts every finished one beside the person receiving it.',
+      note:'Group posts only, no page, no monetisation of any kind. He names the donor every time, which suggests he would be comfortable on the record.' },
+    { id:'rowena-cruz', name:'Rowena Cruz', handle:'@rowenabakes', status:'needs review', score:8, from:'solo-parents', days:4, tags:['baker'],
+      summary:'Baked out of a rented kitchen for four years to keep two children in school, and posts the ledger as often as the cakes.',
+      note:'Writes long captions about money. Has never accepted a sponsored post.' },
+    { id:'joel-ramirez', name:'Joel Ramirez', handle:'@joelbuildsboats', status:'needs review', score:7, from:'ofw-stories', days:6, tags:['navotas','craft'],
+      summary:'Builds wooden fishing boats in Navotas and films every stage, including the year his father\u2019s yard closed.',
+      note:'Low view counts but the comments run long. Speaks Tagalog only on camera.' },
+    { id:'kaye-ilagan', name:'Kaye Ilagan', handle:'@kayeilagan', status:'needs review', score:7, from:'nurses-ph', days:8, tags:['cebu','night shift'],
+      summary:'Night-shift nurse in Cebu who films the hour after her shift ends rather than the shift itself.',
+      note:'Two posts mention her hospital by name. She has turned down one other interview request in public.' },
+    { id:'trina-beltran', name:'Trina Beltran', handle:'@trinaruns', status:'needs review', score:6, from:'ofw-stories', days:12, tags:['recovery'],
+      summary:'Ran her first marathon eighteen months after a spinal injury and posts the training in full, including the weeks she misses.',
+      note:'Two brand partnerships in the last 40 posts, both running gear.' },
+    { id:'bea-tolentino', name:'Bea Tolentino', handle:'@beatolentino', status:'needs review', score:6, from:'manila-foodies', days:14, tags:['manila'],
+      summary:'Posts restaurant photographs with short notes about the people who cook them.',
+      note:'Very little of her own story on the account. Found in Manila Foodies, which has produced no bookings.' },
+    { id:'dennis-ocampo', name:'Dennis Ocampo', handle:'dennis.ocampo', status:'needs review', score:5, from:'health-workers', days:15, tags:['rizal'],
+      summary:'Barangay health worker in Rizal who posts vaccination drives and little else.',
+      note:'No personal story visible yet. Kept in case the topic changes.' },
+    { id:'ana-villaflor', name:'Ana Villaflor', handle:'@anavillaflor', status:'shortlisted', score:9, from:'solo-parents', days:1, tags:['manila','single parent'],
+      summary:'Raised three children alone while finishing a degree at night, and has written about all of it in public for six years.',
+      note:'Already replied once to a comment from the show\u2019s account.' },
+    { id:'rico-manalo', name:'Rico Manalo', handle:'@ricomanalo', status:'shortlisted', score:8, from:'nurses-ph', days:2, tags:['cebu'],
+      summary:'Left nursing for a call centre and went back two years later, and says exactly why in the caption.',
+      note:'Comfortable on video. Has done one local radio interview.' },
+    { id:'nadine-arcilla', name:'Nadine Arcilla', handle:'@nadinearcilla', status:'contacted', score:9, from:'nurses-ph', days:3, tags:['manila'],
+      summary:'Worked the first COVID ward in her hospital at twenty-four and had never posted about it until this year.',
+      note:'Messaged 16 August. No reply yet.' },
+    { id:'lea-domingo', name:'Lea Domingo', handle:'@leadomingo', status:'contacted', score:8, from:'ofw-stories', days:2, tags:['dubai'],
+      summary:'Nurse in Dubai who sends money home and films the calls with her mother, with permission.',
+      note:'Messaged 17 August. Read, no reply.' },
+    { id:'butch-padilla', name:'Butch Padilla', handle:'butch.padilla', status:'gone cold', score:7, from:'health-workers', days:12, tags:['laguna'],
+      summary:'Ran a barangay health post through two typhoons and posts the repairs.',
+      note:'Messaged 07 August. No reply in twelve days.' },
+    { id:'peachy-sunga', name:'Peachy Sunga', handle:'@peachysunga', status:'gone cold', score:7, from:'solo-parents', days:21, tags:['manila'],
+      summary:'Sells food from a tricycle and posts the day\u2019s takings most evenings.',
+      note:'Messaged 29 July. No reply.' }
+  ];
+
+  groups = [
+    { id:'nurses-ph', name:'Nurses PH', access:'joined', days:0, finds:47, booked:4, rule:'no links' },
+    { id:'solo-parents', name:'Solo Parents PH', access:'joined', days:1, finds:31, booked:2, rule:'no self-promo' },
+    { id:'overseas-uk', name:'Overseas Nurses UK', access:'joined', days:2, finds:19, booked:1, rule:'none posted' },
+    { id:'health-workers', name:'Barangay Health Workers', access:'joined', days:4, finds:12, booked:1, rule:'admin approves' },
+    { id:'ofw-stories', name:'OFW Stories', access:'joined', days:12, finds:23, booked:1, rule:'none posted' },
+    { id:'manila-foodies', name:'Manila Foodies', access:'joined', days:1, finds:62, booked:0, rule:'none posted' },
+    { id:'cebu-nurses', name:'Cebu Nurses Network', access:'pending', days:3, finds:0, booked:0, rule:'2 moderators' },
+    { id:'caregivers-ca', name:'Pinoy Caregivers Canada', access:'pending', days:9, finds:0, booked:0, rule:'1 admin' },
+    { id:'nursesph-tag', name:'#nursesph', access:'untried', days:0, finds:0, booked:0, rule:'public' },
+    { id:'manila-moms', name:'Manila Moms Circle', access:'rejected', days:6, finds:0, booked:0, rule:'declined' },
+    { id:'ph-support', name:'PH Nurses Support', access:'banned', days:109, finds:14, booked:1, rule:'banned' }
+  ];
+
+  accessColor = { joined:'var(--ok)', pending:'var(--marked)', untried:'var(--fg-muted)', rejected:'var(--fg-faint)', banned:'var(--danger)' };
+
+  groupName(id){ const g = this.groups.filter(x => x.id === id)[0]; return g ? g.name : id; }
+  dateOf(days){ const d = new Date(2026, 7, 19); d.setDate(d.getDate() - days);
+    const p = n => (n < 10 ? '0' : '') + n;
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
+
+  inspectorFor(rec, isGuest){
+    if (!rec) return { path:'NOTHING SELECTED', props:[], refs:[], linksOut:[], linksIn:[], history:[], graph:{ c:'\u2014', n:'', w:'', e:'', s:'' } };
+    const soft = 'var(--fg-soft)', muted = 'var(--fg-muted)';
+    if (isGuest) {
+      const refs = [{ name:this.groupName(rec.from), coll:'#group', key:'top_finds: [[' + rec.id + ']]' }];
+      if (rec.status !== 'needs review') refs.push({ name:'Book ' + rec.name, coll:'#task', key:'subject: [[' + rec.id + ']]' });
+      if (rec.score >= 8) refs.push({ name:'Video beats photos', coll:'#learning', key:'evidence: [[' + rec.id + ']]' });
+      refs.push({ name:'2026-08 hazing brief', coll:'#project', key:'candidates: [[' + rec.id + ']]' });
+      const history = [
+        { t:this.dateOf(rec.days).slice(5), what:'created from a ' + this.groupName(rec.from) + ' sweep', by:'SCOUT-FB', byFg:'var(--fg-faint)' },
+        { t:'06:09', what:'screenshot attached', by:'SCOUT-FB', byFg:'var(--fg-faint)' },
+        { t:'06:11', what:'scored ' + rec.score + ' from 40 posts', by:'VETTER', byFg:'var(--fg-faint)' }
+      ];
+      if (rec.status !== 'needs review') history.unshift({ t:'09:41', what:'status set to ' + rec.status, by:'CRYSTAL', byFg:'var(--marked)' });
+      return {
+        path: 'data/guests/' + rec.id + '.md',
+        props: [
+          { k:'status', v:rec.status.toUpperCase(), chip:true, plain:false, bd:this.statusColor[rec.status], fg:this.statusColor[rec.status] },
+          { k:'score', v:String(rec.score), chip:false, plain:true, fg:soft },
+          { k:'found_in', v:'#group/' + rec.from, chip:false, plain:true, fg:soft },
+          { k:'handle', v:rec.handle, chip:false, plain:true, fg:soft },
+          { k:'found', v:this.dateOf(rec.days) + ' \u00b7 ' + this.ago(rec.days), chip:false, plain:true, fg:muted },
+          { k:'tags', v:rec.tags.join(', '), chip:false, plain:true, fg:muted }
+        ],
+        refs,
+        graph: { c: rec.name,
+          n: rec.status !== 'needs review' ? '#task/book-' + rec.id : '#project/2026-08-hazing',
+          w: '#group/' + rec.from,
+          e: 'brief.md',
+          s: rec.score >= 8 ? '#learning/video-beats-photos' : 'runs/' + this.dateOf(rec.days) + '-sweep' },
+        linksOut: ['[[#group/' + rec.from + ']] \u2014 in Notes'],
+        linksIn: ['runs/' + this.dateOf(rec.days) + '-sweep.md \u2014 mentions [[' + rec.name + ']]'],
+        history
+      };
+    }
+    const found = this.guests.filter(g => g.from === rec.id);
+    const history = [
+      { t:'08-11', what:rec.access === 'joined' ? 'joined the group' : rec.access + ' \u2014 recorded', by:'SCOUT-FB', byFg:'var(--fg-faint)' },
+      { t:'09:32', what: rec.access === 'joined' ? 'swept, ' + rec.finds + ' people found so far' : 'no sweeps possible', by:'SCOUT-FB', byFg:'var(--fg-faint)' },
+      { t:'08-14', what:'local rule recorded: ' + rec.rule, by:'CRYSTAL', byFg:'var(--marked)' }
+    ];
+    return {
+      path: 'memory/territory/' + rec.id + '.md',
+      props: [
+        { k:'access', v:rec.access.toUpperCase(), chip:true, plain:false, bd:this.accessColor[rec.access], fg:this.accessColor[rec.access] },
+        { k:'last_swept', v: rec.access === 'untried' ? 'never' : this.dateOf(rec.days) + ' \u00b7 ' + this.ago(rec.days), chip:false, plain:true, fg:muted },
+        { k:'finds', v:String(rec.finds), chip:false, plain:true, fg:soft },
+        { k:'booked', v:String(rec.booked), chip:false, plain:true, fg:soft },
+        { k:'local_rule', v:rec.rule, chip:false, plain:true, fg:soft }
+      ],
+      graph: { c: rec.name,
+        n: '#project/2026-08-hazing',
+        w: found[0] ? '#guest/' + found[0].id : 'no finds yet',
+        e: found[1] ? '#guest/' + found[1].id : 'memory/territory',
+        s: '#learning/' + (rec.rule === 'no links' ? 'never-post-a-link' : 'group-rules') },
+      refs: found.slice(0, 5).map(g => ({ name:g.name, coll:'#guest', key:'found_in: [[' + rec.id + ']]' })),
+      linksOut: ['[[memory/learned]] \u2014 in Local rules'],
+      linksIn: ['2026-08-hazing/brief.md \u2014 mentions [[' + rec.name + ']]'],
+      history
+    };
+  }
+
+  meter(days, max){
+    const m = max || 14;
+    const filled = Math.max(0, Math.min(5, 5 - Math.floor((days / m) * 5)));
+    const tone = filled <= 1 ? 'var(--fg-faint)' : 'var(--fg-muted)';
+    const out = [];
+    for (let i = 1; i <= 5; i++) out.push({ bg: i <= filled ? tone : 'var(--border)' });
+    return out;
+  }
+  ago(d){ return d === 0 ? 'today' : d + 'd ago'; }
+
+  guestViews(){
+    return [
+      { name:'Needs review', f: g => g.status === 'needs review' },
+      { name:'Shortlisted', f: g => g.status === 'shortlisted' },
+      { name:'Gone cold', f: g => g.status === 'gone cold' },
+      { name:'Everything', f: () => true }
+    ];
+  }
+  groupViews(){
+    return [
+      { name:'My best', f: g => g.access === 'joined' && g.booked > 0 },
+      { name:'Stale 7d+', f: g => g.access === 'joined' && g.days >= 7 },
+      { name:'Pending', f: g => g.access === 'pending' },
+      { name:'Everything', f: () => true }
+    ];
+  }
+
+  setSort(k){ this.setState(s => ({ sort: Object.assign({}, s.sort, { [s.tab]: k }), dirty: true })); }
+  setView(n){ this.setState(s => ({ view: Object.assign({}, s.view, { [s.tab]: n }), dirty: false })); }
+
+  bump(){ this.setState(s => ({ edits: s.edits + 1, saved: false, conflict: s.edits === 0 ? true : s.conflict })); }
+
+  renderVals(){
+    const tab = this.state.tab;
+    const isGuest = tab === 'guest';
+    const isDoc = tab === 'doc';
+    const viewDefs = isGuest ? this.guestViews() : this.groupViews();
+    const source = isGuest ? this.guests : this.groups;
+    const activeView = this.state.view[isGuest ? 'guest' : 'group'];
+    const def = viewDefs.filter(v => v.name === activeView)[0] || viewDefs[0];
+    let rows = source.filter(def.f);
+    const sortKey = this.state.sort[isGuest ? 'guest' : 'group'];
+    rows = rows.slice().sort((a, b) => {
+      if (sortKey === 'name') return a.name.localeCompare(b.name);
+      if (sortKey === 'score') return b.score - a.score;
+      if (sortKey === 'fresh') return a.days - b.days;
+      if (sortKey === 'yield') return (b.booked / (b.finds || 1)) - (a.booked / (a.finds || 1));
+      return 0;
+    });
+
+    const guestCols = [
+      { key:'name', name:'NAME', w:'auto', flex:'1 1 0' },
+      { key:'status', name:'STATUS', w:'122px', flex:'0 0 122px' },
+      { key:'score', name:'SCORE', w:'52px', flex:'0 0 52px' },
+      { key:'from', name:'FOUND IN', w:'148px', flex:'0 0 148px' },
+      { key:'fresh', name:'FOUND', w:'112px', flex:'0 0 112px' },
+      { key:'tags', name:'TAGS', w:'152px', flex:'0 0 152px' }
+    ];
+    const groupCols = [
+      { key:'name', name:'NAME', w:'auto', flex:'1 1 0' },
+      { key:'status', name:'ACCESS', w:'118px', flex:'0 0 118px' },
+      { key:'fresh', name:'SWEPT', w:'128px', flex:'0 0 128px' },
+      { key:'yield', name:'FINDS / BOOKED', w:'150px', flex:'0 0 150px' },
+      { key:'rule', name:'LOCAL RULE', w:'150px', flex:'0 0 150px' }
+    ];
+    const cols = (isGuest ? guestCols : groupCols).map(c => ({
+      name: c.name, w: c.w, flex: c.flex,
+      fg: sortKey === c.key ? 'var(--fg-soft)' : 'var(--fg-muted)',
+      arrow: sortKey === c.key ? '\u25BE' : '',
+      sort: () => this.setSort(c.key)
+    }));
+
+    const blank = { isChip:false, isMeter:false, isName:false, isPlain:false, isRel:false, isTags:false, isYield:false };
+    const mk = (o) => Object.assign({}, blank, o);
+
+    const tableRows = rows.map(r => {
+      const stale = r.days >= 10;
+      const selected = this.state.selected === r.id;
+      const cells = isGuest ? [
+        mk({ isName:true, v:r.name, w:'auto', flex:'1 1 0', fg: stale ? 'var(--fg-muted)' : 'var(--fg)' }),
+        mk({ isChip:true, v:r.status.toUpperCase(), w:'122px', flex:'0 0 122px', chipBd:this.statusColor[r.status], chipFg:'var(--fg-muted)' }),
+        mk({ isPlain:true, v:String(r.score), w:'52px', flex:'0 0 52px', fg: stale ? 'var(--fg-faint)' : 'var(--fg-soft)' }),
+        mk({ isRel:true, v:'#group/' + r.from, w:'148px', flex:'0 0 148px', fg: stale ? 'var(--fg-faint)' : 'var(--fg-soft)' }),
+        mk({ isMeter:true, v:this.ago(r.days), meter:this.meter(r.days), w:'112px', flex:'0 0 112px', fg: stale ? 'var(--fg-faint)' : 'var(--fg-muted)' }),
+        mk({ isTags:true, tags:r.tags, w:'152px', flex:'0 0 152px' })
+      ] : [
+        mk({ isName:true, v:r.name, w:'auto', flex:'1 1 0', fg: (r.days >= 7 || r.access === 'banned') ? 'var(--fg-muted)' : 'var(--fg)' }),
+        mk({ isChip:true, v:r.access.toUpperCase(), w:'118px', flex:'0 0 118px', chipBd:this.accessColor[r.access], chipFg:'var(--fg-muted)' }),
+        mk({ isMeter:true, v: r.access === 'untried' ? 'never' : this.ago(r.days), meter:this.meter(r.access === 'untried' ? 99 : r.days), w:'128px', flex:'0 0 128px', fg: r.days >= 7 ? 'var(--fg-faint)' : 'var(--fg-muted)' }),
+        mk({ isYield:true, v: r.finds + ' / ' + r.booked, yPct: Math.min(100, r.finds ? Math.round((r.booked / r.finds) * 600) : 0) + '%', yFg: r.booked ? 'var(--fg-soft)' : 'transparent', w:'150px', flex:'0 0 150px', fg: r.booked ? 'var(--fg-muted)' : 'var(--fg-faint)' }),
+        mk({ isPlain:true, v:r.rule, w:'150px', flex:'0 0 150px', fg:'var(--fg-faint)' })
+      ];
+      return {
+        cells, bg: selected ? 'var(--raise)' : 'transparent',
+        select: () => this.setState({ selected: r.id }),
+        open: () => this.setState({ tab:'doc', selected: r.id, docSlug: r.id, docName: r.name, status: r.status, tags: ['guest'].concat(r.tags), onCamera: r.score >= 7, section:'refs', bodyOpen:false, saved:true, conflict:false, edits:0 })
+      };
+    });
+
+    const selRow = source.filter(r => r.id === this.state.selected)[0] || rows[0];
+    const doc = this.guests.filter(g => g.id === this.state.docSlug)[0] || this.guests[0];
+    const insp = isDoc ? this.inspectorFor(doc, true) : this.inspectorFor(selRow, isGuest);
+    const sec = this.state.section;
+    const sections = [
+      { id:'props', name:'PROPERTIES', count:String(insp.props.length), hasCount:true },
+      { id:'refs', name:'REFERENCED BY', count:String(insp.refs.length), hasCount:true },
+      { id:'links', name:'LINKS', count:String(insp.linksOut.length + insp.linksIn.length), hasCount:true },
+      { id:'history', name:'HISTORY', count:String(insp.history.length), hasCount:true },
+      { id:'graph', name:'GRAPH', count:'', hasCount:false }
+    ].map(s => ({
+      name: s.name, count: s.count, hasCount: s.hasCount,
+      caret: sec === s.id ? '\u25BE' : '\u25B8',
+      fg: sec === s.id ? 'var(--fg-soft)' : 'var(--fg-muted)',
+      isProps: sec === s.id && s.id === 'props',
+      isRefs: sec === s.id && s.id === 'refs',
+      isLinks: sec === s.id && s.id === 'links',
+      isHistory: sec === s.id && s.id === 'history',
+      isGraph: sec === s.id && s.id === 'graph',
+      toggle: () => this.setState({ section: sec === s.id ? null : s.id })
+    }));
+
+    const st = this.state.status;
+    const props = [
+      { type:'TXT', key:'NAME', isText:true, v:this.state.docName, edit:(e)=>{ this.setState({docName:e.target.value}); this.bump(); } },
+      { type:'SEL', key:'STATUS', isStatus:true, v:st.toUpperCase(), chipBd:this.statusColor[st], chipFg:this.statusColor[st],
+        cycle:()=>{ const i=this.statuses.indexOf(st); this.setState({status:this.statuses[(i+1)%this.statuses.length]}); this.bump(); } },
+      { type:'TAG', key:'TAGS', isTags:true, tags:this.state.tags.map(t => ({ name:t, drop:()=>{ this.setState({tags:this.state.tags.filter(x=>x!==t)}); this.bump(); } })) },
+      { type:'REL', key:'FOUND IN', isRel:true, v:'#group/' + doc.from },
+      { type:'TXT', key:'HANDLE', isText:true, v:doc.handle, edit:()=>this.bump() },
+      { type:'NUM', key:'SCORE', isText:true, v:String(doc.score), edit:()=>this.bump() },
+      { type:'DTE', key:'FOUND', isDate:true, v:this.dateOf(doc.days), sub:this.ago(doc.days).toUpperCase(), meter:this.meter(doc.days) },
+      { type:'Y/N', key:'ON CAMERA', isBool:true, v: this.state.onCamera ? 'YES' : 'NO', chipFg: this.state.onCamera ? 'var(--ok)' : 'var(--fg-faint)',
+        cycle:()=>{ this.setState({onCamera:!this.state.onCamera}); this.bump(); } }
+    ].map(p => Object.assign({ isText:false, isStatus:false, isTags:false, isRel:false, isBool:false, isDate:false }, p));
+
+    return {
+      projName: '2026-08 hazing', projCaret: this.state.projOpen ? '\u25B4' : '\u25BE',
+      projOpen: this.state.projOpen,
+      onProjMenu: () => this.setState({ projOpen: !this.state.projOpen }),
+      projects: [
+        { name:'2026-08 hazing', state:'RUNNING', fg:'var(--fg)', pick:()=>this.setState({projOpen:false}) },
+        { name:'Nurse migration', state:'PAUSED', fg:'var(--fg-muted)', pick:()=>this.setState({projOpen:false}) },
+        { name:'Q3 sponsors', state:'DONE', fg:'var(--fg-faint)', pick:()=>this.setState({projOpen:false}) }
+      ],
+
+      workflow: [
+        { name:'Needs you', count:'6', hasCount:true, href:'Decide.dc.html', fg:'var(--fg-soft)', fw:'600', countBd:'var(--warn)', countFg:'var(--warn)' },
+        { name:'Today', count:'', hasCount:false, href:'Today.dc.html', fg:'var(--fg-muted)', fw:'500', countBd:'var(--border-2)', countFg:'var(--fg-faint)' },
+        { name:'Project', count:'8', hasCount:true, href:'Project.dc.html', fg:'var(--fg-muted)', fw:'500', countBd:'var(--border-2)', countFg:'var(--fg-faint)' }
+      ],
+
+      collections: [
+        { id:'guest', name:'#guest', count:'147' },
+        { id:'group', name:'#group', count:'12' },
+        { id:'task', name:'#task', count:'8' },
+        { id:'topic', name:'#topic', count:'5' },
+        { id:'learning', name:'#learning', count:'24' }
+      ].map(c => ({
+        name:c.name, count:c.count,
+        bg: (tab === c.id) ? 'var(--raise)' : 'transparent',
+        bd: (tab === c.id) ? 'var(--border-3)' : 'transparent',
+        fg: (tab === c.id) ? 'var(--fg)' : 'var(--fg-muted)',
+        fw: (tab === c.id) ? '600' : '500',
+        pick: () => { if (c.id === 'guest' || c.id === 'group') this.setState({ tab:c.id, section:'props' }); }
+      })),
+
+      assistants: [
+        { name:'scout-fb', state:'SWEEPING', dot:'var(--ok)', dotBd:'var(--ok)', fg:'var(--fg-soft)', stateFg:'var(--ok)' },
+        { name:'vetter', state:'CHECKING', dot:'var(--ok)', dotBd:'var(--ok)', fg:'var(--fg-soft)', stateFg:'var(--ok)' },
+        { name:'writer', state:'BLOCKED', dot:'var(--warn)', dotBd:'var(--warn)', fg:'var(--fg-soft)', stateFg:'var(--warn)' }
+      ],
+
+      filesOpen: this.state.filesOpen,
+      filesCaret: this.state.filesOpen ? '\u25B4' : '\u25BE',
+      onFiles: () => this.setState({ filesOpen: !this.state.filesOpen }),
+      tree: [
+        { name:'data/', pad:'0px' }, { name:'guests/', pad:'10px' }, { name:'maria-santos.md', pad:'20px' },
+        { name:'territory/', pad:'10px' }, { name:'memory/', pad:'10px' }, { name:'2026-08-hazing/', pad:'10px' }
+      ],
+
+      tabs: [
+        { id:'guest', kind:'TBL', label:'#guest \u00b7 ' + this.state.view.guest },
+        { id:'group', kind:'TBL', label:'#group \u00b7 ' + this.state.view.group },
+        { id:'doc', kind:'DOC', label: this.state.docName }
+      ].map(t => ({
+        kind:t.kind, label:t.label,
+        bg: tab === t.id ? 'var(--raise)' : 'transparent',
+        bd: tab === t.id ? 'var(--border-3)' : 'transparent',
+        fg: tab === t.id ? 'var(--fg)' : 'var(--fg-muted)',
+        fw: tab === t.id ? '600' : '500',
+        pick: () => this.setState({ tab: t.id, section: t.id === 'doc' ? 'refs' : 'props' })
+      })),
+
+      isTable: !isDoc, isDoc,
+      views: viewDefs.map(v => ({
+        name: v.name, count: String(source.filter(v.f).length),
+        bg: v.name === activeView ? 'var(--raise)' : 'transparent',
+        bd: v.name === activeView ? 'var(--border-3)' : 'var(--border)',
+        fg: v.name === activeView ? 'var(--fg)' : 'var(--fg-muted)',
+        fw: v.name === activeView ? '600' : '500',
+        pick: () => this.setView(v.name)
+      })),
+      dirty: this.state.dirty,
+      onSaveView: () => this.setState({ dirty: false }),
+      tablePrimary: isGuest ? 'Send to Decide' : 'Sweep the cold ground',
+      query: isGuest
+        ? [{ text:'tag: guest', fg:'var(--fg-soft)' }, { text:'status: ' + activeView.toLowerCase(), fg:'var(--fg-soft)' }, { text:'sort: ' + sortKey + ' \u2193', fg:'var(--fg-muted)' }]
+        : [{ text:'tag: group', fg:'var(--fg-soft)' }, { text:'view: ' + activeView.toLowerCase(), fg:'var(--fg-soft)' }, { text:'sort: ' + sortKey + ' \u2193', fg:'var(--fg-muted)' }],
+      rowCount: String(tableRows.length),
+      srcGlob: isGuest ? 'data/guests/*.md' : 'memory/territory/*.md',
+      cols, rows: tableRows,
+      noRows: tableRows.length === 0,
+      emptyLine: isGuest ? 'NOTHING IN THIS VIEW \u2014 THE AGENT IS STILL WORKING' : 'NO GROUND MATCHES THIS VIEW',
+
+      docTitle: this.state.docName,
+      docPath: 'data/guests/' + doc.id + '.md',
+      showEditor: !this.state.raw, showRaw: this.state.raw,
+      onEditor: () => this.setState({ raw:false }), onRaw: () => this.setState({ raw:true }),
+      edBg: !this.state.raw ? 'var(--raise)' : 'transparent', edBd: !this.state.raw ? 'var(--border-3)' : 'transparent',
+      edFg: !this.state.raw ? 'var(--fg)' : 'var(--fg-muted)', edFw: !this.state.raw ? '600' : '500',
+      rawBg: this.state.raw ? 'var(--raise)' : 'transparent', rawBd: this.state.raw ? 'var(--border-3)' : 'transparent',
+      rawFg: this.state.raw ? 'var(--fg)' : 'var(--fg-muted)', rawFw: this.state.raw ? '600' : '500',
+      saveState: this.state.saved ? 'SAVED 09:41' : 'UNSAVED / \u2318S',
+      saveFg: this.state.saved ? 'var(--fg-faint)' : 'var(--warn)',
+      props,
+
+      conflict: this.state.conflict,
+      conflictText: 'scout-fb wrote to this file 4 seconds ago while you were editing it. It added a screenshot and changed the score.',
+      onResolve: () => this.setState({ conflict:false }),
+
+      docSummary: doc.summary,
+      bodyOpen: this.state.bodyOpen,
+      bodyCaret: this.state.bodyOpen ? '\u25BE' : '\u25B8',
+      bodyLabel: this.state.bodyOpen ? 'HIDE THE FULL NOTE' : 'READ THE FULL NOTE',
+      onBody: () => this.setState({ bodyOpen: !this.state.bodyOpen }),
+      body: [
+        { text:'What the sweep saw', fg:'var(--fg)', fw:'600' },
+        { text:doc.note, fg:'var(--fg-soft)', fw:'400' },
+        { text:'Where this came from', fg:'var(--fg)', fw:'600' },
+        { text:'Picked up in ' + this.groupName(doc.from) + ' on ' + this.dateOf(doc.days) + ', during sweep 41 of 60. ' + doc.handle + ' was read back 40 posts before this record was written.', fg:'var(--fg-soft)', fw:'400' }
+      ],
+      rawText: '---\nname: ' + this.state.docName + '\nstatus: ' + st + '\ntags: [' + this.state.tags.join(', ') + ']\nfound_in: "[[#group/' + doc.from + ']]"\nhandle: "' + doc.handle + '"\nscore: ' + doc.score + '\nfound: ' + this.dateOf(doc.days) + '\non_camera: ' + this.state.onCamera + '\n---\n\n## Summary\n\n' + doc.summary + '\n\n## Notes\n\n' + doc.note,
+
+      inspSubject: insp.path,
+      sections,
+      inspProps: insp.props,
+      refs: insp.refs,
+      linksOut: insp.linksOut,
+      linksIn: insp.linksIn,
+      history: insp.history,
+      graphC: insp.graph.c, graphN: insp.graph.n, graphW: insp.graph.w, graphE: insp.graph.e, graphS: insp.graph.s,
+
+      logOpen: this.state.logOpen,
+      logCaret: this.state.logOpen ? '\u25BE' : '\u25B4',
+      onLog: () => this.setState({ logOpen: !this.state.logOpen }),
+      log: [
+        { t:'09:44', who:'scout-fb', whoFg:'var(--ok)', what:'reading post 61 of 88 in Nurses PH' },
+        { t:'09:41', who:'crystal', whoFg:'var(--marked)', what:'set maria-santos.status = needs review' },
+        { t:'09:38', who:'scout-fb', whoFg:'var(--ok)', what:'8 new candidates written to data/guests/' },
+        { t:'09:32', who:'scout-fb', whoFg:'var(--ok)', what:'started sweep of Nurses PH (12,400 members)' },
+        { t:'09:31', who:'vetter', whoFg:'var(--fg-faint)', what:'idle \u2014 nothing to check' },
+        { t:'06:12', who:'writer', whoFg:'var(--fg-faint)', what:'drafted nurses-ph-intro-post.md, waiting on approval' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

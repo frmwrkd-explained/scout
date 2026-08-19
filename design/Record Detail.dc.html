@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --ink:#0D0E11; --surface:#101115; --surface-2:#14161B;
+  --raise:#1C1F26; --sunk:#0A0B0E; --void:#0B0C0E;
+  --line:#1B1E24; --border:#22252C; --border-2:#2A2E36; --border-3:#3A3F49;
+  --fg:#ECEEF2; --fg-soft:#C9CFD8; --fg-muted:#9AA3AF; --fg-faint:#7B8797;
+  --accent:#E3FF32; --accent-hover:#EEFF66; --accent-deep:#B8CC28; --on-accent:#141519;
+  --accent-05:rgba(227,255,50,.05);
+  --accent-12:rgba(227,255,50,.12);
+  --accent-35:rgba(227,255,50,.35);
+  --accent-60:rgba(227,255,50,.6);
+  --sand:#C9CFD8;
+  --ok:#3FCF8E; --warn:#F0B23A; --danger:#F05B54;
+  --marked:#5B9DFF;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--ink)}
+body{font-family:'Schibsted Grotesk',system-ui,sans-serif;color:var(--fg);-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+a:hover{color:var(--accent-hover)}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;text-align:left}
+textarea{font:inherit;color:inherit;background:none;border:none;resize:none}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:9999px;border:3px solid var(--ink)}
+::-webkit-scrollbar-track{background:transparent}
+</style>
+</helmet>
+
+<div style="position:relative; width:100%; height:900px; display:flex; flex-direction:column; background:var(--ink); font-family:'Schibsted Grotesk',system-ui,sans-serif; overflow:hidden">
+
+  <header style="height:48px; flex:none; display:flex; align-items:center; justify-content:space-between; gap:20px; padding:0 20px; background:var(--surface); border-bottom:1px solid var(--line)">
+    <div style="display:flex; align-items:center; gap:16px">
+      <span style="font-size:12px; font-weight:800; letter-spacing:.2em; color:var(--fg)">SCOUT</span>
+      <span style="width:1px; height:16px; background:var(--border)"></span>
+      <span style="font-size:9.5px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; color:var(--fg-muted)">Guest research</span>
+      <nav style="display:flex; align-items:center; gap:4px; margin-left:8px">
+        <a href="Review Deck.dc.html" style="display:flex; align-items:center; height:26px; padding:0 11px; border-radius:6px; border:1px solid transparent; color:var(--fg-muted); font-size:11px; font-weight:500" style-hover="color:var(--fg-soft); border-color:var(--border-2)">Review</a>
+        <a href="Pipeline.dc.html" style="display:flex; align-items:center; height:26px; padding:0 11px; border-radius:6px; border:1px solid transparent; color:var(--fg-muted); font-size:11px; font-weight:500" style-hover="color:var(--fg-soft); border-color:var(--border-2)">Pipeline</a>
+        <span style="display:flex; align-items:center; height:26px; padding:0 11px; border-radius:6px; background:var(--raise); border:1px solid var(--border-3); color:var(--fg); font-size:11px; font-weight:600">Record</span>
+      </nav>
+    </div>
+    <span style="font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:500; color:var(--fg-faint)">147 RECORDS / 5 STAGES</span>
+  </header>
+
+  <div style="flex:1; min-height:0; display:flex; position:relative">
+
+    <section style="flex:1; min-width:0; display:flex; gap:12px; padding:16px 20px; overflow:hidden">
+      <sc-for list="{{ ghostCols }}" as="col" hint-placeholder-count="5">
+        <div style="flex:1; min-width:150px; display:flex; flex-direction:column; background:var(--surface); border:1px solid var(--line); border-radius:8px; overflow:hidden">
+          <div style="flex:none; padding:11px 12px 9px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:8px">
+            <span style="font-size:9.5px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; color:var(--fg-muted)">{{ col.name }}</span>
+            <span style="font-family:'Spline Sans Mono',monospace; font-size:11px; font-weight:600; color:var(--fg-faint); font-variant-numeric:tabular-nums">{{ col.count }}</span>
+          </div>
+          <div style="flex:1; padding:8px; display:flex; flex-direction:column; gap:6px">
+            <sc-for list="{{ col.cards }}" as="c" hint-placeholder-count="3">
+              <div style="display:flex; flex-direction:column; gap:6px; padding:9px 10px; background:var(--surface-2); border:1px solid {{ c.bd }}; border-radius:6px">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px">
+                  <span style="font-size:12px; font-weight:600; color:var(--fg-soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ c.name }}</span>
+                  <span style="font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:600; color:var(--fg-muted); font-variant-numeric:tabular-nums">{{ c.score }}</span>
+                </div>
+                <span style="font-family:'Spline Sans Mono',monospace; font-size:9.5px; font-weight:500; color:var(--fg-faint); overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ c.handle }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-for>
+    </section>
+
+    <div style="position:absolute; inset:0; background:rgba(10,11,14,.66)"></div>
+
+    <aside style="position:absolute; top:0; right:0; bottom:0; width:576px; display:flex; flex-direction:column; background:var(--surface-2); border-left:1px solid var(--border-2); box-shadow:-24px 0 48px rgba(0,0,0,.45)">
+
+      <div style="flex:none; padding:16px 22px 14px; border-bottom:1px solid var(--line); display:flex; flex-direction:column; gap:14px">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px">
+          <div style="display:flex; align-items:center; gap:9px; min-width:0">
+            <span style="font-size:9px; font-weight:800; letter-spacing:.16em; color:var(--fg-muted); flex:none">FILE</span>
+            <span style="font-family:'Spline Sans Mono',monospace; font-size:11px; font-weight:500; color:var(--fg-soft); background:var(--sunk); border:1px solid var(--border); border-radius:6px; padding:3px 8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">guests/maria-santos.md</span>
+            <span style="display:inline-flex; align-items:center; height:18px; padding:0 8px; border-radius:9999px; border:1px solid var(--border-2); color:var(--fg-faint); font-size:8.5px; font-weight:800; letter-spacing:.12em; flex:none">4.1 KB</span>
+          </div>
+          <a href="Pipeline.dc.html" style="display:flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:6px; color:var(--fg-muted); font-family:'Spline Sans Mono',monospace; font-size:14px; flex:none" style-hover="color:var(--fg)">&#215;</a>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:8px">
+          <h1 style="margin:0; font-size:23px; font-weight:500; letter-spacing:-.015em; color:var(--fg)">Maria Santos</h1>
+          <div style="display:flex; align-items:center; gap:9px; font-family:'Spline Sans Mono',monospace; font-size:11px; font-weight:500; color:var(--fg-muted)">
+            <span style="color:var(--fg-soft)">@mariacooks</span>
+            <span style="color:var(--border-3)">/</span>
+            <span style="text-transform:uppercase; letter-spacing:.06em">INSTAGRAM</span>
+            <span style="color:var(--border-3)">/</span>
+            <span>34k followers</span>
+            <span style="color:var(--border-3)">/</span>
+            <span style="color:var(--fg-soft)">SCORE 9</span>
+          </div>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:7px">
+          <span style="font-size:9px; font-weight:800; letter-spacing:.16em; color:var(--fg-muted)">STAGE</span>
+          <div style="display:flex; gap:4px; padding:3px; background:var(--sunk); border:1px solid var(--border); border-radius:8px">
+            <sc-for list="{{ stages }}" as="s" hint-placeholder-count="5">
+              <button onClick="{{ s.pick }}" style="flex:1; height:28px; display:flex; align-items:center; justify-content:center; border-radius:6px; background:{{ s.bg }}; border:1px solid {{ s.bd }}; color:{{ s.fg }}; font-size:11px; font-weight:{{ s.fw }}; transition:color 130ms ease, border-color 130ms ease" style-hover="color:var(--fg-soft)">{{ s.name }}</button>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+
+      <div style="flex:1; min-height:0; overflow-y:auto">
+
+        <div style="padding:18px 22px; border-bottom:1px solid var(--line); display:flex; flex-direction:column; gap:12px">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px">
+            <span style="font-size:9px; font-weight:800; letter-spacing:.16em; color:var(--fg-muted)">FRONTMATTER</span>
+            <div style="display:flex; align-items:center; gap:10px">
+              <button onClick="{{ onToggleRaw }}" style="font-size:11px; font-weight:600; color:var(--accent)" style-hover="color:var(--accent-hover)">{{ rawToggleLabel }}</button>
+              <span style="width:1px; height:12px; background:var(--border)"></span>
+              <a href="#" style="font-size:11px; font-weight:600; color:var(--accent)" style-hover="color:var(--accent-hover)">Reveal in Finder</a>
+            </div>
+          </div>
+
+          <sc-if value="{{ showFields }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex; flex-direction:column; border:1px solid var(--border); border-radius:6px; overflow:hidden; background:var(--surface)">
+              <sc-for list="{{ fields }}" as="f" hint-placeholder-count="8">
+                <div style="display:flex; align-items:center; gap:12px; height:30px; padding:0 12px; border-bottom:1px solid var(--line); transition:background 130ms ease" style-hover="background:var(--raise)">
+                  <span style="flex:none; width:112px; font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:500; color:var(--fg-faint)">{{ f.k }}</span>
+                  <span style="flex:1; min-width:0; font-family:'Spline Sans Mono',monospace; font-size:11px; font-weight:500; color:var(--fg-soft); font-variant-numeric:tabular-nums; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ f.v }}</span>
+                  <span style="flex:none; font-family:'Spline Sans Mono',monospace; font-size:9px; font-weight:600; letter-spacing:.1em; color:{{ f.srcFg }}">{{ f.src }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ showRaw }}" hint-placeholder-val="{{ false }}">
+            <pre style="margin:0; padding:14px; background:var(--sunk); border:1px solid var(--border); border-radius:6px; font-family:'Spline Sans Mono',monospace; font-size:11px; font-weight:500; line-height:1.75; color:var(--fg-soft); white-space:pre-wrap; overflow-x:auto">{{ rawText }}</pre>
+          </sc-if>
+        </div>
+
+        <div style="padding:18px 22px; border-bottom:1px solid var(--line); display:flex; flex-direction:column; gap:10px">
+          <span style="font-size:9px; font-weight:800; letter-spacing:.16em; color:var(--fg-muted)">WHY THE AGENT FLAGGED THIS</span>
+          <p style="margin:0; font-size:13px; line-height:1.65; color:var(--fg-soft); text-wrap:pretty">A nurse who started cooking on camera during the pandemic. She tells her own story rather than reviewing other people&#8217;s &#8212; no brand deals in the last 40 posts. 34k followers and the comment section is people responding to her, not to the food.</p>
+          <div style="display:flex; flex-wrap:wrap; gap:6px; padding-top:2px">
+            <sc-for list="{{ signals }}" as="sig" hint-placeholder-count="3">
+              <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:var(--fg-muted); background:var(--raise); border:1px solid var(--border); border-radius:6px; padding:3px 8px">{{ sig }}</span>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="padding:18px 22px; border-bottom:1px solid var(--line); display:flex; flex-direction:column; gap:10px">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px">
+            <span style="font-size:9px; font-weight:800; letter-spacing:.16em; color:var(--fg-muted)">NOTES &#8212; MARKDOWN BODY</span>
+            <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:{{ saveFg }}; font-variant-numeric:tabular-nums">{{ saveState }}</span>
+          </div>
+          <textarea onChange="{{ onNotes }}" value="{{ notes }}" spellcheck="false" style="width:100%; min-height:112px; padding:12px 13px; background:var(--sunk); border:1px solid var(--border); border-radius:6px; font-size:12.5px; line-height:1.65; color:var(--fg-soft); transition:border-color 130ms ease" style-focus="border-color:var(--border-3)"></textarea>
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px">
+            <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:var(--fg-faint); font-variant-numeric:tabular-nums">{{ charCount }} CHARS</span>
+            <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:var(--fg-faint)">&#8984;S WRITES TO DISK</span>
+          </div>
+        </div>
+
+        <div style="padding:18px 22px; border-bottom:1px solid var(--line); display:flex; gap:16px; align-items:center">
+          <div style="flex:none; width:132px; height:88px; border-radius:10px; background:var(--sunk); border:1px solid var(--border); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px">
+            <span style="font-size:9px; font-weight:800; letter-spacing:.16em; color:var(--fg-faint)">SCREENSHOT</span>
+            <span style="font-family:'Spline Sans Mono',monospace; font-size:9.5px; font-weight:500; color:var(--border-3)">1080 &#215; 1350</span>
+          </div>
+          <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:8px">
+            <span style="font-size:9px; font-weight:800; letter-spacing:.16em; color:var(--fg-muted)">EVIDENCE</span>
+            <a href="#" style="display:inline-flex; align-items:center; gap:7px; font-size:12.5px; font-weight:600; color:var(--accent); width:fit-content" style-hover="color:var(--accent-hover)">
+              <span>Open Instagram profile</span>
+              <span style="font-family:'Spline Sans Mono',monospace; font-size:11px">&#8599;</span>
+            </a>
+            <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:var(--fg-faint)">shots/mariacooks-0812.png</span>
+          </div>
+        </div>
+
+        <div style="padding:18px 22px 24px; display:flex; flex-direction:column; gap:12px">
+          <span style="font-size:9px; font-weight:800; letter-spacing:.16em; color:var(--fg-muted)">HISTORY</span>
+          <div style="display:flex; flex-direction:column">
+            <sc-for list="{{ history }}" as="h" hint-placeholder-count="5">
+              <div style="display:flex; gap:12px; padding:0 0 14px 0">
+                <div style="flex:none; width:52px; display:flex; flex-direction:column; align-items:flex-end; gap:3px">
+                  <span style="font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:600; color:var(--fg-muted); font-variant-numeric:tabular-nums">{{ h.time }}</span>
+                  <span style="font-family:'Spline Sans Mono',monospace; font-size:9px; font-weight:500; color:var(--fg-faint); font-variant-numeric:tabular-nums">{{ h.date }}</span>
+                </div>
+                <div style="flex:none; display:flex; flex-direction:column; align-items:center; padding-top:4px">
+                  <span style="width:6px; height:6px; border-radius:9999px; background:{{ h.dot }}"></span>
+                  <span style="flex:1; width:1px; background:var(--border); margin-top:4px"></span>
+                </div>
+                <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:3px">
+                  <div style="display:flex; align-items:center; gap:8px">
+                    <span style="font-size:11.5px; font-weight:600; color:var(--fg-soft)">{{ h.title }}</span>
+                    <span style="font-family:'Spline Sans Mono',monospace; font-size:9px; font-weight:600; letter-spacing:.1em; color:{{ h.byFg }}">{{ h.by }}</span>
+                  </div>
+                  <span style="font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:500; color:var(--fg-faint); line-height:1.5">{{ h.detail }}</span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+
+      <div style="flex:none; padding:14px 22px; background:var(--surface); border-top:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:12px">
+        <div style="display:flex; align-items:center; gap:9px">
+          <button style="display:flex; align-items:center; gap:9px; height:38px; padding:0 18px; border-radius:6px; background:var(--accent); color:var(--on-accent); font-size:12.5px; font-weight:600; transition:background 130ms ease" style-hover="background:var(--accent-hover)">
+            <span>Mark contacted</span>
+            <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600; background:rgba(20,21,25,.16); border-radius:4px; padding:2px 6px">C</span>
+          </button>
+          <button style="display:flex; align-items:center; gap:9px; height:38px; padding:0 15px; border-radius:6px; background:var(--raise); border:1px solid var(--border-2); color:var(--fg-soft); font-size:12.5px; font-weight:600; transition:border-color 130ms ease, color 130ms ease" style-hover="border-color:var(--border-3); color:var(--fg)">
+            <span>Reject</span>
+            <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600; background:var(--sunk); border:1px solid var(--border-2); border-radius:4px; padding:1px 5px; color:var(--fg-muted)">R</span>
+          </button>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px">
+          <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:var(--fg-faint)">ESC CLOSES</span>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  state = {
+    stage: 'shortlist',
+    raw: false,
+    saved: true,
+    notes: 'Messaged 12 Aug, no reply yet. Her sister runs the account\u2019s DMs \u2014 worth a second attempt on a weekday morning.\n\nStory to open with: the first week back on the ward after her mother died.'
+  };
+
+  stageList = ['inbox','shortlist','contacted','replied','won'];
+
+  raw() {
+    return '---\nname: Maria Santos\nhandle: "@mariacooks"\nplatform: instagram\nfound_via: "#manilafoodie"\nscore: 9\nstage: ' + this.state.stage + '\nfollowers: 34000\ntags: [food, manila, storyteller]\nfirst_seen: 2026-08-12\nscreenshot: shots/mariacooks-0812.png\n---\n\n## Why\n\nA nurse who started cooking on camera during the pandemic\u2026\n\n## Notes\n\n' + this.state.notes;
+  }
+
+  renderVals(){
+    return {
+      stages: this.stageList.map(name => {
+        const on = name === this.state.stage;
+        return {
+          name,
+          bg: on ? 'var(--raise)' : 'transparent',
+          bd: on ? 'var(--border-3)' : 'transparent',
+          fg: on ? 'var(--fg)' : 'var(--fg-muted)',
+          fw: on ? '600' : '500',
+          pick: () => this.setState({ stage: name, saved: false })
+        };
+      }),
+
+      showFields: !this.state.raw,
+      showRaw: this.state.raw,
+      rawToggleLabel: this.state.raw ? 'Show fields' : 'View raw',
+      rawText: this.raw(),
+      onToggleRaw: () => this.setState({ raw: !this.state.raw }),
+
+      fields: [
+        { k:'name', v:'Maria Santos', src:'AGENT', srcFg:'var(--fg-faint)' },
+        { k:'handle', v:'@mariacooks', src:'AGENT', srcFg:'var(--fg-faint)' },
+        { k:'platform', v:'instagram', src:'AGENT', srcFg:'var(--fg-faint)' },
+        { k:'found_via', v:'#manilafoodie', src:'AGENT', srcFg:'var(--fg-faint)' },
+        { k:'score', v:'9', src:'AGENT', srcFg:'var(--fg-faint)' },
+        { k:'stage', v:this.state.stage, src:'CRYSTAL', srcFg:'var(--marked)' },
+        { k:'followers', v:'34,000', src:'AGENT', srcFg:'var(--fg-faint)' },
+        { k:'tags', v:'food, manila, storyteller', src:'CRYSTAL', srcFg:'var(--marked)' },
+        { k:'first_seen', v:'2026-08-12', src:'AGENT', srcFg:'var(--fg-faint)' },
+        { k:'screenshot', v:'shots/mariacooks-0812.png', src:'AGENT', srcFg:'var(--fg-faint)' }
+      ],
+
+      signals: ['own story, not reviews','0 brand deals / 40 posts','comments address her directly'],
+
+      notes: this.state.notes,
+      charCount: this.state.notes.length,
+      saveState: this.state.saved ? 'SAVED 14:22' : 'UNSAVED',
+      saveFg: this.state.saved ? 'var(--fg-faint)' : 'var(--warn)',
+      onNotes: (e) => this.setState({ notes: e.target.value, saved: false }),
+
+      history: [
+        { time:'14:22', date:'08-12', dot:'var(--fg-faint)', title:'Screenshot captured', by:'AGENT', byFg:'var(--fg-faint)', detail:'shots/mariacooks-0812.png / 1080 \u00d7 1350' },
+        { time:'14:22', date:'08-12', dot:'var(--fg-faint)', title:'Scored 9', by:'AGENT', byFg:'var(--fg-faint)', detail:'3 of 4 signals matched on #manilafoodie' },
+        { time:'09:41', date:'08-12', dot:'var(--marked)', title:'Moved inbox \u2192 shortlist', by:'CRYSTAL', byFg:'var(--marked)', detail:'from review deck / keystroke A' },
+        { time:'09:41', date:'08-12', dot:'var(--marked)', title:'Note added', by:'CRYSTAL', byFg:'var(--marked)', detail:'+184 chars written to guests/maria-santos.md' },
+        { time:'08:02', date:'08-12', dot:'var(--fg-faint)', title:'Found', by:'AGENT', byFg:'var(--fg-faint)', detail:'instagram / #manilafoodie / sweep 41 of 60' }
+      ],
+
+      ghostCols: [
+        { name:'inbox', count:'118', cards:[
+          { name:'Ferdie Lim', handle:'ferdie.lim.94', score:'8', bd:'var(--border)' },
+          { name:'Rowena Cruz', handle:'@rowenabakes', score:'8', bd:'var(--border)' },
+          { name:'Joel Ramirez', handle:'@joelbuildsboats', score:'7', bd:'var(--border)' }
+        ]},
+        { name:'shortlist', count:'24', cards:[
+          { name:'Maria Santos', handle:'@mariacooks', score:'9', bd:'var(--border-3)' },
+          { name:'Ana Villaflor', handle:'@anavillaflor', score:'9', bd:'var(--border)' },
+          { name:'Rico Manalo', handle:'@ricomanalo', score:'8', bd:'var(--border)' }
+        ]},
+        { name:'contacted', count:'11', cards:[
+          { name:'Nadine Arcilla', handle:'@nadinearcilla', score:'9', bd:'var(--border)' },
+          { name:'Butch Padilla', handle:'butch.padilla', score:'7', bd:'var(--border)' }
+        ]},
+        { name:'replied', count:'4', cards:[
+          { name:'Ramon Dizon', handle:'@ramondizon', score:'9', bd:'var(--border)' }
+        ]},
+        { name:'won', count:'0', cards:[] }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

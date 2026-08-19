@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --ink:#0D0E11; --surface:#101115; --surface-2:#14161B;
+  --raise:#1C1F26; --sunk:#0A0B0E; --void:#0B0C0E;
+  --line:#1B1E24; --border:#22252C; --border-2:#2A2E36; --border-3:#3A3F49;
+  --fg:#ECEEF2; --fg-soft:#C9CFD8; --fg-muted:#9AA3AF; --fg-faint:#7B8797;
+  --accent:#E3FF32; --accent-hover:#EEFF66; --accent-deep:#B8CC28; --on-accent:#141519;
+  --accent-05:rgba(227,255,50,.05);
+  --accent-12:rgba(227,255,50,.12);
+  --accent-35:rgba(227,255,50,.35);
+  --accent-60:rgba(227,255,50,.6);
+  --sand:#C9CFD8;
+  --ok:#3FCF8E; --warn:#F0B23A; --danger:#F05B54;
+  --marked:#5B9DFF;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--ink)}
+body{font-family:'Schibsted Grotesk',system-ui,sans-serif;color:var(--fg);-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+a:hover{color:var(--accent-hover)}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;text-align:left}
+input{font:inherit;color:inherit;background:none;border:none}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:9999px;border:3px solid var(--ink)}
+::-webkit-scrollbar-track{background:transparent}
+</style>
+</helmet>
+
+<div style="width:100%; height:900px; display:flex; flex-direction:column; background:var(--ink); font-family:'Schibsted Grotesk',system-ui,sans-serif; overflow:hidden">
+
+  <div style="flex:1; min-height:0; display:flex">
+  <aside style="width:210px; flex:none; background:var(--surface); border-right:1px solid var(--line); display:flex; flex-direction:column; overflow:hidden">
+    <div style="flex:none; padding:10px 12px; border-bottom:1px solid var(--line)">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:7px 10px; border-radius:6px; background:var(--raise); border:1px solid var(--border-3)">
+        <span style="display:flex; flex-direction:column; gap:3px; min-width:0">
+          <span style="font-size:8.5px; font-weight:800; letter-spacing:.16em; color:var(--fg-faint)">PROJECT</span>
+          <span style="font-size:12.5px; font-weight:600; color:var(--fg); overflow:hidden; text-overflow:ellipsis; white-space:nowrap">2026-08 hazing</span>
+        </span>
+        <span style="font-family:'Spline Sans Mono',monospace; font-size:9px; color:var(--fg-muted)">&#9662;</span>
+      </div>
+    </div>
+    <div style="flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column">
+      <div style="padding:10px 12px; display:flex; flex-direction:column; gap:2px">
+          <a href="Decide.dc.html" style="display:flex; align-items:center; justify-content:space-between; gap:8px; height:30px; padding:0 10px; border-radius:6px; border:1px solid transparent; color:var(--fg-muted); font-size:12px; font-weight:500; transition:background 130ms ease, color 130ms ease" style-hover="background:var(--surface-2); color:var(--fg-soft)"><span>Needs you</span><span style="display:inline-flex; align-items:center; height:17px; padding:0 6px; border-radius:9999px; border:1px solid var(--warn); font-family:'Spline Sans Mono',monospace; font-size:9.5px; font-weight:600; color:var(--warn); font-variant-numeric:tabular-nums">6</span></a>
+          <span style="display:flex; align-items:center; justify-content:space-between; gap:8px; height:30px; padding:0 10px; border-radius:6px; background:var(--raise); border:1px solid var(--border-3); color:var(--fg); font-size:12px; font-weight:600; transition:background 130ms ease, color 130ms ease"><span>Today</span></span>
+          <a href="Project.dc.html" style="display:flex; align-items:center; justify-content:space-between; gap:8px; height:30px; padding:0 10px; border-radius:6px; border:1px solid transparent; color:var(--fg-muted); font-size:12px; font-weight:500; transition:background 130ms ease, color 130ms ease" style-hover="background:var(--surface-2); color:var(--fg-soft)"><span>Project</span><span style="display:inline-flex; align-items:center; height:17px; padding:0 6px; border-radius:9999px; border:1px solid var(--border-2); font-family:'Spline Sans Mono',monospace; font-size:9.5px; font-weight:600; color:var(--fg-faint); font-variant-numeric:tabular-nums">8</span></a>
+      </div>
+      <div style="padding:6px 12px 10px; display:flex; flex-direction:column; gap:2px; border-top:1px solid var(--line)">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 10px 6px">
+          <span style="font-size:8.5px; font-weight:800; letter-spacing:.18em; color:var(--fg-muted)">COLLECTIONS</span>
+          <span style="font-family:'Spline Sans Mono',monospace; font-size:9px; font-weight:500; color:var(--fg-faint)">SAVED QUERIES</span>
+        </div>
+          <a href="Scout.dc.html" style="display:flex; align-items:center; justify-content:space-between; gap:8px; height:29px; padding:0 10px; border-radius:6px; transition:background 130ms ease" style-hover="background:var(--surface-2)"><span style="font-family:'Spline Sans Mono',monospace; font-size:11.5px; font-weight:500; color:var(--fg-muted)">#guest</span><span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:var(--fg-faint); font-variant-numeric:tabular-nums">147</span></a>
+          <a href="Scout.dc.html" style="display:flex; align-items:center; justify-content:space-between; gap:8px; height:29px; padding:0 10px; border-radius:6px; transition:background 130ms ease" style-hover="background:var(--surface-2)"><span style="font-family:'Spline Sans Mono',monospace; font-size:11.5px; font-weight:500; color:var(--fg-muted)">#group</span><span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:var(--fg-faint); font-variant-numeric:tabular-nums">12</span></a>
+          <a href="Scout.dc.html" style="display:flex; align-items:center; justify-content:space-between; gap:8px; height:29px; padding:0 10px; border-radius:6px; transition:background 130ms ease" style-hover="background:var(--surface-2)"><span style="font-family:'Spline Sans Mono',monospace; font-size:11.5px; font-weight:500; color:var(--fg-muted)">#task</span><span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:var(--fg-faint); font-variant-numeric:tabular-nums">8</span></a>
+          <a href="Scout.dc.html" style="display:flex; align-items:center; justify-content:space-between; gap:8px; height:29px; padding:0 10px; border-radius:6px; transition:background 130ms ease" style-hover="background:var(--surface-2)"><span style="font-family:'Spline Sans Mono',monospace; font-size:11.5px; font-weight:500; color:var(--fg-muted)">#topic</span><span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:var(--fg-faint); font-variant-numeric:tabular-nums">5</span></a>
+          <a href="Scout.dc.html" style="display:flex; align-items:center; justify-content:space-between; gap:8px; height:29px; padding:0 10px; border-radius:6px; transition:background 130ms ease" style-hover="background:var(--surface-2)"><span style="font-family:'Spline Sans Mono',monospace; font-size:11.5px; font-weight:500; color:var(--fg-muted)">#learning</span><span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:var(--fg-faint); font-variant-numeric:tabular-nums">24</span></a>
+        <a href="Scout.dc.html" style="display:flex; align-items:center; height:29px; padding:0 10px; border-radius:6px; color:var(--accent); font-family:'Spline Sans Mono',monospace; font-size:11.5px; font-weight:600" style-hover="background:var(--surface-2)">+ new collection</a>
+      </div>
+      <div style="padding:6px 12px 12px; display:flex; flex-direction:column; gap:2px; border-top:1px solid var(--line)">
+        <span style="font-size:8.5px; font-weight:800; letter-spacing:.18em; color:var(--fg-muted); padding:10px 10px 6px">ASSISTANTS</span>
+          <div style="display:flex; align-items:center; gap:9px; height:28px; padding:0 10px"><span style="flex:none; width:6px; height:6px; border-radius:9999px; background:var(--ok); border:1px solid var(--ok)"></span><span style="flex:1; font-family:'Spline Sans Mono',monospace; font-size:11px; font-weight:500; color:var(--fg-muted)">scout-fb</span><span style="font-family:'Spline Sans Mono',monospace; font-size:8.5px; font-weight:700; letter-spacing:.1em; color:var(--ok)">SWEEPING</span></div>
+          <div style="display:flex; align-items:center; gap:9px; height:28px; padding:0 10px"><span style="flex:none; width:6px; height:6px; border-radius:9999px; background:var(--ok); border:1px solid var(--ok)"></span><span style="flex:1; font-family:'Spline Sans Mono',monospace; font-size:11px; font-weight:500; color:var(--fg-muted)">vetter</span><span style="font-family:'Spline Sans Mono',monospace; font-size:8.5px; font-weight:700; letter-spacing:.1em; color:var(--ok)">CHECKING</span></div>
+          <div style="display:flex; align-items:center; gap:9px; height:28px; padding:0 10px"><span style="flex:none; width:6px; height:6px; border-radius:9999px; background:var(--warn); border:1px solid var(--warn)"></span><span style="flex:1; font-family:'Spline Sans Mono',monospace; font-size:11px; font-weight:500; color:var(--fg-muted)">writer</span><span style="font-family:'Spline Sans Mono',monospace; font-size:8.5px; font-weight:700; letter-spacing:.1em; color:var(--warn)">BLOCKED</span></div>
+      </div>
+    </div>
+    <div style="flex:none; border-top:1px solid var(--line); padding:8px 12px">
+      <span style="display:flex; align-items:center; height:28px; padding:0 10px; color:var(--fg-faint); font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600; letter-spacing:.1em">FILES ON DISK</span>
+    </div>
+  </aside>
+  <main style="flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden">
+
+  <sc-if value="{{ isReturning }}" hint-placeholder-val="{{ true }}">
+  <div style="flex:1; min-height:0; display:flex; gap:16px; padding:20px; overflow:hidden">
+
+    <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:16px; overflow:hidden">
+
+      <section style="flex:none; padding:20px 22px; background:var(--surface); border:1px solid var(--border); border-radius:8px; display:flex; flex-direction:column; gap:12px">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px">
+          <span style="font-size:9.5px; font-weight:800; letter-spacing:.18em; color:var(--fg-muted)">OVERNIGHT</span>
+          <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:var(--fg-faint); font-variant-numeric:tabular-nums">23:40 &#8594; 06:12 / 3 SWEEPS</span>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:7px">
+          <sc-for list="{{ overnight }}" as="line" hint-placeholder-count="3">
+            <p style="margin:0; font-size:16px; font-weight:400; line-height:1.45; color:var(--fg-soft); text-wrap:pretty">{{ line }}</p>
+          </sc-for>
+        </div>
+      </section>
+
+      <section style="flex:none; padding:16px 22px; background:var(--surface); border:1px solid var(--border); border-radius:8px; display:flex; flex-direction:column; gap:14px">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:20px">
+          <div style="display:flex; flex-direction:column; gap:5px; flex:none">
+            <span style="font-size:9.5px; font-weight:800; letter-spacing:.18em; color:var(--fg-muted)">NEEDS YOU</span>
+            <div style="display:flex; align-items:baseline; gap:8px">
+              <span style="font-family:'Spline Sans Mono',monospace; font-size:30px; font-weight:600; line-height:1; color:var(--fg); font-variant-numeric:tabular-nums">12</span>
+              <span style="font-size:12.5px; font-weight:500; color:var(--fg-muted)">decisions waiting</span>
+            </div>
+          </div>
+        <a href="Decide.dc.html" style="flex:none; display:flex; align-items:center; gap:10px; height:40px; padding:0 18px; border-radius:6px; border:1px solid var(--accent-35); color:var(--accent); font-size:13px; font-weight:600; transition:border-color 130ms ease, background 130ms ease" style-hover="border-color:var(--accent-60); background:var(--accent-05)">
+          <span>Start deciding</span>
+          <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600; border:1px solid var(--accent-35); border-radius:4px; padding:1px 5px">D</span>
+        </a>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:6px; min-width:0">
+            <sc-for list="{{ breakdown }}" as="b" hint-placeholder-count="5">
+              <a href="Decide.dc.html" style="display:flex; align-items:center; gap:7px; height:26px; padding:0 10px; border-radius:6px; background:var(--surface-2); border:1px solid var(--border); color:var(--fg-muted); font-size:11px; font-weight:500; white-space:nowrap; transition:border-color 130ms ease, color 130ms ease" style-hover="border-color:var(--border-3); color:var(--fg-soft)">
+                <span style="font-family:'Spline Sans Mono',monospace; font-size:11px; font-weight:600; color:var(--fg-soft); font-variant-numeric:tabular-nums">{{ b.n }}</span>
+                <span>{{ b.what }}</span>
+              </a>
+            </sc-for>
+        </div>
+      </section>
+
+      <section style="flex:1; min-height:0; display:flex; flex-direction:column; gap:10px">
+        <div style="flex:none; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:0 2px">
+          <span style="font-size:9.5px; font-weight:800; letter-spacing:.18em; color:var(--fg-muted)">YOUR AGENTS ARE ASKING</span>
+          <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:var(--fg-faint); font-variant-numeric:tabular-nums">{{ qCount }} OPEN</span>
+        </div>
+
+        <div style="flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:8px">
+          <sc-for list="{{ questions }}" as="q" hint-placeholder-count="3">
+            <div style="flex:none; padding:16px 18px; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; display:flex; flex-direction:column; gap:12px">
+              <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px">
+                <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:8px">
+                  <p style="margin:0; font-size:15.5px; font-weight:500; line-height:1.4; color:var(--fg); text-wrap:pretty">{{ q.text }}</p>
+                  <div style="display:flex; align-items:center; gap:9px">
+                    <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; letter-spacing:.05em; color:var(--fg-faint)">{{ q.meta }}</span>
+                    <div style="display:flex; gap:2px; height:3px; width:36px">
+                      <sc-for list="{{ q.fresh }}" as="f" hint-placeholder-count="5">
+                        <span style="flex:1; border-radius:1px; background:{{ f.bg }}"></span>
+                      </sc-for>
+                    </div>
+                  </div>
+                </div>
+                <div style="flex:none; display:flex; align-items:center; gap:6px">
+                  <button onClick="{{ q.yes }}" style="height:32px; padding:0 15px; border-radius:6px; background:var(--raise); border:1px solid var(--border-2); color:var(--fg); font-size:12.5px; font-weight:600; transition:border-color 130ms ease" style-hover="border-color:var(--border-3)">Yes</button>
+                  <button onClick="{{ q.no }}" style="height:32px; padding:0 15px; border-radius:6px; background:var(--raise); border:1px solid var(--border-2); color:var(--fg-soft); font-size:12.5px; font-weight:600; transition:border-color 130ms ease" style-hover="border-color:var(--border-3)">No</button>
+                  <button onClick="{{ q.later }}" style="height:32px; padding:0 12px; border-radius:6px; color:var(--fg-muted); font-size:12.5px; font-weight:500; transition:color 130ms ease" style-hover="color:var(--fg-soft)">Later</button>
+                </div>
+              </div>
+
+              <div style="display:flex; align-items:center; gap:14px; border-top:1px solid var(--line); padding-top:11px">
+                <button onClick="{{ q.toggle }}" style="display:flex; align-items:center; gap:7px; font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600; letter-spacing:.12em; color:{{ q.whyFg }}; transition:color 130ms ease" style-hover="color:var(--fg-soft)">
+                  <span style="display:inline-flex; align-items:center; justify-content:center; width:14px; height:14px; border:1px solid var(--border-2); border-radius:4px; font-size:8px">{{ q.caret }}</span>
+                  <span>WHY</span>
+                </button>
+                <sc-if value="{{ q.hasDraft }}" hint-placeholder-val="{{ false }}">
+                  <button onClick="{{ q.toggle }}" style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600; letter-spacing:.12em; color:var(--fg-faint); transition:color 130ms ease" style-hover="color:var(--fg-soft)">READ THE POST</button>
+                </sc-if>
+              </div>
+
+              <sc-if value="{{ q.open }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex; flex-direction:column; gap:12px; padding:14px 16px; background:var(--sunk); border:1px solid var(--border); border-radius:6px">
+                  <p style="margin:0; font-size:13px; line-height:1.6; color:var(--fg-soft); text-wrap:pretty">{{ q.why }}</p>
+                  <sc-if value="{{ q.hasDraft }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex; flex-direction:column; gap:8px; padding-top:12px; border-top:1px solid var(--line)">
+                      <span style="font-family:'Spline Sans Mono',monospace; font-size:9.5px; font-weight:600; letter-spacing:.12em; color:var(--fg-faint)">DRAFT / 412 CHARS / NO LINKS</span>
+                      <p style="margin:0; font-size:13px; line-height:1.65; color:var(--fg-soft); text-wrap:pretty">{{ q.draft }}</p>
+                      <a href="Decide.dc.html" style="font-size:11.5px; font-weight:600; color:var(--accent); width:fit-content" style-hover="color:var(--accent-hover)">Edit the wording</a>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+
+          <sc-if value="{{ noQuestions }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:1; display:flex; align-items:center; justify-content:center; border:1px dashed var(--border-2); border-radius:8px; min-height:150px">
+              <span style="font-family:'Spline Sans Mono',monospace; font-size:11px; font-weight:600; letter-spacing:.14em; color:var(--fg-faint)">NO QUESTIONS &#8212; YOUR AGENTS ARE CLEAR</span>
+            </div>
+          </sc-if>
+        </div>
+      </section>
+    </div>
+
+    <aside style="width:388px; flex:none; display:flex; flex-direction:column; gap:16px; overflow:hidden">
+
+      <button onClick="{{ onSend }}" style="flex:none; display:flex; align-items:center; justify-content:space-between; gap:14px; height:64px; padding:0 22px; border-radius:8px; background:var(--accent); color:var(--on-accent); transition:background 130ms ease" style-hover="background:var(--accent-hover)">
+        <span style="display:flex; flex-direction:column; gap:4px; align-items:flex-start">
+          <span style="font-size:16px; font-weight:600">{{ sendLabel }}</span>
+          <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600; letter-spacing:.1em; opacity:.72">{{ sendSub }}</span>
+        </span>
+        <span style="font-family:'Spline Sans Mono',monospace; font-size:11px; font-weight:600; background:rgba(20,21,25,.16); border-radius:4px; padding:3px 8px">&#8629;</span>
+      </button>
+
+      <section style="flex:none; background:var(--surface); border:1px solid var(--border); border-radius:8px; overflow:hidden">
+        <div style="padding:12px 16px 10px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:10px">
+          <span style="font-size:9.5px; font-weight:800; letter-spacing:.18em; color:var(--fg-muted)">YOUR ASSISTANTS</span>
+          <a href="#" style="font-size:11px; font-weight:600; color:var(--accent)" style-hover="color:var(--accent-hover)">Hire one</a>
+        </div>
+        <sc-for list="{{ agents }}" as="a" hint-placeholder-count="5">
+          <div style="display:flex; gap:11px; padding:11px 16px 11px {{ a.pad }}; border-bottom:1px solid var(--line)">
+            <span style="flex:none; margin-top:5px; width:7px; height:7px; border-radius:9999px; background:{{ a.dot }}; box-shadow:0 0 0 {{ a.ring }} {{ a.ringColor }}"></span>
+            <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:3px">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:10px">
+                <span style="font-family:'Spline Sans Mono',monospace; font-size:12px; font-weight:600; color:{{ a.nameFg }}">{{ a.name }}</span>
+                <span style="font-family:'Spline Sans Mono',monospace; font-size:9px; font-weight:800; letter-spacing:.12em; color:{{ a.stateFg }}">{{ a.state }}</span>
+              </div>
+              <span style="font-size:11.5px; font-weight:400; color:var(--fg-muted); line-height:1.4">{{ a.job }}</span>
+              <span style="font-family:'Spline Sans Mono',monospace; font-size:9.5px; font-weight:500; color:var(--fg-faint); font-variant-numeric:tabular-nums">{{ a.stat }}</span>
+            </div>
+          </div>
+        </sc-for>
+      </section>
+
+      <section style="flex:1; min-height:0; background:var(--surface); border:1px solid var(--border); border-radius:8px; overflow:hidden; display:flex; flex-direction:column">
+        <div style="flex:none; padding:12px 16px 10px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:10px">
+          <span style="font-size:9.5px; font-weight:800; letter-spacing:.18em; color:var(--fg-muted)">GOALS</span>
+          <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:var(--fg-faint)">SET BY YOU</span>
+        </div>
+        <div style="flex:1; overflow-y:auto">
+          <sc-for list="{{ goals }}" as="g" hint-placeholder-count="3">
+            <div style="padding:13px 16px; border-bottom:1px solid var(--line); display:flex; flex-direction:column; gap:9px">
+              <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px">
+                <span style="font-size:12.5px; font-weight:500; color:var(--fg-soft); line-height:1.35">{{ g.name }}</span>
+                <span style="font-family:'Spline Sans Mono',monospace; font-size:11.5px; font-weight:600; color:var(--fg); font-variant-numeric:tabular-nums; flex:none">{{ g.figure }}</span>
+              </div>
+              <div style="height:3px; background:var(--line); border-radius:2px">
+                <div style="height:3px; border-radius:2px; background:{{ g.barFg }}; width:{{ g.pct }}"></div>
+              </div>
+              <span style="font-family:'Spline Sans Mono',monospace; font-size:9.5px; font-weight:500; letter-spacing:.08em; color:{{ g.leftFg }}; font-variant-numeric:tabular-nums">{{ g.left }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+    </aside>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isFirstRun }}" hint-placeholder-val="{{ false }}">
+  <div style="flex:1; min-height:0; display:flex; align-items:center; justify-content:center; padding:40px; overflow:auto">
+    <div style="width:100%; max-width:660px; display:flex; flex-direction:column; gap:28px">
+
+      <div style="display:flex; align-items:center; gap:10px">
+        <span style="width:7px; height:7px; border-radius:9999px; background:var(--ok)"></span>
+        <span style="font-size:9.5px; font-weight:800; letter-spacing:.18em; color:var(--fg-muted)">SCOUT IS AWAKE</span>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:14px">
+        <h1 style="margin:0; font-size:24px; font-weight:500; line-height:1.35; letter-spacing:-.01em; color:var(--fg); text-wrap:pretty">I&#8217;m going to look for podcast guests for you while you sleep.</h1>
+        <p style="margin:0; font-size:15px; line-height:1.6; color:var(--fg-muted); max-width:56ch; text-wrap:pretty">Six questions and I&#8217;ll start tonight. You can change any answer later, and I&#8217;ll come back to you when I&#8217;m unsure.</p>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:14px; padding:24px; background:var(--surface-2); border:1px solid var(--border); border-radius:8px">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px">
+          <span style="font-family:'Spline Sans Mono',monospace; font-size:9.5px; font-weight:600; letter-spacing:.14em; color:var(--fg-faint)">QUESTION 1 OF 6</span>
+          <div style="display:flex; gap:3px; height:3px; width:78px">
+            <sc-for list="{{ setupSteps }}" as="s" hint-placeholder-count="6">
+              <span style="flex:1; border-radius:1px; background:{{ s.bg }}"></span>
+            </sc-for>
+          </div>
+        </div>
+        <p style="margin:0; font-size:19px; font-weight:500; line-height:1.4; color:var(--fg); text-wrap:pretty">Who do you want to talk to on the show?</p>
+        <input value="{{ setupAnswer }}" onChange="{{ onSetupAnswer }}" placeholder="Nurses who&#8217;ve worked abroad and want to talk about it" style="width:100%; height:46px; padding:0 14px; background:var(--sunk); border:1px solid var(--border-2); border-radius:6px; font-size:14px; color:var(--fg); transition:border-color 130ms ease" style-focus="border-color:var(--border-3)" />
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding-top:2px">
+          <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; letter-spacing:.06em; color:var(--fg-faint)">PLAIN LANGUAGE IS FINE</span>
+          <button style="display:flex; align-items:center; gap:10px; height:40px; padding:0 20px; border-radius:6px; background:var(--accent); color:var(--on-accent); font-size:13px; font-weight:600; transition:background 130ms ease" style-hover="background:var(--accent-hover)">
+            <span>Next question</span>
+            <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600; background:rgba(20,21,25,.16); border-radius:4px; padding:2px 6px">&#8629;</span>
+          </button>
+        </div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:8px">
+        <span style="font-size:9.5px; font-weight:800; letter-spacing:.18em; color:var(--fg-muted)">WHAT I&#8217;LL ASK NEXT</span>
+        <div style="display:flex; flex-direction:column; gap:6px">
+          <sc-for list="{{ setupUpcoming }}" as="u" hint-placeholder-count="5">
+            <span style="font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:500; letter-spacing:.04em; color:var(--fg-faint); line-height:1.5">{{ u }}</span>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  </main>
+  </div>
+  <footer style="flex:none; height:38px; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:0 18px; background:var(--surface); border-top:1px solid var(--border)">
+    <div style="display:flex; align-items:center; gap:11px; min-width:0">
+      <span style="flex:none; width:7px; height:7px; border-radius:9999px; background:var(--ok); box-shadow:0 0 0 3px rgba(63,207,142,.14)"></span>
+      <span style="font-family:'Spline Sans Mono',monospace; font-size:11px; font-weight:600; color:var(--fg-soft)">scout-fb</span>
+      <span style="font-size:12px; font-weight:400; color:var(--fg-muted)">sweeping Nurses PH</span>
+      <span style="font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:500; color:var(--fg-faint); font-variant-numeric:tabular-nums">12 MIN / 8 FOUND</span>
+      <span style="width:1px; height:13px; background:var(--border)"></span>
+      <span style="font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:500; color:var(--fg-faint)">writer &#183; WAITING ON YOU</span>
+    </div>
+    <div style="flex:none; display:flex; align-items:center; gap:12px">
+      <button onClick="{{ onToggleMode }}" style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600; letter-spacing:.12em; color:var(--fg-faint); transition:color 130ms ease" style-hover="color:var(--fg-soft)">{{ modeToggle }}</button>
+      <a href="Scout.dc.html" style="display:flex; align-items:center; gap:8px; height:26px; padding:0 11px; border-radius:6px; border:1px solid var(--border-2); color:var(--fg-muted); font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:700; letter-spacing:.1em" style-hover="border-color:var(--border-3); color:var(--fg-soft)"><span>ACTIVITY</span><span style="font-size:9px">&#9652;</span></a>
+    </div>
+  </footer>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  state = {
+    firstRun: false,
+    open: null,
+    answered: [],
+    sending: false,
+    setupAnswer: ''
+  };
+
+  qs = [
+    { id:'post', text:'Can I post this introduction in Nurses PH?', meta:'NURSES PH / DRAFT WRITTEN 06:09', age:5,
+      why:'The group deletes anything with a link in it, so this version has none. People who introduce themselves in the feed get about three times more replies than the ones I message cold.',
+      draft:'Hi everyone \u2014 I\u2019m a producer for a Philippine podcast about work and family. I\u2019m looking for nurses willing to tell their own story on camera: night shifts, migration, the money, the parts people don\u2019t see. Nothing to sign up for. If that\u2019s you or someone you know, comment here or message me and I\u2019ll explain how it works.' },
+    { id:'video', text:'Should people who post video rank above people who post photos?', meta:'PLAYBOOK / 11 BOOKINGS EXAMINED', age:4,
+      why:'Nine of your bookings already posted video of themselves. Two posted photos only. Guests who film themselves say yes to a camera faster and drop out less. I\u2019d start using this tomorrow and keep it under review for a month.' },
+    { id:'ofw', text:'Should I sweep OFW Stories today? It\u2019s been twelve days.', meta:'OFW STORIES / 21,000 MEMBERS', age:1,
+      why:'The last sweep found 23 people and one of them booked. Nothing posted there since 07 August has been read. It is the only group of yours that has gone quiet.' }
+  ];
+
+  meter(filled, tone){
+    const out = [];
+    for (let i = 1; i <= 5; i++) out.push({ bg: i <= filled ? (tone || 'var(--fg-muted)') : 'var(--border)' });
+    return out;
+  }
+
+  answer(id){
+    this.setState(s => ({ answered: s.answered.concat([id]), open: s.open === id ? null : s.open }));
+  }
+
+  renderVals(){
+    const live = this.qs.filter(q => this.state.answered.indexOf(q.id) === -1);
+    const sending = this.state.sending;
+    return {
+      isReturning: !this.state.firstRun,
+      isFirstRun: this.state.firstRun,
+      clock: 'TUE 19 AUG / 09:04',
+
+      overnight: [
+        'Swept 3 groups overnight. 34 new people, 6 worth your eyes.',
+        'Nurses PH is still your best group by a distance \u2014 4 of your last 6 bookings came from it.',
+        'OFW Stories hasn\u2019t been swept in 12 days, and Manila Foodies has now given 62 finds and no bookings.'
+      ],
+
+      breakdown: [
+        { n:'6', what:'people' },
+        { n:'1', what:'draft post' },
+        { n:'2', what:'new groups' },
+        { n:'2', what:'memory' },
+        { n:'1', what:'skill' }
+      ],
+
+      qCount: live.length,
+      noQuestions: live.length === 0,
+      questions: live.map(q => ({
+        text: q.text, meta: q.meta, why: q.why, draft: q.draft || '',
+        hasDraft: !!q.draft,
+        fresh: this.meter(q.age),
+        open: this.state.open === q.id,
+        caret: this.state.open === q.id ? '\u25BE' : '\u25B8',
+        whyFg: this.state.open === q.id ? 'var(--fg-soft)' : 'var(--fg-faint)',
+        toggle: () => this.setState({ open: this.state.open === q.id ? null : q.id }),
+        yes: () => this.answer(q.id),
+        no: () => this.answer(q.id),
+        later: () => this.answer(q.id)
+      })),
+
+      sendLabel: sending ? 'They\u2019re out' : 'Send them out',
+      sendSub: sending ? '3 ASSISTANTS RUNNING / STARTED 09:04' : '3 ASSISTANTS AND 2 SUB-AGENTS IDLE SINCE 06:12',
+      onSend: () => this.setState({ sending: !this.state.sending }),
+
+      agents: [
+        { name:'scout-fb', job:'Finds guests in Facebook groups', state: sending ? 'RUNNING' : 'IDLE',
+          stat:'LAST RUN 06:12 / 34 FOUND / \u20B118 TODAY', pad:'16px',
+          dot: sending ? 'var(--ok)' : 'var(--border-3)', ring: sending ? '3px' : '0',
+          ringColor:'rgba(63,207,142,.14)', nameFg:'var(--fg)',
+          stateFg: sending ? 'var(--ok)' : 'var(--fg-faint)' },
+        { name:'group-crawler', job:'Reads new posts in the 6 groups I\u2019ve joined', state: sending ? 'RUNNING' : 'IDLE',
+          stat:'SUB-AGENT OF SCOUT-FB / EVERY 6H', pad:'34px',
+          dot: sending ? 'var(--ok)' : 'var(--border-3)', ring:'0', ringColor:'transparent',
+          nameFg:'var(--fg-soft)', stateFg: sending ? 'var(--ok)' : 'var(--fg-faint)' },
+        { name:'profile-reader', job:'Opens each person and reads their last 40 posts', state: sending ? 'RUNNING' : 'IDLE',
+          stat:'SUB-AGENT OF SCOUT-FB / ON DEMAND', pad:'34px',
+          dot: sending ? 'var(--ok)' : 'var(--border-3)', ring:'0', ringColor:'transparent',
+          nameFg:'var(--fg-soft)', stateFg: sending ? 'var(--ok)' : 'var(--fg-faint)' },
+        { name:'vetter', job:'Checks the story is real and first-hand', state: sending ? 'RUNNING' : 'IDLE',
+          stat:'LAST RUN 06:12 / 9 CHECKED / \u20B14 TODAY', pad:'16px',
+          dot: sending ? 'var(--ok)' : 'var(--border-3)', ring:'0', ringColor:'transparent',
+          nameFg:'var(--fg)', stateFg: sending ? 'var(--ok)' : 'var(--fg-faint)' },
+        { name:'writer', job:'Writes the first message and follows up', state:'BLOCKED',
+          stat:'WAITING ON YOUR APPROVAL OF THE NURSES PH POST', pad:'16px',
+          dot:'var(--warn)', ring:'3px', ringColor:'rgba(240,178,58,.14)',
+          nameFg:'var(--fg)', stateFg:'var(--warn)' }
+      ],
+
+      goals: [
+        { name:'Book 8 guests by 30 September', figure:'4 / 8', pct:'50%', barFg:'var(--fg-soft)', left:'9 DAYS LEFT', leftFg:'var(--fg-faint)' },
+        { name:'Join 2 new groups this month', figure:'1 / 2', pct:'50%', barFg:'var(--fg-soft)', left:'9 DAYS LEFT / 2 REQUESTS PENDING', leftFg:'var(--fg-faint)' },
+        { name:'Keep reply rate above 30%', figure:'24%', pct:'24%', barFg:'var(--fg-muted)', left:'MEASURED WEEKLY / LAST 21 SENT', leftFg:'var(--fg-faint)' }
+      ],
+
+      setupSteps: this.meter(1, 'var(--fg-soft)').slice(0,5).concat([{ bg:'var(--border)' }]),
+      setupAnswer: this.state.setupAnswer,
+      onSetupAnswer: (e) => this.setState({ setupAnswer: e.target.value }),
+      setupUpcoming: [
+        '2 / WHAT MAKES SOMEONE WORTH AN EPISODE',
+        '3 / WHERE THESE PEOPLE ALREADY GATHER',
+        '4 / HOW MANY YOU NEED, AND BY WHEN',
+        '5 / WHAT YOU WANT ME TO NEVER DO',
+        '6 / HOW OFTEN I SHOULD COME BACK TO YOU'
+      ],
+
+      footLeft: this.state.firstRun ? 'NOTHING SET UP YET / data/ IS EMPTY' : 'data/ / 1,412 RECORDS / MEMORY UPDATED 2D AGO / \u20B122 SPENT TODAY',
+      modeToggle: this.state.firstRun ? 'BACK TO TODAY' : 'SEE THE FIRST-EVER OPEN',
+      onToggleMode: () => this.setState({ firstRun: !this.state.firstRun })
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "frameforge-ui",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 5175,
+      "autoPort": true
+    },
+    {
+      "name": "frameforge-api",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "server"],
+      "port": 5176
+    },
+    {
+      "name": "frameforge-landing",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "5177", "--directory", "landingpage"],
+      "port": 5177
+    }
+  ]
+}

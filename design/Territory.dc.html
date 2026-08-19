@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --ink:#0D0E11; --surface:#101115; --surface-2:#14161B;
+  --raise:#1C1F26; --sunk:#0A0B0E; --void:#0B0C0E;
+  --line:#1B1E24; --border:#22252C; --border-2:#2A2E36; --border-3:#3A3F49;
+  --fg:#ECEEF2; --fg-soft:#C9CFD8; --fg-muted:#9AA3AF; --fg-faint:#7B8797;
+  --accent:#E3FF32; --accent-hover:#EEFF66; --accent-deep:#B8CC28; --on-accent:#141519;
+  --accent-05:rgba(227,255,50,.05);
+  --accent-12:rgba(227,255,50,.12);
+  --accent-35:rgba(227,255,50,.35);
+  --accent-60:rgba(227,255,50,.6);
+  --sand:#C9CFD8;
+  --ok:#3FCF8E; --warn:#F0B23A; --danger:#F05B54;
+  --marked:#5B9DFF;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--ink)}
+body{font-family:'Schibsted Grotesk',system-ui,sans-serif;color:var(--fg);-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+a:hover{color:var(--accent-hover)}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;text-align:left}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:9999px;border:3px solid var(--ink)}
+::-webkit-scrollbar-track{background:transparent}
+</style>
+</helmet>
+
+<div style="width:100%; height:900px; display:flex; flex-direction:column; background:var(--ink); font-family:'Schibsted Grotesk',system-ui,sans-serif; overflow:hidden">
+
+  <header style="height:48px; flex:none; display:flex; align-items:center; justify-content:space-between; gap:20px; padding:0 20px; background:var(--surface); border-bottom:1px solid var(--line)">
+    <div style="display:flex; align-items:center; gap:16px">
+      <span style="font-size:12px; font-weight:800; letter-spacing:.2em; color:var(--fg)">SCOUT</span>
+      <span style="width:1px; height:16px; background:var(--border)"></span>
+      <nav style="display:flex; align-items:center; gap:4px">
+        <a href="Today.dc.html" style="display:flex; align-items:center; height:26px; padding:0 11px; border-radius:6px; border:1px solid transparent; color:var(--fg-muted); font-size:11px; font-weight:500" style-hover="color:var(--fg-soft); border-color:var(--border-2)">Today</a>
+        <a href="Decide.dc.html" style="display:flex; align-items:center; height:26px; padding:0 11px; border-radius:6px; border:1px solid transparent; color:var(--fg-muted); font-size:11px; font-weight:500" style-hover="color:var(--fg-soft); border-color:var(--border-2)">Decide</a>
+        <span style="display:flex; align-items:center; height:26px; padding:0 11px; border-radius:6px; background:var(--raise); border:1px solid var(--border-3); color:var(--fg); font-size:11px; font-weight:600">Territory</span>
+        <a href="Pipeline.dc.html" style="display:flex; align-items:center; height:26px; padding:0 11px; border-radius:6px; border:1px solid transparent; color:var(--fg-muted); font-size:11px; font-weight:500" style-hover="color:var(--fg-soft); border-color:var(--border-2)">Records</a>
+      </nav>
+    </div>
+    <span style="font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:500; color:var(--fg-faint); font-variant-numeric:tabular-nums">memory/territory/ / 13 PLACES</span>
+  </header>
+
+  <section style="flex:none; padding:18px 20px; background:var(--surface); border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:24px">
+    <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:8px">
+      <span style="font-size:9.5px; font-weight:800; letter-spacing:.18em; color:var(--fg-muted)">WHERE YOUR AGENTS WORK</span>
+      <p style="margin:0; font-size:16px; font-weight:400; line-height:1.45; color:var(--fg-soft); text-wrap:pretty">Six groups joined, two waiting on moderators, two closed to you. Nurses PH is doing nearly all the work; OFW Stories has gone twelve days cold and Manila Foodies has given you sixty-two people and no bookings.</p>
+    </div>
+    <button onClick="{{ onSweep }}" style="flex:none; display:flex; align-items:center; gap:12px; height:44px; padding:0 20px; border-radius:6px; background:var(--accent); color:var(--on-accent); font-size:13.5px; font-weight:600; transition:background 130ms ease" style-hover="background:var(--accent-hover)">
+      <span>{{ sweepLabel }}</span>
+      <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600; background:rgba(20,21,25,.16); border-radius:4px; padding:2px 6px">&#8629;</span>
+    </button>
+  </section>
+
+  <div style="flex:1; min-height:0; display:flex">
+
+    <aside style="width:212px; flex:none; background:var(--surface); border-right:1px solid var(--line); display:flex; flex-direction:column; overflow:auto">
+      <div style="padding:16px 14px 12px; display:flex; flex-direction:column; gap:6px">
+        <span style="font-size:9px; font-weight:800; letter-spacing:.18em; color:var(--fg-muted); padding:0 4px 4px">KIND OF GROUND</span>
+        <sc-for list="{{ kinds }}" as="k" hint-placeholder-count="5">
+          <button onClick="{{ k.pick }}" style="display:flex; align-items:center; justify-content:space-between; gap:8px; height:30px; padding:0 10px; border-radius:6px; background:{{ k.bg }}; border:1px solid {{ k.bd }}; color:{{ k.fg }}; font-size:11.5px; font-weight:{{ k.fw }}; transition:border-color 130ms ease, color 130ms ease" style-hover="border-color:var(--border-2)">
+            <span>{{ k.name }}</span>
+            <span style="font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:500; color:var(--fg-faint); font-variant-numeric:tabular-nums">{{ k.count }}</span>
+          </button>
+        </sc-for>
+      </div>
+
+      <div style="padding:12px 18px 16px; border-top:1px solid var(--line); display:flex; flex-direction:column; gap:14px">
+        <span style="font-size:9px; font-weight:800; letter-spacing:.18em; color:var(--fg-muted); padding-top:6px">HOW TO READ THIS</span>
+        <div style="display:flex; flex-direction:column; gap:8px">
+          <div style="display:flex; align-items:center; gap:9px">
+            <div style="display:flex; gap:2px; height:3px; width:36px; flex:none">
+              <span style="flex:1; border-radius:1px; background:var(--fg-muted)"></span>
+              <span style="flex:1; border-radius:1px; background:var(--fg-muted)"></span>
+              <span style="flex:1; border-radius:1px; background:var(--fg-muted)"></span>
+              <span style="flex:1; border-radius:1px; background:var(--fg-muted)"></span>
+              <span style="flex:1; border-radius:1px; background:var(--fg-muted)"></span>
+            </div>
+            <span style="font-family:'Spline Sans Mono',monospace; font-size:9.5px; font-weight:500; letter-spacing:.06em; color:var(--fg-faint)">SWEPT TODAY</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:9px">
+            <div style="display:flex; gap:2px; height:3px; width:36px; flex:none">
+              <span style="flex:1; border-radius:1px; background:var(--fg-faint)"></span>
+              <span style="flex:1; border-radius:1px; background:var(--border)"></span>
+              <span style="flex:1; border-radius:1px; background:var(--border)"></span>
+              <span style="flex:1; border-radius:1px; background:var(--border)"></span>
+              <span style="flex:1; border-radius:1px; background:var(--border)"></span>
+            </div>
+            <span style="font-family:'Spline Sans Mono',monospace; font-size:9.5px; font-weight:500; letter-spacing:.06em; color:var(--fg-faint)">GOING COLD</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:9px">
+            <div style="height:4px; width:36px; border-radius:2px; background:var(--line); flex:none; overflow:hidden">
+              <span style="display:block; height:4px; width:60%; border-radius:2px; background:var(--fg-soft)"></span>
+            </div>
+            <span style="font-family:'Spline Sans Mono',monospace; font-size:9.5px; font-weight:500; letter-spacing:.06em; color:var(--fg-faint)">FINDS THAT BOOKED</span>
+          </div>
+        </div>
+        <p style="margin:0; font-size:11px; line-height:1.55; color:var(--fg-faint)">Bright ground is working. Faded ground is old or empty. Dashed edges mean you can&#8217;t work there yet.</p>
+      </div>
+
+      <div style="margin-top:auto; padding:14px; border-top:1px solid var(--line); display:flex; flex-direction:column; gap:9px">
+        <div style="display:flex; align-items:center; gap:8px">
+          <span style="width:6px; height:6px; border-radius:9999px; background:var(--ok)"></span>
+          <span style="font-size:9px; font-weight:800; letter-spacing:.16em; color:var(--fg-muted)">GROUP CRAWLER</span>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:4px; font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:var(--fg-faint); font-variant-numeric:tabular-nums">
+          <span>SWEEPS EVERY 6H</span>
+          <span>LAST 06:12 / 34 FOUND</span>
+        </div>
+      </div>
+    </aside>
+
+    <main style="flex:1; min-width:0; overflow-y:auto; padding:18px 20px 28px; display:flex; flex-direction:column; gap:20px">
+      <sc-for list="{{ bands }}" as="band" hint-placeholder-count="4">
+        <section style="display:flex; flex-direction:column; gap:10px">
+          <div style="display:flex; align-items:center; gap:10px">
+            <span style="font-size:9.5px; font-weight:800; letter-spacing:.18em; color:{{ band.fg }}">{{ band.name }}</span>
+            <span style="font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:600; color:var(--fg-faint); font-variant-numeric:tabular-nums">{{ band.count }}</span>
+            <span style="flex:1; height:1px; background:var(--line)"></span>
+            <span style="font-family:'Spline Sans Mono',monospace; font-size:9.5px; font-weight:500; letter-spacing:.08em; color:var(--fg-faint)">{{ band.note }}</span>
+          </div>
+
+          <div style="display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:8px; align-items:start">
+            <sc-for list="{{ band.tiles }}" as="t" hint-placeholder-count="5">
+              <div role="button" tabindex="0" onClick="{{ t.pick }}" onKeyDown="{{ t.key }}" style="grid-column:{{ t.span }}; display:flex; flex-direction:column; gap:10px; padding:12px 13px 13px; background:{{ t.bg }}; border:1px {{ t.bdStyle }} {{ t.bd }}; border-radius:8px; cursor:pointer; transition:border-color 130ms ease, background 130ms ease" style-hover="border-color:var(--border-3)" style-focus="outline:2px solid var(--accent); outline-offset:2px">
+                <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px">
+                  <span style="font-size:12.5px; font-weight:600; line-height:1.3; color:{{ t.nameFg }}">{{ t.name }}</span>
+                  <span style="flex:none; margin-top:3px; width:6px; height:6px; border-radius:9999px; background:{{ t.dot }}; border:1px solid {{ t.dotBd }}"></span>
+                </div>
+
+                <span style="font-family:'Spline Sans Mono',monospace; font-size:9.5px; font-weight:500; letter-spacing:.06em; color:var(--fg-faint)">{{ t.kind }}</span>
+
+                <div style="display:flex; flex-direction:column; gap:6px">
+                  <div style="display:flex; gap:2px; height:3px">
+                    <sc-for list="{{ t.fresh }}" as="f" hint-placeholder-count="5">
+                      <span style="flex:1; border-radius:1px; background:{{ f.bg }}"></span>
+                    </sc-for>
+                  </div>
+                  <span style="font-family:'Spline Sans Mono',monospace; font-size:9.5px; font-weight:500; letter-spacing:.06em; color:{{ t.freshFg }}">{{ t.freshLabel }}</span>
+                </div>
+
+                <div style="display:flex; flex-direction:column; gap:6px">
+                  <div style="height:4px; border-radius:2px; background:var(--line); overflow:hidden">
+                    <span style="display:block; height:4px; border-radius:2px; background:{{ t.yieldFg }}; width:{{ t.yieldPct }}"></span>
+                  </div>
+                  <span style="font-family:'Spline Sans Mono',monospace; font-size:9.5px; font-weight:500; letter-spacing:.06em; color:{{ t.yieldTextFg }}; font-variant-numeric:tabular-nums">{{ t.yieldLabel }}</span>
+                </div>
+
+                <sc-if value="{{ t.hasRule }}" hint-placeholder-val="{{ false }}">
+                  <span style="align-self:flex-start; font-family:'Spline Sans Mono',monospace; font-size:8.5px; font-weight:700; letter-spacing:.12em; white-space:nowrap; color:{{ t.ruleFg }}; border:1px solid {{ t.ruleBd }}; border-radius:9999px; padding:2px 7px">{{ t.rule }}</span>
+                </sc-if>
+
+                <sc-if value="{{ t.open }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex; flex-direction:column; gap:10px; padding-top:11px; border-top:1px solid var(--border)">
+                    <sc-for list="{{ t.detail }}" as="d" hint-placeholder-count="3">
+                      <div style="display:flex; flex-direction:column; gap:2px">
+                        <span style="font-family:'Spline Sans Mono',monospace; font-size:8.5px; font-weight:700; letter-spacing:.12em; color:var(--fg-faint)">{{ d.k }}</span>
+                        <span style="font-size:11px; font-weight:400; line-height:1.45; color:var(--fg-soft)">{{ d.v }}</span>
+                      </div>
+                    </sc-for>
+                    <div style="display:flex; gap:6px; padding-top:2px">
+                      <button onClick="{{ t.act }}" style="display:flex; align-items:center; height:26px; padding:0 10px; border-radius:6px; border:1px solid var(--accent-35); color:var(--accent); font-size:11px; font-weight:600; transition:border-color 130ms ease, background 130ms ease" style-hover="border-color:var(--accent-60); background:var(--accent-05)">{{ t.action }}</button>
+                      <button onClick="{{ t.act2 }}" style="display:flex; align-items:center; height:26px; padding:0 10px; border-radius:6px; color:var(--fg-muted); font-size:11px; font-weight:500; transition:color 130ms ease" style-hover="color:var(--fg-soft)">{{ t.action2 }}</button>
+                    </div>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </section>
+      </sc-for>
+    </main>
+  </div>
+
+  <footer style="height:40px; flex:none; display:flex; align-items:center; justify-content:space-between; gap:20px; padding:0 20px; background:var(--surface); border-top:1px solid var(--line)">
+    <span style="font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:500; color:var(--fg-faint); font-variant-numeric:tabular-nums">{{ footLeft }}</span>
+    <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; letter-spacing:.08em; color:var(--fg-faint)">CLICK ANY GROUND FOR ITS RULES</span>
+  </footer>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  state = { open: null, kind: 'All ground', swept: false, done: {} };
+
+  mark(id, which){
+    this.setState(s => {
+      const d = Object.assign({}, s.done);
+      d[id] = d[id] === which ? undefined : which;
+      return { done: d };
+    });
+  }
+
+  data = [
+    { band:'working', id:'nurses-ph', name:'Nurses PH', kind:'FACEBOOK GROUP / 12,400', fresh:5,
+      freshLabel:'SWEPT 8H AGO', finds:47, booked:4, best:true, rule:'NO LINKS',
+      detail:[
+        { k:'THE RULE HERE', v:'Mods delete anything with a link. Introduce yourself in the feed first.' },
+        { k:'YOU POSTED', v:'14 June \u2014 31 comments, 2 of your bookings came from it.' },
+        { k:'LAST THREE FINDS', v:'Maria Santos 9 \u00b7 Nadine Arcilla 9 \u00b7 Lea Domingo 8' }
+      ], action:'Sweep now', actionDone:'Sweeping now', action2:'Pause this group', action2Done:'Paused' },
+    { band:'working', id:'solo-parents', name:'Solo Parents PH', kind:'FACEBOOK GROUP / 8,900', fresh:4,
+      freshLabel:'SWEPT 1D AGO', finds:31, booked:2, rule:'NO SELF-PROMO',
+      detail:[
+        { k:'THE RULE HERE', v:'No promotion of any kind. Admins approve every post.' },
+        { k:'YOU POSTED', v:'2 July \u2014 19 comments, 1 booking.' },
+        { k:'LAST THREE FINDS', v:'Ana Villaflor 9 \u00b7 Peachy Sunga 7 \u00b7 Bea Tolentino 6' }
+      ], action:'Sweep now', actionDone:'Sweeping now', action2:'Pause this group', action2Done:'Paused' },
+    { band:'working', id:'overseas-nurses', name:'Overseas Nurses UK', kind:'FACEBOOK GROUP / 5,200', fresh:3,
+      freshLabel:'SWEPT 2D AGO', finds:19, booked:1, rule:'NO RULES POSTED',
+      detail:[
+        { k:'THE RULE HERE', v:'Nothing written down. Two members have asked people not to DM.' },
+        { k:'YOU POSTED', v:'Never.' },
+        { k:'LAST THREE FINDS', v:'Rico Manalo 8 \u00b7 Elmer Bautista 8 \u00b7 Kaye Ilagan 7' }
+      ], action:'Sweep now', actionDone:'Sweeping now', action2:'Draft an intro', action2Done:'Draft queued' },
+    { band:'working', id:'bhw', name:'Barangay Health Workers', kind:'FACEBOOK GROUP / 3,400', fresh:3,
+      freshLabel:'SWEPT 4D AGO', finds:12, booked:1, rule:'ADMIN APPROVES',
+      detail:[
+        { k:'THE RULE HERE', v:'Members only, posts are approved by one admin.' },
+        { k:'YOU POSTED', v:'Never.' },
+        { k:'LAST THREE FINDS', v:'Ferdie Lim 8 \u00b7 Dennis Ocampo 5 \u00b7 Marlon Vega 4' }
+      ], action:'Sweep now', actionDone:'Sweeping now', action2:'Draft an intro', action2Done:'Draft queued' },
+    { band:'working', id:'ofw-stories', name:'OFW Stories', kind:'FACEBOOK GROUP / 21,000', fresh:1, cold:true,
+      freshLabel:'SWEPT 12D AGO', finds:23, booked:1, rule:'NO RULES POSTED',
+      detail:[
+        { k:'THE RULE HERE', v:'No rules posted. Very high volume, roughly 40 posts a day.' },
+        { k:'WHY IT WENT QUIET', v:'The crawler was moved to Nurses PH on 7 August and never sent back.' },
+        { k:'LAST THREE FINDS', v:'Trina Beltran 6 \u00b7 Rowena Cruz 8 \u00b7 Joel Ramirez 7' }
+      ], action:'Sweep now', actionDone:'Sweeping now', action2:'Pause this group', action2Done:'Paused' },
+    { band:'working', id:'manila-foodies', name:'Manila Foodies', kind:'FACEBOOK GROUP / 34,000', fresh:4, dead:true,
+      freshLabel:'SWEPT 1D AGO', finds:62, booked:0, rule:'NO RULES POSTED',
+      detail:[
+        { k:'THE RULE HERE', v:'Anything goes. Mostly restaurant photos.' },
+        { k:'WHAT IT HAS GIVEN YOU', v:'62 people, none booked, 4 replied and then stopped.' },
+        { k:'MY SUGGESTION', v:'Stop sweeping it. Nothing here tells a personal story.' }
+      ], action:'Stop sweeping', actionDone:'Stopped', action2:'Keep it anyway', action2Done:'Keeping it' },
+
+    { band:'waiting', id:'cebu-nurses', name:'Cebu Nurses Network', kind:'FACEBOOK GROUP / 3,100', fresh:0, pending:true,
+      freshLabel:'REQUESTED 3D AGO', finds:0, booked:0, rule:'2 MODERATORS',
+      detail:[
+        { k:'WHO DECIDES', v:'Two moderators. They usually answer within three days.' },
+        { k:'WHY I ASKED', v:'71% of its members also post in Nurses PH, your best group.' },
+        { k:'IF THEY SAY NO', v:'I won\u2019t ask again.' }
+      ], action:'Nudge the mods', actionDone:'Nudged', action2:'Withdraw', action2Done:'Withdrawn' },
+    { band:'waiting', id:'caregivers-ca', name:'Pinoy Caregivers Canada', kind:'FACEBOOK GROUP / 6,700', fresh:0, pending:true, stalePending:true,
+      freshLabel:'REQUESTED 9D AGO', finds:0, booked:0, rule:'1 ADMIN, QUIET',
+      detail:[
+        { k:'WHO DECIDES', v:'One admin, last active six days ago.' },
+        { k:'WHY I ASKED', v:'Caregivers abroad, adjacent to your nursing story.' },
+        { k:'MY SUGGESTION', v:'Nine days is longer than any request that was later approved.' }
+      ], action:'Withdraw the request', actionDone:'Withdrawn', action2:'Wait longer', action2Done:'Waiting' },
+
+    { band:'untried', id:'nursesph-tag', name:'#nursesph', kind:'HASHTAG / INSTAGRAM', fresh:0, untried:true,
+      freshLabel:'NEVER SWEPT', finds:0, booked:0, rule:'PUBLIC',
+      detail:[
+        { k:'WHAT IT LOOKS LIKE', v:'About 60 new posts a day, most of them uniform photos.' },
+        { k:'WHY IT MIGHT WORK', v:'Public, no approval needed, and you can start tonight.' }
+      ], action:'Try it tonight', actionDone:'Queued for tonight', action2:'Not interested', action2Done:'Dismissed' },
+    { band:'untried', id:'r-philippines', name:'r/Philippines', kind:'SUBREDDIT / 1.2M', fresh:0, untried:true,
+      freshLabel:'NEVER SWEPT', finds:0, booked:0, rule:'PUBLIC',
+      detail:[
+        { k:'WHAT IT LOOKS LIKE', v:'Large and general. Long personal posts do well on weekends.' },
+        { k:'WHY IT MIGHT WORK', v:'People write at length about work abroad here.' }
+      ], action:'Try it tonight', actionDone:'Queued for tonight', action2:'Not interested', action2Done:'Dismissed' },
+    { band:'untried', id:'ofw-tiktok', name:'#ofwstories', kind:'HASHTAG / TIKTOK', fresh:0, untried:true,
+      freshLabel:'NEVER SWEPT', finds:0, booked:0, rule:'PUBLIC',
+      detail:[
+        { k:'WHAT IT LOOKS LIKE', v:'Video only, which is what your bookings already do.' },
+        { k:'WHY IT MIGHT WORK', v:'Nine of your eleven bookings posted video of themselves.' }
+      ], action:'Try it tonight', actionDone:'Queued for tonight', action2:'Not interested', action2Done:'Dismissed' },
+
+    { band:'locked', id:'manila-moms', name:'Manila Moms Circle', kind:'FACEBOOK GROUP / 15,800', fresh:0, locked:true,
+      freshLabel:'DECLINED 6D AGO', finds:0, booked:0, rule:'DECLINED',
+      detail:[
+        { k:'WHAT HAPPENED', v:'The request was declined. No reason was given.' },
+        { k:'CAN YOU RETRY', v:'The group allows one request every 90 days. 84 days left.' }
+      ], action:'Remind me in 84 days', actionDone:'Reminder set', action2:'Forget this group', action2Done:'Forgotten' },
+    { band:'locked', id:'ph-nurses-support', name:'PH Nurses Support', kind:'FACEBOOK GROUP / 9,100', fresh:0, locked:true, banned:true,
+      freshLabel:'REMOVED 02 MAY', finds:14, booked:1, rule:'BANNED',
+      detail:[
+        { k:'WHAT HAPPENED', v:'An intro post included a link. The mods removed the post and the account.' },
+        { k:'WHAT I LEARNED', v:'Never post a link in a nursing group. This is now in your memory.' },
+        { k:'BEFORE THE BAN', v:'14 people found, 1 of them booked.' }
+      ], action:'Read the learned note', actionDone:'Opening the note', action2:'Forget this group', action2Done:'Forgotten' }
+  ];
+
+  bandMeta = [
+    { key:'working', name:'WORKING GROUND', fg:'var(--fg-soft)', note:'SWEPT ON A SCHEDULE' },
+    { key:'waiting', name:'WAITING ON SOMEONE', fg:'var(--marked)', note:'YOU CAN\u2019T WORK HERE YET' },
+    { key:'untried', name:'NEVER TRIED', fg:'var(--fg-muted)', note:'NOTHING SPENT HERE' },
+    { key:'locked', name:'LOCKED OUT', fg:'var(--fg-faint)', note:'KEPT SO NOTHING IS RETRIED BY MISTAKE' }
+  ];
+
+  renderVals(){
+    const faded = t => t.cold || t.dead || t.locked || t.stalePending;
+    const bands = this.bandMeta.map(b => {
+      const tiles = this.data.filter(t => t.band === b.key).map(t => {
+        const fade = faded(t);
+        const fresh = [];
+        for (let i = 1; i <= 5; i++) {
+          fresh.push({ bg: i <= t.fresh ? (t.fresh <= 1 ? 'var(--fg-faint)' : 'var(--fg-muted)') : 'var(--border)' });
+        }
+        const yieldPct = t.finds > 0 ? Math.round((t.booked / t.finds) * 100 * 6) : 0;
+        return {
+          name: t.name, kind: t.kind, fresh,
+          freshLabel: t.freshLabel,
+          freshFg: fade ? 'var(--fg-faint)' : 'var(--fg-muted)',
+          bg: t.best ? 'var(--raise)' : fade ? 'var(--surface)' : 'var(--surface-2)',
+          bd: t.best ? 'var(--border-3)' : (t.pending || t.untried) ? 'var(--border-2)' : fade ? 'var(--line)' : 'var(--border)',
+          bdStyle: (t.pending || t.untried) ? 'dashed' : 'solid',
+          nameFg: t.best ? 'var(--fg)' : fade ? 'var(--fg-muted)' : 'var(--fg-soft)',
+          dot: t.pending ? 'var(--marked)' : t.banned ? 'var(--danger)' : t.locked ? 'transparent' : t.dead ? 'transparent' : t.best ? 'var(--ok)' : 'transparent',
+          dotBd: t.pending ? 'var(--marked)' : t.banned ? 'var(--danger)' : t.best ? 'var(--ok)' : 'var(--border-3)',
+          yieldPct: Math.min(100, yieldPct) + '%',
+          yieldFg: t.booked > 0 ? (fade ? 'var(--fg-faint)' : 'var(--fg-soft)') : 'transparent',
+          yieldLabel: t.untried || t.pending ? 'NO FINDS YET' : t.finds + ' FINDS / ' + t.booked + ' BOOKED',
+          yieldTextFg: t.dead ? 'var(--fg-faint)' : fade ? 'var(--fg-faint)' : 'var(--fg-muted)',
+          hasRule: !!t.rule, rule: t.rule || '',
+          ruleFg: t.banned ? 'var(--danger)' : t.locked ? 'var(--fg-faint)' : 'var(--fg-muted)',
+          ruleBd: t.banned ? 'var(--danger)' : 'var(--border-2)',
+          span: this.state.open === t.id ? 'span 2' : 'span 1',
+          open: this.state.open === t.id,
+          detail: t.detail,
+          action: this.state.done[t.id] === 1 ? t.actionDone : t.action,
+          action2: this.state.done[t.id] === 2 ? t.action2Done : t.action2,
+          pick: () => this.setState({ open: this.state.open === t.id ? null : t.id }),
+          key: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.setState({ open: this.state.open === t.id ? null : t.id }); } },
+          act: (e) => { e.stopPropagation(); this.mark(t.id, 1); },
+          act2: (e) => { e.stopPropagation(); this.mark(t.id, 2); }
+        };
+      });
+      return { name: b.name, fg: b.fg, note: b.note, count: tiles.length, tiles };
+    });
+
+    return {
+      bands,
+      sweepLabel: this.state.swept ? 'Sweeping 3 groups' : 'Sweep the cold ground',
+      onSweep: () => this.setState({ swept: !this.state.swept }),
+      kinds: [
+        { name:'All ground', count:'13', active:true },
+        { name:'Facebook groups', count:'10' },
+        { name:'Hashtags', count:'2' },
+        { name:'Subreddits', count:'1' },
+        { name:'Accounts', count:'0' }
+      ].map(k => ({
+        name: k.name, count: k.count,
+        bg: k.active ? 'var(--raise)' : 'transparent',
+        bd: k.active ? 'var(--border-3)' : 'transparent',
+        fg: k.active ? 'var(--fg)' : 'var(--fg-muted)',
+        fw: k.active ? '600' : '500',
+        pick: () => {}
+      })),
+      footLeft: '208 FINDS ACROSS 13 PLACES / 9 BOOKED / \u20B12,140 SPENT THIS MONTH'
+    };
+  }
+}
+</script>
+</body>
+</html>

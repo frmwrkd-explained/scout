@@ -1,0 +1,1891 @@
+{
+  "_": "Generated from FrameForge source. Do NOT hand-edit — regenerate with scripts/export-prompt-catalog.mjs.",
+  "generated_from": {
+    "angles": "frontend/models.js AXES.framing",
+    "moves": "frontend/cameraMovements.js",
+    "looks": "frontend/models.js PRESETS",
+    "style_axes": "frontend/models.js AXES (all but framing)"
+  },
+  "thumbnail_base": "https://<frameforge-host>/axis-options/",
+  "angles": [
+    {
+      "name": "Extreme wide",
+      "fragment": "extreme wide establishing shot, subject small in the frame",
+      "description": null,
+      "thumb": "/axis-options/framing--extreme-wide.jpg"
+    },
+    {
+      "name": "Wide",
+      "fragment": "wide shot with full environment context",
+      "description": null,
+      "thumb": "/axis-options/framing--wide.jpg"
+    },
+    {
+      "name": "Medium",
+      "fragment": "medium shot, waist up",
+      "description": null,
+      "thumb": "/axis-options/framing--medium.jpg"
+    },
+    {
+      "name": "Close-up",
+      "fragment": "tight close-up on the face, emotional detail",
+      "description": null,
+      "thumb": "/axis-options/framing--close-up.jpg"
+    },
+    {
+      "name": "Macro detail",
+      "fragment": "macro detail shot of the smallest meaningful part, blurred context",
+      "description": null,
+      "thumb": "/axis-options/framing--macro-detail.jpg"
+    },
+    {
+      "name": "Over-shoulder",
+      "fragment": "over-the-shoulder shot, classic dialogue angle",
+      "description": null,
+      "thumb": "/axis-options/framing--over-shoulder.jpg"
+    },
+    {
+      "name": "Low-angle power",
+      "fragment": "low-angle shot from below eye-line, heroic scale",
+      "description": null,
+      "thumb": "/axis-options/framing--low-angle-power.jpg"
+    },
+    {
+      "name": "Top-down geometry",
+      "fragment": "pure overhead top-down shot, graphic shapes",
+      "description": null,
+      "thumb": "/axis-options/framing--top-down-geometry.jpg"
+    },
+    {
+      "name": "Dutch tilt",
+      "fragment": "dutch tilt, tension in the tilted frame",
+      "description": null,
+      "thumb": "/axis-options/framing--dutch-tilt.jpg"
+    },
+    {
+      "name": "Negative-space wide",
+      "fragment": "wide shot with vast negative space, subject tiny and isolated",
+      "description": null,
+      "thumb": "/axis-options/framing--negative-space-wide.jpg"
+    },
+    {
+      "name": "Through obstruction",
+      "fragment": "shot through a foreground obstruction, voyeuristic candid layer",
+      "description": null,
+      "thumb": "/axis-options/framing--through-obstruction.jpg"
+    },
+    {
+      "name": "Tracking",
+      "fragment": "dynamic tracking shot alongside the subject",
+      "description": null,
+      "thumb": "/axis-options/framing--tracking.jpg"
+    }
+  ],
+  "quick_angles": [
+    "Wide",
+    "Medium",
+    "Close-up",
+    "Over-shoulder",
+    "Low-angle power",
+    "Top-down geometry"
+  ],
+  "moves": [
+    {
+      "id": "static",
+      "name": "Static",
+      "category": "fixed",
+      "direction": "camera locked",
+      "description": "No camera movement. Composition, performance or product shape stays exact.",
+      "fragment": "Keep the camera completely locked on a tripod or fixed virtual camera. Do not pan, tilt, zoom, dolly, drift, shake, or reframe. The composition should stay stable from first frame to last; any motion should come from the subject or environment only."
+    },
+    {
+      "id": "pan-left",
+      "name": "Pan Left",
+      "category": "axis",
+      "direction": "lens rotates left",
+      "description": "Camera stays planted while the lens swings left.",
+      "fragment": "Rotate the camera head left from a fixed position. The tripod/camera body does not travel through space. Use the pan to follow action moving left or reveal new information entering from the left side of the frame."
+    },
+    {
+      "id": "pan-right",
+      "name": "Pan Right",
+      "category": "axis",
+      "direction": "lens rotates right",
+      "description": "Camera stays planted while the lens swings right.",
+      "fragment": "Rotate the camera head right from a fixed position. The tripod/camera body does not travel through space. Use the pan to follow action moving right or reveal new information entering from the right side of the frame."
+    },
+    {
+      "id": "tilt-up",
+      "name": "Tilt Up",
+      "category": "axis",
+      "direction": "lens tilts up",
+      "description": "Camera stays planted while the lens rotates upward.",
+      "fragment": "Tilt the lens upward while the camera body stays planted. Start framed lower, then rotate up to reveal height, a face, a building, the sky, a creature, a product detail, or whatever sits above the starting frame."
+    },
+    {
+      "id": "tilt-down",
+      "name": "Tilt Down",
+      "category": "axis",
+      "direction": "lens tilts down",
+      "description": "Camera stays planted while the lens rotates downward.",
+      "fragment": "Tilt the lens downward while the camera body stays planted. Start framed higher, then rotate down to reveal the subject, an object, hands, feet, floor action, a product surface, or the key detail below."
+    },
+    {
+      "id": "zoom-in",
+      "name": "Zoom In",
+      "category": "lens",
+      "direction": "focal length tightens",
+      "description": "Lens magnifies the subject without moving the camera body.",
+      "fragment": "Zoom in with the lens only. The camera body stays fixed in place, so there is no parallax shift. The subject grows larger in frame and the field of view tightens as focal length increases."
+    },
+    {
+      "id": "zoom-out",
+      "name": "Zoom Out",
+      "category": "lens",
+      "direction": "focal length widens",
+      "description": "Lens widens the view without moving the camera body.",
+      "fragment": "Zoom out with the lens only. The camera body stays fixed in place, so there is no parallax shift. The subject becomes smaller in frame and more of the surrounding environment is revealed as focal length widens."
+    },
+    {
+      "id": "roll-clockwise",
+      "name": "Roll CW",
+      "category": "rotation",
+      "direction": "frame rotates clockwise",
+      "description": "The camera rolls around the lens axis.",
+      "fragment": "Roll the camera clockwise around the lens axis. The frame itself rotates clockwise while the camera position stays otherwise controlled. Use it as a stylized transition, disorientation beat, impact moment, or surreal camera move."
+    },
+    {
+      "id": "roll-counterclockwise",
+      "name": "Roll CCW",
+      "category": "rotation",
+      "direction": "frame rotates counterclockwise",
+      "description": "Reverse lens-axis roll.",
+      "fragment": "Roll the camera counterclockwise around the lens axis. The frame itself rotates counterclockwise while the camera position stays otherwise controlled. Use it as a stylized transition, disorientation beat, impact moment, or surreal camera move."
+    },
+    {
+      "id": "tracking-left",
+      "name": "Tracking Left",
+      "category": "lateral",
+      "direction": "camera travels left",
+      "description": "Camera physically slides left on track, dolly, gimbal, or virtual path.",
+      "fragment": "Move the entire camera left on a track, dolly, gimbal, slider, or virtual camera path. This is physical lateral travel, not a pan. Foreground and background should slide with visible parallax while the subject remains readable."
+    },
+    {
+      "id": "tracking-right",
+      "name": "Tracking Right",
+      "category": "lateral",
+      "direction": "camera travels right",
+      "description": "Camera physically slides right on track, dolly, gimbal, or virtual path.",
+      "fragment": "Move the entire camera right on a track, dolly, gimbal, slider, or virtual camera path. This is physical lateral travel, not a pan. Foreground and background should slide with visible parallax while the subject remains readable."
+    },
+    {
+      "id": "arc-clockwise",
+      "name": "Arc CW",
+      "category": "rotation",
+      "direction": "camera arcs clockwise",
+      "description": "Camera physically curves around the subject.",
+      "fragment": "Move the camera in a clockwise arc around the subject. The camera physically changes position on a curved path, keeping the subject as the anchor while the background rotates with clear parallax."
+    },
+    {
+      "id": "arc-counterclockwise",
+      "name": "Arc CCW",
+      "category": "rotation",
+      "direction": "camera arcs counterclockwise",
+      "description": "Camera physically curves around the subject in reverse.",
+      "fragment": "Move the camera in a counterclockwise arc around the subject. The camera physically changes position on a curved path, keeping the subject as the anchor while the background rotates with clear parallax."
+    },
+    {
+      "id": "boom-up",
+      "name": "Boom Up",
+      "category": "vertical",
+      "direction": "camera arm rises",
+      "description": "Crane/jib arm raises the camera through space.",
+      "fragment": "Raise the camera upward on a crane, jib, boom arm, drone, or virtual vertical path. This is a physical rise through space, not a lens tilt. Reveal height, scale, overhead geometry, or a broader view as the camera ascends."
+    },
+    {
+      "id": "boom-down",
+      "name": "Boom Down",
+      "category": "vertical",
+      "direction": "camera arm lowers",
+      "description": "Crane/jib arm lowers the camera through space.",
+      "fragment": "Lower the camera downward on a crane, jib, boom arm, drone, or virtual vertical path. This is a physical descent through space, not a lens tilt. Move from a higher view down toward subject level, a detail, or a more intimate final frame."
+    },
+    {
+      "id": "pedestal-up",
+      "name": "Pedestal Up",
+      "category": "vertical",
+      "direction": "camera column rises",
+      "description": "Camera moves vertically up without tilting.",
+      "fragment": "Pedestal the camera straight upward while keeping the lens angle level. The camera column rises vertically without tilting up. Preserve screen direction and use the height change to reveal more of the subject or set."
+    },
+    {
+      "id": "pedestal-down",
+      "name": "Pedestal Down",
+      "category": "vertical",
+      "direction": "camera column lowers",
+      "description": "Camera moves vertically down without tilting.",
+      "fragment": "Pedestal the camera straight downward while keeping the lens angle level. The camera column lowers vertically without tilting down. Preserve screen direction and use the height change to settle onto the subject or detail."
+    },
+    {
+      "id": "push-in",
+      "name": "Push In / Dolly",
+      "category": "dolly",
+      "direction": "camera moves toward subject",
+      "description": "Camera physically moves forward, creating parallax.",
+      "fragment": "Dolly or push the entire camera forward toward the subject. This is physical camera travel, not a zoom. Foreground and background should shift with natural parallax as the shot becomes tighter and more focused."
+    },
+    {
+      "id": "pull-out",
+      "name": "Pull Out / Dolly",
+      "category": "dolly",
+      "direction": "camera moves away",
+      "description": "Camera physically moves backward, revealing more context.",
+      "fragment": "Dolly or pull the entire camera backward away from the subject. This is physical camera travel, not a zoom. Foreground and background should shift with natural parallax as the frame widens and reveals more context."
+    },
+    {
+      "id": "dolly-zoom",
+      "name": "Dolly Zoom",
+      "category": "dolly",
+      "direction": "camera and lens counter-move",
+      "description": "Camera movement and lens zoom oppose each other for a vertigo effect.",
+      "fragment": "Create a dolly zoom: move the camera physically in one direction while zooming the lens in the opposite direction. Keep the subject nearly the same size in frame while the background appears to stretch, compress, or warp dramatically."
+    }
+  ],
+  "quick_moves": [
+    "static",
+    "push-in",
+    "pull-out",
+    "pan-left",
+    "pan-right",
+    "arc-clockwise",
+    "boom-up"
+  ],
+  "move_categories": [
+    {
+      "id": "fixed",
+      "label": "Fixed"
+    },
+    {
+      "id": "axis",
+      "label": "Axis"
+    },
+    {
+      "id": "lens",
+      "label": "Lens"
+    },
+    {
+      "id": "lateral",
+      "label": "Lateral"
+    },
+    {
+      "id": "dolly",
+      "label": "Dolly"
+    },
+    {
+      "id": "vertical",
+      "label": "Vertical"
+    },
+    {
+      "id": "rotation",
+      "label": "Rotation"
+    }
+  ],
+  "move_speeds": [
+    {
+      "id": "creep",
+      "label": "Creep",
+      "phrase": "The movement is a barely perceptible creep — extremely slow and controlled."
+    },
+    {
+      "id": "slow",
+      "label": "Slow",
+      "phrase": "The movement is slow and deliberate, letting the frame breathe."
+    },
+    {
+      "id": "normal",
+      "label": "Normal",
+      "phrase": "The movement runs at a natural, steady operating speed."
+    },
+    {
+      "id": "fast",
+      "label": "Fast",
+      "phrase": "The movement is fast and energetic, with clear momentum."
+    }
+  ],
+  "move_stabilizations": [
+    {
+      "id": "locked",
+      "label": "Locked",
+      "phrase": "Execution is perfectly stabilized — machined, tripod/robotic smoothness with zero shake."
+    },
+    {
+      "id": "smooth",
+      "label": "Gimbal",
+      "phrase": "Execution is gimbal-smooth with a faint organic float, no visible shake."
+    },
+    {
+      "id": "handheld",
+      "label": "Handheld",
+      "phrase": "Execution is handheld with natural micro-shake and human energy."
+    }
+  ],
+  "look_presets": [
+    {
+      "id": "br2049",
+      "name": "Blade Runner 2049",
+      "picks": {
+        "style": [
+          "Cinematic",
+          "Photorealistic"
+        ],
+        "framing": [
+          "Extreme wide"
+        ],
+        "camera": [
+          "ARRI ALEXA 65"
+        ],
+        "lenstype": [
+          "Anamorphic Cinema Lens"
+        ],
+        "lightsource": [
+          "Neon Lights"
+        ],
+        "lightstyle": [
+          "Low Key"
+        ],
+        "atmosphere": [
+          "Moody"
+        ],
+        "look": [
+          "Blade Runner 2049"
+        ],
+        "filter": [
+          "Fog/Haze"
+        ],
+        "aspect": [
+          "2.39:1 Anamorphic"
+        ]
+      }
+    },
+    {
+      "id": "goldenhour",
+      "name": "Golden Hour Portrait",
+      "picks": {
+        "style": [
+          "Cinematic",
+          "Photorealistic"
+        ],
+        "framing": [
+          "Close-up"
+        ],
+        "focal": [
+          "85mm Portrait Lens"
+        ],
+        "filmstock": [
+          "Kodak Portra 400"
+        ],
+        "lightsource": [
+          "Golden Hour"
+        ],
+        "lightstyle": [
+          "Backlighting"
+        ],
+        "atmosphere": [
+          "Romantic"
+        ],
+        "look": [
+          "The Revenant"
+        ],
+        "filter": [
+          "Halation"
+        ],
+        "aspect": [
+          "16:9 HD"
+        ]
+      }
+    },
+    {
+      "id": "noir",
+      "name": "Film Noir",
+      "picks": {
+        "style": [
+          "Cinematic"
+        ],
+        "framing": [
+          "Dutch tilt"
+        ],
+        "camera": [
+          "35mm Film Camera"
+        ],
+        "filmstock": [
+          "Ilford HP5 Plus"
+        ],
+        "lightsource": [
+          "Practical Lights"
+        ],
+        "lightstyle": [
+          "Chiaroscuro"
+        ],
+        "atmosphere": [
+          "Mysterious"
+        ],
+        "look": [
+          "Classic Film Noir"
+        ],
+        "filter": [
+          "Heavy Film Grain"
+        ],
+        "aspect": [
+          "4:3 Academy"
+        ]
+      }
+    },
+    {
+      "id": "cyberpunk",
+      "name": "Cyberpunk Neon",
+      "picks": {
+        "style": [
+          "Cinematic",
+          "Photorealistic"
+        ],
+        "framing": [
+          "Tracking"
+        ],
+        "lenstype": [
+          "Panavision C-Series Anamorphic"
+        ],
+        "filmstock": [
+          "CineStill 800T"
+        ],
+        "lightsource": [
+          "Neon Lights"
+        ],
+        "lightstyle": [
+          "Rim / Edge Light"
+        ],
+        "atmosphere": [
+          "Energetic"
+        ],
+        "look": [
+          "Neon Noir"
+        ],
+        "filter": [
+          "Rain Drops on Lens"
+        ],
+        "aspect": [
+          "2.39:1 Anamorphic"
+        ]
+      }
+    },
+    {
+      "id": "verite",
+      "name": "Documentary Vérité",
+      "picks": {
+        "style": [
+          "Photorealistic"
+        ],
+        "framing": [
+          "Through obstruction"
+        ],
+        "camera": [
+          "16mm Film Camera"
+        ],
+        "focal": [
+          "50mm Normal"
+        ],
+        "lightsource": [
+          "Overcast Diffused"
+        ],
+        "lightstyle": [
+          "Motivated Lighting"
+        ],
+        "atmosphere": [
+          "Gritty"
+        ],
+        "filter": [
+          "Film Grain"
+        ],
+        "aspect": [
+          "16:9 HD"
+        ]
+      }
+    },
+    {
+      "id": "anderson",
+      "name": "Wes Anderson",
+      "picks": {
+        "style": [
+          "Cinematic"
+        ],
+        "framing": [
+          "Medium"
+        ],
+        "focal": [
+          "40mm Standard"
+        ],
+        "filmstock": [
+          "Kodak Portra 160"
+        ],
+        "lightsource": [
+          "Window Light"
+        ],
+        "lightstyle": [
+          "High Key"
+        ],
+        "atmosphere": [
+          "Whimsical"
+        ],
+        "look": [
+          "Wes Anderson"
+        ],
+        "aspect": [
+          "4:3 Academy"
+        ]
+      }
+    },
+    {
+      "id": "mythic",
+      "name": "Mythic Firelight",
+      "picks": {
+        "style": [
+          "Oil Painting"
+        ],
+        "framing": [
+          "Over-shoulder"
+        ],
+        "lenstype": [
+          "Anamorphic Cinema Lens"
+        ],
+        "lightsource": [
+          "Firelight",
+          "Torchlight"
+        ],
+        "lightstyle": [
+          "Chiaroscuro"
+        ],
+        "atmosphere": [
+          "Epic"
+        ],
+        "look": [
+          "Dune"
+        ],
+        "filter": [
+          "God Rays"
+        ],
+        "aspect": [
+          "2.39:1 Anamorphic"
+        ]
+      }
+    }
+  ],
+  "style_axes": [
+    {
+      "key": "style",
+      "name": "Style",
+      "max": 2,
+      "tokens": [
+        {
+          "name": "3D Render",
+          "fragment": "A 3D rendered image, CGI quality, smooth surfaces, volumetric lighting, Octane render",
+          "thumb": "/axis-options/style--3d-render.jpg"
+        },
+        {
+          "name": "Anamorphic Wide-Open",
+          "fragment": "anamorphic, T/1.8 wide open aperture.Ultrawide environmental framing \nwith paradoxically shallow depth of field — foreground \nsubject razor sharp, mid-ground figures softly defocused, \nbackground completely blurred into painterly bokeh. \nAnamorphic oval bokeh shapes. Deep \nthree-layer staging. No fisheye distortion, straight \nvertical lines.",
+          "thumb": "/axis-options/style--anamorphic-wide-open.jpg"
+        },
+        {
+          "name": "Anime",
+          "fragment": "An anime style illustration, vibrant colors, clean linework, Japanese animation aesthetic",
+          "thumb": "/axis-options/style--anime.jpg"
+        },
+        {
+          "name": "Cinematic",
+          "fragment": "A cinematic film still, dramatic composition, movie-quality lighting, widescreen framing",
+          "thumb": "/axis-options/style--cinematic.jpg"
+        },
+        {
+          "name": "Comic Book",
+          "fragment": "A comic book illustration, bold outlines, halftone dots, dynamic action poses, vibrant flat colors",
+          "thumb": "/axis-options/style--comic-book.jpg"
+        },
+        {
+          "name": "Oil Painting",
+          "fragment": "An oil painting, visible brushstrokes, rich pigments, classical painting technique",
+          "thumb": "/axis-options/style--oil-painting.jpg"
+        },
+        {
+          "name": "Pencil Sketch",
+          "fragment": "A detailed pencil sketch, graphite drawing, cross-hatching, hand-drawn linework",
+          "thumb": "/axis-options/style--pencil-sketch.jpg"
+        },
+        {
+          "name": "Photorealistic",
+          "fragment": "A photorealistic image",
+          "thumb": "/axis-options/style--photorealistic.jpg"
+        },
+        {
+          "name": "Pixel Art",
+          "fragment": "A pixel art image, 16-bit retro game aesthetic, limited color palette, crisp pixels",
+          "thumb": "/axis-options/style--pixel-art.jpg"
+        },
+        {
+          "name": "Premium Anamorphic Commercial",
+          "fragment": "anamorphic, T/1.8 wide open aperture.Ultrawide environmental framing with paradoxically shallow depth of field — foreground subject razor sharp, mid-ground figures softly defocused, background completely blurred into painterly bokeh. Anamorphic oval bokeh shapes. Deep three-layer staging. No fisheye distortion, straight vertical lines.",
+          "thumb": "/axis-options/style--premium-anamorphic-commercial.jpg"
+        },
+        {
+          "name": "Studio Ghibli",
+          "fragment": "A Studio Ghibli style illustration, whimsical, soft colors, hand-painted backgrounds, Hayao Miyazaki aesthetic",
+          "thumb": "/axis-options/style--studio-ghibli.jpg"
+        },
+        {
+          "name": "Watercolor",
+          "fragment": "A watercolor painting, soft washes, delicate translucent layers, fluid bleeding edges",
+          "thumb": "/axis-options/style--watercolor.jpg"
+        },
+        {
+          "name": "Teal-Amber Forecourt Dusk",
+          "fragment": "anamorphic T/1.8, ARRI ALEXA Mini LF, 24-50mm anamorphic. Premium commercial teal-and-amber palette. Lifted blacks RGB 25-30 never crushed. Saturation +8. Highlights roll creamy amber-white, gentle S-curve, Black Pro-Mist 1/4 halation. Warm amber key from station canopy or shop interior spill, cool blue-teal fill from dusk sky, wet asphalt bounces warm light back up. Temperature split is the signature. Deep three-layer staging, anamorphic oval bokeh on every point light, horizontal lens flare. Natural skin texture readable on shadow side. No grunge, no grain, premium commercial finish.",
+          "thumb": "/axis-options/style--teal-amber-forecourt-dusk.jpg"
+        },
+        {
+          "name": "Misty Urban Night",
+          "fragment": "anamorphic T/2.8, ARRI ALEXA Mini LF, 40mm. Heavy Black Pro-Mist 1 + real atmospheric fog — double diffusion. Full night. Teal-dominant cool field fills ~60% of frame (sky, fog, wet ground). Readable red/pink neon accents (VIVA sign, canopy trim, brake lights) + readable green OMV LED strip + contained warm tungsten only directly under canopy. Saturation neutral to +5 — mist softens edges not hue. Low-contrast tone, lifted toe AND shoulder, blacks to misty grey RGB 28-35. All light sources broken and softened — soft glowing rectangles bleeding into fog as diffuse halos, never sharp beams. Wet reflective ground with teal sky + green LED + red neon + small warm pool reflected softly, bloomed not mirrored. Symmetrical near-centered composition, negative space 50-60%, static observational. Todd Hido / Gregory Crewdson stillness. Feels filmed on 35mm through mist.",
+          "thumb": "/axis-options/style--misty-urban-night.jpg"
+        },
+        {
+          "name": "Pastel Paper Dreamworld",
+          "fragment": "anamorphic T/1.8, ARRI ALEXA Mini LF, 21mm. Dynamic autosport-cam energy — low angles whipping around subject, fast fluid gimbal, high-energy movement. Deep three-layer staging with motion blur on mid-ground fluttering paper. Saturated pastel palette: Post-it yellow hero plus pink, mint, peach, sky blue, coral — warm-on-warm, no cool shadows. Blacks lifted high RGB 35-40, shadows warm charcoal with golden undertone. Saturation +25 painterly not candy. Diffuse golden-hour sunlight through paper canopy, light wraps from every angle, long soft shadows, sun rays and lens bokeh. Black Pro-Mist 1/2 dreamy halation. Paper squares catch warm rim light as they flutter. Oval anamorphic bokeh on sunlight gaps, strong anamorphic breath and swirl at frame edges. Wes Anderson meets Inception.",
+          "thumb": "/axis-options/style--pastel-paper-dreamworld.jpg"
+        },
+        {
+          "name": "Firelit Cabin Reunion",
+          "fragment": "anamorphic T/1.8, ARRI ALEXA Mini LF, 35-50mm anamorphic. Measured smooth dolly or gimbal, story-driven, shots breathe. Warm golden amber palette. Rich oranges against deep teal-blue shadow from blue-hour sky — temperature split. Saturation +12. Blacks lifted RGB 28-32, shadow detail preserved. Gentle S-curve, faces readable on shadow side. Black Pro-Mist 1/4 warm halation around campfire and cabin window edges. Primary key warm flickering campfire on faces with visible flicker on skin and hair. Secondary amber spill from cabin windows behind. Fill from cool teal blue-hour ambient, never black. Temperature split orange-fire vs cool-blue-hour is the signature. Skin rich with firelight glow, glassy emotional eyes. Anamorphic oval bokeh on campfire sparks, cabin glow, string lights. Cinematic short-film premium intimacy.",
+          "thumb": "/axis-options/style--firelit-cabin-reunion.jpg"
+        }
+      ]
+    },
+    {
+      "key": "camera",
+      "name": "Camera Body",
+      "max": 1,
+      "tokens": [
+        {
+          "name": "ARRI ALEXA 65",
+          "fragment": "shot on ARRI ALEXA 65 large format sensor with exceptional dynamic range and color science",
+          "thumb": "/axis-options/camera-body--arri-alexa-65.jpg"
+        },
+        {
+          "name": "ARRI ALEXA Mini LF",
+          "fragment": "shot on ARRI ALEXA Mini LF compact large format cinema camera with natural skin tones",
+          "thumb": "/axis-options/camera-body--arri-alexa-mini-lf.jpg"
+        },
+        {
+          "name": "ARRI ALEXA 35",
+          "fragment": "shot on ARRI ALEXA 35 with enhanced highlight handling and REVEAL color science",
+          "thumb": "/axis-options/camera-body--arri-alexa-35.jpg"
+        },
+        {
+          "name": "RED V-RAPTOR 8K VV",
+          "fragment": "shot on RED V-RAPTOR 8K VV with ultra-high resolution and sharp detail rendering",
+          "thumb": "/axis-options/camera-body--red-v-raptor-8k-vv.jpg"
+        },
+        {
+          "name": "RED KOMODO 6K",
+          "fragment": "shot on RED KOMODO 6K compact cinema camera with punchy colors",
+          "thumb": "/axis-options/camera-body--red-komodo-6k.jpg"
+        },
+        {
+          "name": "Sony VENICE 2",
+          "fragment": "shot on Sony VENICE 2 8.6K full-frame with dual ISO and cinematic color",
+          "thumb": "/axis-options/camera-body--sony-venice-2.jpg"
+        },
+        {
+          "name": "Sony FX6",
+          "fragment": "shot on Sony FX6 full-frame cinema camera with S-Cinetone color profile",
+          "thumb": "/axis-options/camera-body--sony-fx6.jpg"
+        },
+        {
+          "name": "Canon C500 Mark II",
+          "fragment": "shot on Canon C500 Mark II full-frame with Cinema RAW Light and warm tones",
+          "thumb": "/axis-options/camera-body--canon-c500-mark-ii.jpg"
+        },
+        {
+          "name": "Canon C70",
+          "fragment": "shot on Canon C70 Super 35 DGO sensor with enhanced dynamic range",
+          "thumb": "/axis-options/camera-body--canon-c70.jpg"
+        },
+        {
+          "name": "Blackmagic URSA Mini Pro 12K",
+          "fragment": "shot on Blackmagic URSA Mini Pro 12K with extreme resolution and Blackmagic color",
+          "thumb": "/axis-options/camera-body--blackmagic-ursa-mini-pro-12k.jpg"
+        },
+        {
+          "name": "Blackmagic Pocket 6K Pro",
+          "fragment": "shot on Blackmagic Pocket 6K Pro with Super 35 sensor and Blackmagic RAW",
+          "thumb": "/axis-options/camera-body--blackmagic-pocket-6k-pro.jpg"
+        },
+        {
+          "name": "Panavision DXL2",
+          "fragment": "shot on Panavision DXL2 with 8K RED sensor and Panavision color science",
+          "thumb": "/axis-options/camera-body--panavision-dxl2.jpg"
+        },
+        {
+          "name": "Panavision Millennium XL2",
+          "fragment": "shot on Panavision Millennium XL2 35mm film camera with classic film texture",
+          "thumb": "/axis-options/camera-body--panavision-millennium-xl2.jpg"
+        },
+        {
+          "name": "IMAX 15/70",
+          "fragment": "shot on IMAX 15/70 large format film with immense detail and scale",
+          "thumb": "/axis-options/camera-body--imax-15-70.jpg"
+        },
+        {
+          "name": "35mm Film Camera",
+          "fragment": "shot on 35mm film with organic grain texture and classic cinema aesthetic",
+          "thumb": "/axis-options/camera-body--35mm-film-camera.jpg"
+        },
+        {
+          "name": "16mm Film Camera",
+          "fragment": "shot on 16mm film with visible grain and indie documentary texture",
+          "thumb": "/axis-options/camera-body--16mm-film-camera.jpg"
+        },
+        {
+          "name": "Super 8 Film Camera",
+          "fragment": "shot on Super 8 film with heavy grain nostalgic home movie aesthetic",
+          "thumb": "/axis-options/camera-body--super-8-film-camera.jpg"
+        },
+        {
+          "name": "65mm Film Camera",
+          "fragment": "shot on 65mm film with stunning resolution and epic large format look",
+          "thumb": "/axis-options/camera-body--65mm-film-camera.jpg"
+        },
+        {
+          "name": "Hasselblad H6D-100c",
+          "fragment": "shot on Hasselblad H6D-100c medium format with exceptional detail and color depth",
+          "thumb": "/axis-options/camera-body--hasselblad-h6d-100c.jpg"
+        },
+        {
+          "name": "Leica M11",
+          "fragment": "shot on Leica M11 rangefinder with classic Leica color and micro-contrast",
+          "thumb": "/axis-options/camera-body--leica-m11.jpg"
+        }
+      ]
+    },
+    {
+      "key": "focal",
+      "name": "Focal Length",
+      "max": 1,
+      "tokens": [
+        {
+          "name": "8mm Ultra Wide",
+          "fragment": "8mm ultra wide angle with extreme distortion and immersive perspective",
+          "thumb": "/axis-options/focal-length--8mm-ultra-wide.jpg"
+        },
+        {
+          "name": "12mm Ultra Wide",
+          "fragment": "12mm ultra wide angle with dramatic perspective and visible distortion",
+          "thumb": "/axis-options/focal-length--12mm-ultra-wide.jpg"
+        },
+        {
+          "name": "14mm Ultra Wide",
+          "fragment": "14mm ultra wide angle with expansive field of view",
+          "thumb": "/axis-options/focal-length--14mm-ultra-wide.jpg"
+        },
+        {
+          "name": "16mm Wide",
+          "fragment": "16mm wide angle with environmental context and slight distortion",
+          "thumb": "/axis-options/focal-length--16mm-wide.jpg"
+        },
+        {
+          "name": "18mm Wide Lens",
+          "fragment": "18mm wide angle with natural perspective and minimal distortion",
+          "thumb": "/axis-options/focal-length--18mm-wide-lens.jpg"
+        },
+        {
+          "name": "21mm Wide",
+          "fragment": "21mm wide angle with classic cinema perspective",
+          "thumb": "/axis-options/focal-length--21mm-wide.jpg"
+        },
+        {
+          "name": "24mm Wide",
+          "fragment": "24mm wide angle with natural field of view and storytelling perspective",
+          "thumb": "/axis-options/focal-length--24mm-wide.jpg"
+        },
+        {
+          "name": "28mm Wide Lens",
+          "fragment": "28mm moderate wide angle with balanced perspective",
+          "thumb": "/axis-options/focal-length--28mm-wide-lens.jpg"
+        },
+        {
+          "name": "32mm Standard Lens",
+          "fragment": "32mm standard focal length with natural human perspective",
+          "thumb": "/axis-options/focal-length--32mm-standard-lens.jpg"
+        },
+        {
+          "name": "35mm Standard Lens",
+          "fragment": "35mm standard focal length with classic cinema framing",
+          "thumb": "/axis-options/focal-length--35mm-standard-lens.jpg"
+        },
+        {
+          "name": "40mm Standard",
+          "fragment": "40mm standard focal length with intimate neutral perspective",
+          "thumb": "/axis-options/focal-length--40mm-standard.jpg"
+        },
+        {
+          "name": "50mm Normal",
+          "fragment": "50mm normal lens with human eye equivalent perspective",
+          "thumb": "/axis-options/focal-length--50mm-normal.jpg"
+        },
+        {
+          "name": "65mm Portrait Lens",
+          "fragment": "65mm short telephoto with flattering facial proportions",
+          "thumb": "/axis-options/focal-length--65mm-portrait-lens.jpg"
+        },
+        {
+          "name": "85mm Portrait Lens",
+          "fragment": "85mm classic portrait lens with beautiful subject isolation and compression",
+          "thumb": "/axis-options/focal-length--85mm-portrait-lens.jpg"
+        },
+        {
+          "name": "100mm Portrait Lens",
+          "fragment": "100mm telephoto with strong background separation and compression",
+          "thumb": "/axis-options/focal-length--100mm-portrait-lens.jpg"
+        },
+        {
+          "name": "135mm Telephoto",
+          "fragment": "135mm telephoto with compressed perspective and creamy bokeh",
+          "thumb": "/axis-options/focal-length--135mm-telephoto.jpg"
+        },
+        {
+          "name": "200mm Telephoto",
+          "fragment": "200mm telephoto with strong compression and distant subject isolation",
+          "thumb": "/axis-options/focal-length--200mm-telephoto.jpg"
+        },
+        {
+          "name": "300mm Super Telephoto",
+          "fragment": "300mm super telephoto with extreme compression and flattened perspective",
+          "thumb": "/axis-options/focal-length--300mm-super-telephoto.jpg"
+        },
+        {
+          "name": "400mm Super Telephoto",
+          "fragment": "400mm super telephoto with dramatic compression and subject magnification",
+          "thumb": "/axis-options/focal-length--400mm-super-telephoto.jpg"
+        },
+        {
+          "name": "600mm Ultra Telephoto",
+          "fragment": "600mm ultra telephoto with extreme reach and massive compression",
+          "thumb": "/axis-options/focal-length--600mm-ultra-telephoto.jpg"
+        }
+      ]
+    },
+    {
+      "key": "lenstype",
+      "name": "Lens Type",
+      "max": 1,
+      "tokens": [
+        {
+          "name": "Anamorphic Cinema Lens",
+          "fragment": "anamorphic lens with horizontal lens flares oval bokeh and 2.39:1 widescreen characteristics",
+          "thumb": "/axis-options/lens-type--anamorphic-cinema-lens.jpg"
+        },
+        {
+          "name": "Cooke S4/i",
+          "fragment": "Cooke S4/i prime lens with warm organic rendering and smooth skin tones",
+          "thumb": "/axis-options/lens-type--cooke-s4-i.jpg"
+        },
+        {
+          "name": "Cooke Anamorphic/i",
+          "fragment": "Cooke Anamorphic/i lens with warm anamorphic flares and creamy bokeh",
+          "thumb": "/axis-options/lens-type--cooke-anamorphic-i.jpg"
+        },
+        {
+          "name": "Zeiss Master Prime",
+          "fragment": "Zeiss Master Prime with clinical sharpness and neutral color rendition",
+          "thumb": "/axis-options/lens-type--zeiss-master-prime.jpg"
+        },
+        {
+          "name": "Zeiss Supreme Prime",
+          "fragment": "Zeiss Supreme Prime large format lens with full-frame coverage and modern sharpness",
+          "thumb": "/axis-options/lens-type--zeiss-supreme-prime.jpg"
+        },
+        {
+          "name": "Panavision Primo",
+          "fragment": "Panavision Primo lens with cinematic character and smooth focus falloff",
+          "thumb": "/axis-options/lens-type--panavision-primo.jpg"
+        },
+        {
+          "name": "Panavision C-Series Anamorphic",
+          "fragment": "Panavision C-Series vintage anamorphic with classic flares and organic aberrations",
+          "thumb": "/axis-options/lens-type--panavision-c-series-anamorphic.jpg"
+        },
+        {
+          "name": "Helios 44-2 Swirly Bokeh",
+          "fragment": "Helios 44-2 vintage Soviet lens with distinctive swirly bokeh and dreamy rendering",
+          "thumb": "/axis-options/lens-type--helios-44-2-swirly-bokeh.jpg"
+        },
+        {
+          "name": "Canon K35",
+          "fragment": "Canon K35 vintage cinema lens with soft rendering and warm nostalgic tone",
+          "thumb": "/axis-options/lens-type--canon-k35.jpg"
+        },
+        {
+          "name": "Leitz Summilux-C",
+          "fragment": "Leitz Summilux-C cinema lens with Leica rendering and exceptional micro-contrast",
+          "thumb": "/axis-options/lens-type--leitz-summilux-c.jpg"
+        },
+        {
+          "name": "Petzval Portrait Lens",
+          "fragment": "Petzval lens with swirly bokeh and sharp center focus vintage portrait rendering",
+          "thumb": "/axis-options/lens-type--petzval-portrait-lens.jpg"
+        },
+        {
+          "name": "Tilt-Shift Lens",
+          "fragment": "tilt-shift lens with selective focus plane and miniature effect",
+          "thumb": "/axis-options/lens-type--tilt-shift-lens.jpg"
+        },
+        {
+          "name": "Macro Lens",
+          "fragment": "macro lens with extreme close-up detail and shallow depth of field",
+          "thumb": "/axis-options/lens-type--macro-lens.jpg"
+        },
+        {
+          "name": "Fisheye Lens",
+          "fragment": "fisheye lens with extreme barrel distortion and 180-degree field of view",
+          "thumb": "/axis-options/lens-type--fisheye-lens.jpg"
+        },
+        {
+          "name": "Lensbaby Selective Focus",
+          "fragment": "Lensbaby lens with selective sweet spot focus and creative blur",
+          "thumb": "/axis-options/lens-type--lensbaby-selective-focus.jpg"
+        },
+        {
+          "name": "Holga Plastic Lens",
+          "fragment": "Holga plastic toy lens with heavy vignette light leaks and lo-fi aesthetic",
+          "thumb": "/axis-options/lens-type--holga-plastic-lens.jpg"
+        },
+        {
+          "name": "Catadioptric Mirror Lens",
+          "fragment": "catadioptric mirror lens with donut-shaped bokeh and compressed telephoto perspective",
+          "thumb": "/axis-options/lens-type--catadioptric-mirror-lens.jpg"
+        },
+        {
+          "name": "Soft-Focus Portrait Lens",
+          "fragment": "soft-focus portrait lens with dreamy glow and flattering skin smoothing",
+          "thumb": "/axis-options/lens-type--soft-focus-portrait-lens.jpg"
+        },
+        {
+          "name": "Voigtländer Nokton",
+          "fragment": "Voigtländer Nokton fast prime with smooth bokeh and vintage character",
+          "thumb": "/axis-options/lens-type--voigtl-nder-nokton.jpg"
+        },
+        {
+          "name": "ARRI Signature Prime",
+          "fragment": "ARRI Signature Prime large format lens with creamy bokeh and organic rendering",
+          "thumb": "/axis-options/lens-type--arri-signature-prime.jpg"
+        }
+      ]
+    },
+    {
+      "key": "filmstock",
+      "name": "Film Stock",
+      "max": 1,
+      "tokens": [
+        {
+          "name": "Kodak Vision3 500T",
+          "fragment": "Kodak Vision3 500T tungsten film stock with rich shadows and cinema color",
+          "thumb": "/axis-options/film-stock--kodak-vision3-500t.jpg"
+        },
+        {
+          "name": "Kodak Vision3 250D",
+          "fragment": "Kodak Vision3 250D daylight film stock with natural color and fine grain",
+          "thumb": "/axis-options/film-stock--kodak-vision3-250d.jpg"
+        },
+        {
+          "name": "Kodak Vision3 50D",
+          "fragment": "Kodak Vision3 50D fine grain daylight film with exceptional sharpness and detail",
+          "thumb": "/axis-options/film-stock--kodak-vision3-50d.jpg"
+        },
+        {
+          "name": "Kodak Ektachrome E100",
+          "fragment": "Kodak Ektachrome E100 reversal film with vivid saturated colors and fine grain",
+          "thumb": "/axis-options/film-stock--kodak-ektachrome-e100.jpg"
+        },
+        {
+          "name": "Kodak Portra 400",
+          "fragment": "Kodak Portra 400 with soft pastel tones beautiful skin rendering and fine grain",
+          "thumb": "/axis-options/film-stock--kodak-portra-400.jpg"
+        },
+        {
+          "name": "Kodak Portra 160",
+          "fragment": "Kodak Portra 160 with ultra-fine grain and subtle pastel color palette",
+          "thumb": "/axis-options/film-stock--kodak-portra-160.jpg"
+        },
+        {
+          "name": "Kodak Portra 800",
+          "fragment": "Kodak Portra 800 high speed film with visible grain and warm tones",
+          "thumb": "/axis-options/film-stock--kodak-portra-800.jpg"
+        },
+        {
+          "name": "Kodak Gold 200",
+          "fragment": "Kodak Gold 200 consumer film with warm golden tones and nostalgic quality",
+          "thumb": "/axis-options/film-stock--kodak-gold-200.jpg"
+        },
+        {
+          "name": "Kodak Ektar 100",
+          "fragment": "Kodak Ektar 100 with ultra-saturated colors high contrast and fine grain",
+          "thumb": "/axis-options/film-stock--kodak-ektar-100.jpg"
+        },
+        {
+          "name": "Kodak Tri-X 400",
+          "fragment": "Kodak Tri-X 400 black and white film with classic contrast and beautiful grain",
+          "thumb": "/axis-options/film-stock--kodak-tri-x-400.jpg"
+        },
+        {
+          "name": "Kodak T-MAX 400",
+          "fragment": "Kodak T-MAX 400 black and white with fine grain and smooth tonal range",
+          "thumb": "/axis-options/film-stock--kodak-t-max-400.jpg"
+        },
+        {
+          "name": "Fuji Pro 400H",
+          "fragment": "Fuji Pro 400H with soft pastel colors and smooth skin tones",
+          "thumb": "/axis-options/film-stock--fuji-pro-400h.jpg"
+        },
+        {
+          "name": "Fuji Velvia 50",
+          "fragment": "Fuji Velvia 50 with hyper-saturated colors and high contrast",
+          "thumb": "/axis-options/film-stock--fuji-velvia-50.jpg"
+        },
+        {
+          "name": "Fuji Provia 100F",
+          "fragment": "Fuji Provia 100F reversal film with natural colors and fine grain",
+          "thumb": "/axis-options/film-stock--fuji-provia-100f.jpg"
+        },
+        {
+          "name": "Fuji Superia 400",
+          "fragment": "Fuji Superia 400 consumer film with green-shifted tones and punchy colors",
+          "thumb": "/axis-options/film-stock--fuji-superia-400.jpg"
+        },
+        {
+          "name": "Fuji Eterna 500T",
+          "fragment": "Fuji Eterna 500T cinema tungsten film with subtle colors and clean shadows",
+          "thumb": "/axis-options/film-stock--fuji-eterna-500t.jpg"
+        },
+        {
+          "name": "Fuji Acros 100",
+          "fragment": "Fuji Acros 100 black and white with ultra-fine grain and deep blacks",
+          "thumb": "/axis-options/film-stock--fuji-acros-100.jpg"
+        },
+        {
+          "name": "CineStill 800T",
+          "fragment": "CineStill 800T tungsten film with halation glow around highlights and cinematic color",
+          "thumb": "/axis-options/film-stock--cinestill-800t.jpg"
+        },
+        {
+          "name": "CineStill 50D",
+          "fragment": "CineStill 50D daylight cinema film with fine grain and balanced color",
+          "thumb": "/axis-options/film-stock--cinestill-50d.jpg"
+        },
+        {
+          "name": "Ilford HP5 Plus",
+          "fragment": "Ilford HP5 Plus black and white with classic grain and wide exposure latitude",
+          "thumb": "/axis-options/film-stock--ilford-hp5-plus.jpg"
+        },
+        {
+          "name": "Ilford Delta 3200",
+          "fragment": "Ilford Delta 3200 high speed black and white with heavy grain and high contrast",
+          "thumb": "/axis-options/film-stock--ilford-delta-3200.jpg"
+        },
+        {
+          "name": "Ilford XP2 Super",
+          "fragment": "Ilford XP2 Super chromogenic black and white with smooth tones and C-41 processing",
+          "thumb": "/axis-options/film-stock--ilford-xp2-super.jpg"
+        },
+        {
+          "name": "AGFA Vista 200",
+          "fragment": "AGFA Vista 200 consumer film with distinctive color shifts and retro aesthetic",
+          "thumb": "/axis-options/film-stock--agfa-vista-200.jpg"
+        },
+        {
+          "name": "Lomography 800",
+          "fragment": "Lomography 800 experimental film with unpredictable colors and artistic grain",
+          "thumb": "/axis-options/film-stock--lomography-800.jpg"
+        },
+        {
+          "name": "Fomapan 400",
+          "fragment": "Fomapan 400 Czech black and white with vintage rendering and strong grain",
+          "thumb": "/axis-options/film-stock--fomapan-400.jpg"
+        }
+      ]
+    },
+    {
+      "key": "lightsource",
+      "name": "Light Source",
+      "max": 2,
+      "tokens": [
+        {
+          "name": "Natural Sunlight",
+          "fragment": "natural sunlight with warm tones and organic shadows",
+          "thumb": "/axis-options/lighting-source--natural-sunlight.jpg"
+        },
+        {
+          "name": "Golden Hour",
+          "fragment": "golden hour warm sunlight with long shadows and orange glow",
+          "thumb": "/axis-options/lighting-source--golden-hour.jpg"
+        },
+        {
+          "name": "Blue Hour",
+          "fragment": "blue hour twilight with cool tones and soft ambient light",
+          "thumb": "/axis-options/lighting-source--blue-hour.jpg"
+        },
+        {
+          "name": "Overcast Diffused",
+          "fragment": "soft overcast diffused light with even illumination and no harsh shadows",
+          "thumb": "/axis-options/lighting-source--overcast-diffused.jpg"
+        },
+        {
+          "name": "Window Light",
+          "fragment": "soft window light with natural falloff and gentle shadows",
+          "thumb": "/axis-options/lighting-source--window-light.jpg"
+        },
+        {
+          "name": "Neon Lights",
+          "fragment": "colorful neon lights with vibrant color casts and urban glow",
+          "thumb": "/axis-options/lighting-source--neon-lights.jpg"
+        },
+        {
+          "name": "Moonlight",
+          "fragment": "cool moonlight with silver-blue tones and mysterious shadows",
+          "thumb": "/axis-options/lighting-source--moonlight.jpg"
+        },
+        {
+          "name": "Candlelight",
+          "fragment": "warm flickering candlelight with intimate golden glow",
+          "thumb": "/axis-options/lighting-source--candlelight.jpg"
+        },
+        {
+          "name": "Firelight",
+          "fragment": "warm dancing firelight with orange glow and flickering shadows",
+          "thumb": "/axis-options/lighting-source--firelight.jpg"
+        },
+        {
+          "name": "Fluorescent",
+          "fragment": "harsh fluorescent lighting with green cast and unflattering quality",
+          "thumb": "/axis-options/lighting-source--fluorescent.jpg"
+        },
+        {
+          "name": "Practical Lights",
+          "fragment": "practical lighting from visible in-scene sources like lamps and fixtures",
+          "thumb": "/axis-options/lighting-source--practical-lights.jpg"
+        },
+        {
+          "name": "Screen Glow",
+          "fragment": "cool screen glow illumination from computer or phone on face",
+          "thumb": "/axis-options/lighting-source--screen-glow.jpg"
+        },
+        {
+          "name": "Streetlights",
+          "fragment": "sodium vapor streetlight with orange cast and urban night atmosphere",
+          "thumb": "/axis-options/lighting-source--streetlights.jpg"
+        },
+        {
+          "name": "Car Headlights",
+          "fragment": "harsh car headlights cutting through darkness with dramatic beams",
+          "thumb": "/axis-options/lighting-source--car-headlights.jpg"
+        },
+        {
+          "name": "Studio Softbox",
+          "fragment": "professional softbox lighting with controlled soft illumination",
+          "thumb": "/axis-options/lighting-source--studio-softbox.jpg"
+        },
+        {
+          "name": "Ring Light",
+          "fragment": "ring light with even face illumination and catchlight in eyes",
+          "thumb": "/axis-options/lighting-source--ring-light.jpg"
+        },
+        {
+          "name": "LED Panel",
+          "fragment": "LED panel lighting with adjustable color temperature",
+          "thumb": "/axis-options/lighting-source--led-panel.jpg"
+        },
+        {
+          "name": "Harsh Midday Sun",
+          "fragment": "harsh overhead midday sun with strong shadows and high contrast",
+          "thumb": "/axis-options/lighting-source--harsh-midday-sun.jpg"
+        },
+        {
+          "name": "Laser Lights",
+          "fragment": "colorful laser lights cutting through haze with sharp beams",
+          "thumb": "/axis-options/lighting-source--laser-lights.jpg"
+        },
+        {
+          "name": "Torchlight",
+          "fragment": "warm flickering torchlight with dancing flames and medieval atmosphere",
+          "thumb": "/axis-options/lighting-source--torchlight.jpg"
+        }
+      ]
+    },
+    {
+      "key": "lightstyle",
+      "name": "Light Style",
+      "max": 1,
+      "tokens": [
+        {
+          "name": "High Key",
+          "fragment": "high key lighting with bright even illumination and minimal shadows",
+          "thumb": "/axis-options/lighting-style--high-key.jpg"
+        },
+        {
+          "name": "Low Key",
+          "fragment": "low key lighting with deep shadows and dramatic contrast",
+          "thumb": "/axis-options/lighting-style--low-key.jpg"
+        },
+        {
+          "name": "Chiaroscuro",
+          "fragment": "chiaroscuro lighting with strong contrast between light and dark areas",
+          "thumb": "/axis-options/lighting-style--chiaroscuro.jpg"
+        },
+        {
+          "name": "Rembrandt",
+          "fragment": "Rembrandt lighting with triangle of light on cheek and dramatic shadows",
+          "thumb": "/axis-options/lighting-style--rembrandt.jpg"
+        },
+        {
+          "name": "Loop Lighting",
+          "fragment": "loop lighting with small shadow beside nose creating depth",
+          "thumb": "/axis-options/lighting-style--loop-lighting.jpg"
+        },
+        {
+          "name": "Butterfly / Paramount",
+          "fragment": "butterfly lighting from directly above creating shadow under nose",
+          "thumb": "/axis-options/lighting-style--butterfly-paramount.jpg"
+        },
+        {
+          "name": "Split Lighting",
+          "fragment": "split lighting with half face illuminated and half in shadow",
+          "thumb": "/axis-options/lighting-style--split-lighting.jpg"
+        },
+        {
+          "name": "Rim / Edge Light",
+          "fragment": "rim lighting creating glowing edge outline and separation from background",
+          "thumb": "/axis-options/lighting-style--rim-edge-light.jpg"
+        },
+        {
+          "name": "Backlighting",
+          "fragment": "backlighting with light source behind subject creating silhouette",
+          "thumb": "/axis-options/lighting-style--backlighting.jpg"
+        },
+        {
+          "name": "Three-Point",
+          "fragment": "three-point lighting setup with key fill and back light",
+          "thumb": "/axis-options/lighting-style--three-point.jpg"
+        },
+        {
+          "name": "Volumetric",
+          "fragment": "volumetric lighting with visible light rays and atmospheric haze",
+          "thumb": "/axis-options/lighting-style--volumetric.jpg"
+        },
+        {
+          "name": "Motivated Lighting",
+          "fragment": "motivated lighting justified by visible sources in the scene",
+          "thumb": "/axis-options/lighting-style--motivated-lighting.jpg"
+        },
+        {
+          "name": "Broad Lighting",
+          "fragment": "broad lighting illuminating the wider side of the face",
+          "thumb": "/axis-options/lighting-style--broad-lighting.jpg"
+        },
+        {
+          "name": "Short Lighting",
+          "fragment": "short lighting illuminating the narrow side of the face",
+          "thumb": "/axis-options/lighting-style--short-lighting.jpg"
+        },
+        {
+          "name": "Fill Flash",
+          "fragment": "fill flash balancing ambient light with subtle flash illumination",
+          "thumb": "/axis-options/lighting-style--fill-flash.jpg"
+        }
+      ]
+    },
+    {
+      "key": "atmosphere",
+      "name": "Atmosphere",
+      "max": 2,
+      "tokens": [
+        {
+          "name": "Cinematic",
+          "fragment": "cinematic dramatic atmosphere with film-like quality",
+          "thumb": "/axis-options/atmosphere--cinematic.jpg"
+        },
+        {
+          "name": "Moody",
+          "fragment": "moody contemplative atmosphere with emotional depth",
+          "thumb": "/axis-options/atmosphere--moody.jpg"
+        },
+        {
+          "name": "Mysterious",
+          "fragment": "mysterious enigmatic atmosphere with secrets and intrigue",
+          "thumb": "/axis-options/atmosphere--mysterious.jpg"
+        },
+        {
+          "name": "Melancholic",
+          "fragment": "melancholic sad atmosphere with nostalgic sorrow",
+          "thumb": "/axis-options/atmosphere--melancholic.jpg"
+        },
+        {
+          "name": "Tense",
+          "fragment": "tense suspenseful atmosphere with building anxiety",
+          "thumb": "/axis-options/atmosphere--tense.jpg"
+        },
+        {
+          "name": "Romantic",
+          "fragment": "romantic soft atmosphere with love and intimacy",
+          "thumb": "/axis-options/atmosphere--romantic.jpg"
+        },
+        {
+          "name": "Ethereal",
+          "fragment": "ethereal dreamlike atmosphere with otherworldly quality",
+          "thumb": "/axis-options/atmosphere--ethereal.jpg"
+        },
+        {
+          "name": "Gritty",
+          "fragment": "gritty raw atmosphere with harsh reality",
+          "thumb": "/axis-options/atmosphere--gritty.jpg"
+        },
+        {
+          "name": "Serene",
+          "fragment": "serene peaceful atmosphere with calm tranquility",
+          "thumb": "/axis-options/atmosphere--serene.jpg"
+        },
+        {
+          "name": "Ominous",
+          "fragment": "ominous foreboding atmosphere with sense of dread",
+          "thumb": "/axis-options/atmosphere--ominous.jpg"
+        },
+        {
+          "name": "Nostalgic",
+          "fragment": "nostalgic vintage atmosphere with memories of the past",
+          "thumb": "/axis-options/atmosphere--nostalgic.jpg"
+        },
+        {
+          "name": "Energetic",
+          "fragment": "energetic dynamic atmosphere with movement and excitement",
+          "thumb": "/axis-options/atmosphere--energetic.jpg"
+        },
+        {
+          "name": "Intimate",
+          "fragment": "intimate close personal atmosphere with private connection",
+          "thumb": "/axis-options/atmosphere--intimate.jpg"
+        },
+        {
+          "name": "Epic",
+          "fragment": "epic grand scale atmosphere with monumental importance",
+          "thumb": "/axis-options/atmosphere--epic.jpg"
+        },
+        {
+          "name": "Lonely",
+          "fragment": "lonely isolated atmosphere with solitude and emptiness",
+          "thumb": "/axis-options/atmosphere--lonely.jpg"
+        },
+        {
+          "name": "Whimsical",
+          "fragment": "whimsical playful atmosphere with fantastical charm",
+          "thumb": "/axis-options/atmosphere--whimsical.jpg"
+        },
+        {
+          "name": "Chaotic",
+          "fragment": "chaotic frantic atmosphere with disorder and urgency",
+          "thumb": "/axis-options/atmosphere--chaotic.jpg"
+        },
+        {
+          "name": "Hopeful",
+          "fragment": "hopeful optimistic atmosphere with light at the end",
+          "thumb": "/axis-options/atmosphere--hopeful.jpg"
+        },
+        {
+          "name": "Eerie",
+          "fragment": "eerie unsettling atmosphere with something not quite right",
+          "thumb": "/axis-options/atmosphere--eerie.jpg"
+        },
+        {
+          "name": "Triumphant",
+          "fragment": "triumphant victorious atmosphere with celebration and achievement",
+          "thumb": "/axis-options/atmosphere--triumphant.jpg"
+        }
+      ]
+    },
+    {
+      "key": "look",
+      "name": "Look & Feel",
+      "max": 1,
+      "tokens": [
+        {
+          "name": "Blade Runner 2049",
+          "fragment": "Blade Runner 2049 aesthetic neon fog dystopian future orange teal color grading",
+          "thumb": "/axis-options/look-and-feel--blade-runner-2049.jpg"
+        },
+        {
+          "name": "Dune",
+          "fragment": "Dune aesthetic desaturated warm tones vast scale epic desert",
+          "thumb": "/axis-options/look-and-feel--dune.jpg"
+        },
+        {
+          "name": "The Matrix",
+          "fragment": "The Matrix aesthetic green tint cyberpunk digital rain dark",
+          "thumb": "/axis-options/look-and-feel--the-matrix.jpg"
+        },
+        {
+          "name": "Drive",
+          "fragment": "Drive aesthetic neon noir synthwave pink blue nighttime Los Angeles",
+          "thumb": "/axis-options/look-and-feel--drive.jpg"
+        },
+        {
+          "name": "Her",
+          "fragment": "Her aesthetic soft warm pastels intimate romantic futuristic",
+          "thumb": "/axis-options/look-and-feel--her.jpg"
+        },
+        {
+          "name": "Mad Max Fury Road",
+          "fragment": "Mad Max Fury Road aesthetic orange teal high contrast apocalyptic desert chrome",
+          "thumb": "/axis-options/look-and-feel--mad-max-fury-road.jpg"
+        },
+        {
+          "name": "Moonlight",
+          "fragment": "Moonlight aesthetic blue purple intimate dreamlike soft focus",
+          "thumb": "/axis-options/look-and-feel--moonlight.jpg"
+        },
+        {
+          "name": "Interstellar",
+          "fragment": "Interstellar aesthetic vast cosmic IMAX documentary realism space",
+          "thumb": "/axis-options/look-and-feel--interstellar.jpg"
+        },
+        {
+          "name": "Joker",
+          "fragment": "Joker aesthetic gritty 1970s New York desaturated urban decay",
+          "thumb": "/axis-options/look-and-feel--joker.jpg"
+        },
+        {
+          "name": "Amelie",
+          "fragment": "Amelie aesthetic warm golden green whimsical French romantic",
+          "thumb": "/axis-options/look-and-feel--amelie.jpg"
+        },
+        {
+          "name": "Wes Anderson",
+          "fragment": "Wes Anderson aesthetic symmetrical composition pastel colors whimsical centered framing",
+          "thumb": "/axis-options/look-and-feel--wes-anderson.jpg"
+        },
+        {
+          "name": "Tron Legacy",
+          "fragment": "Tron Legacy aesthetic neon blue orange black digital grid sleek futuristic",
+          "thumb": "/axis-options/look-and-feel--tron-legacy.jpg"
+        },
+        {
+          "name": "La La Land",
+          "fragment": "La La Land aesthetic vibrant saturated colors magical realism golden hour romantic",
+          "thumb": "/axis-options/look-and-feel--la-la-land.jpg"
+        },
+        {
+          "name": "Sicario",
+          "fragment": "Sicario aesthetic Roger Deakins desaturated tension dread silhouettes",
+          "thumb": "/axis-options/look-and-feel--sicario.jpg"
+        },
+        {
+          "name": "Neon Noir",
+          "fragment": "neon noir aesthetic rain-soaked streets vibrant neon reflections dark moody",
+          "thumb": "/axis-options/look-and-feel--neon-noir.jpg"
+        },
+        {
+          "name": "Classic Film Noir",
+          "fragment": "classic film noir aesthetic black and white high contrast shadows Venetian blinds",
+          "thumb": "/axis-options/look-and-feel--classic-film-noir.jpg"
+        },
+        {
+          "name": "Blade Runner 1982",
+          "fragment": "Blade Runner 1982 aesthetic Ridley Scott rain neon smoke retrofuturism",
+          "thumb": "/axis-options/look-and-feel--blade-runner-1982.jpg"
+        },
+        {
+          "name": "The Revenant",
+          "fragment": "The Revenant aesthetic natural light only epic wilderness raw visceral",
+          "thumb": "/axis-options/look-and-feel--the-revenant.jpg"
+        },
+        {
+          "name": "Gravity",
+          "fragment": "Gravity aesthetic space realism long takes earth from orbit blue marble",
+          "thumb": "/axis-options/look-and-feel--gravity.jpg"
+        },
+        {
+          "name": "Children of Men",
+          "fragment": "Children of Men aesthetic gritty documentary handheld dystopia single take",
+          "thumb": "/axis-options/look-and-feel--children-of-men.jpg"
+        },
+        {
+          "name": "Akira Anime",
+          "fragment": "Akira anime aesthetic cyberpunk Neo-Tokyo neon red motorcycle night",
+          "thumb": "/axis-options/look-and-feel--akira-anime.jpg"
+        },
+        {
+          "name": "Ghost in the Shell",
+          "fragment": "Ghost in the Shell aesthetic cyberpunk Hong Kong rain hologram futuristic",
+          "thumb": "/axis-options/look-and-feel--ghost-in-the-shell.jpg"
+        },
+        {
+          "name": "Ex Machina",
+          "fragment": "Ex Machina aesthetic minimalist modern architecture clean sterile tech",
+          "thumb": "/axis-options/look-and-feel--ex-machina.jpg"
+        },
+        {
+          "name": "Annihilation",
+          "fragment": "Annihilation aesthetic otherworldly bioluminescent alien nature surreal",
+          "thumb": "/axis-options/look-and-feel--annihilation.jpg"
+        },
+        {
+          "name": "The Dark Knight",
+          "fragment": "The Dark Knight aesthetic IMAX gritty urban night Gotham blue steel",
+          "thumb": "/axis-options/look-and-feel--the-dark-knight.jpg"
+        },
+        {
+          "name": "John Wick",
+          "fragment": "John Wick aesthetic neon club lighting high contrast action sleek",
+          "thumb": "/axis-options/look-and-feel--john-wick.jpg"
+        },
+        {
+          "name": "Sin City",
+          "fragment": "Sin City aesthetic black white red accent high contrast comic noir",
+          "thumb": "/axis-options/look-and-feel--sin-city.jpg"
+        },
+        {
+          "name": "Arrival",
+          "fragment": "Arrival aesthetic fog muted tones alien mystery contemplative",
+          "thumb": "/axis-options/look-and-feel--arrival.jpg"
+        },
+        {
+          "name": "Midsommar",
+          "fragment": "Midsommar aesthetic bright daylight horror pastoral Swedish folk",
+          "thumb": "/axis-options/look-and-feel--midsommar.jpg"
+        },
+        {
+          "name": "Hereditary",
+          "fragment": "Hereditary aesthetic dark domestic horror unsettling shadows dread",
+          "thumb": "/axis-options/look-and-feel--hereditary.jpg"
+        },
+        {
+          "name": "Analog Film Naturalism",
+          "fragment": "COLOR: Muted earth-tone palette shot on expired analog film stock. Warm highlights roll to golden amber, shadows pull to deep chocolate brown with subtle green-olive undertone in the deepest blacks. Desaturated overall — reds muted to brick and rust, greens muted to sage and olive, blues almost absent except in reflected sky. Skin tones sit in a narrow warm band from pale peach to deep umber, never orange or pink. Saturation 25-35%. Subtle color fringing at high-contrast edges from vintage lens optics. TONE: Medium-low key with crushed true blacks. Highlight rolloff is smooth and analog — no digital clipping, lights bloom softly at their edges. Midtones carry visible film grain — not digital noise but organic chemical grain with varying cluster sizes. Matte surface quality throughout, as if printed on fiber-based darkroom paper. Blacks are dense and tactile. Shadow detail present but requires the eye to search for it. SKIN: Rendered with extreme naturalism — every pore, fine hair, scar, and imperfection visible. Skin has a matte quality with natural oil sheen only where it would actually occur. Subsurface scattering visible in backlit ears and thin skin areas. Under-eye shadows are real and deep. Lighting on faces is environmental only — window light, fire light, overhead practical — never beauty or fashion lighting. Faces are underexposed and read as three-dimensional sculptural forms emerging from shadow. DEPTH: Pronounced depth separation with natural focus falloff. Background elements dissolve into soft warm bokeh with visible optical aberrations — swirly bokeh patterns, cats-eye shapes at frame edges. Focus plane is razor thin. Foreground objects fall off into gentle blur. Atmospheric haze and dust particles visible in light shafts adding volumetric depth between planes. TEXTURE: Every surface has tactile quality — wood grain, fabric weave, metal patina, stone roughness, paper fiber. The image has physical weight. Nothing looks CGI, nothing looks clean or new — everything has been used, touched, lived with",
+          "thumb": "/axis-options/look-and-feel--analog-film-naturalism.jpg"
+        },
+        {
+          "name": "Arid Golden — Neutral",
+          "fragment": "COLOR PALETTE:\n- Dominant hue: desaturated burnt sienna and raw umber earth tones\n- Secondary hue: dusty ochre and muted terracotta\n- Shadow tint: subtle cool undertone in shadows, barely \n  perceptible teal — more like a temperature drop than \n  a visible color shift\n- Highlight tint: warm amber-peach, never pure white\n- Skin tones: natural warm undertone, slightly desaturated \n  but retaining healthy warmth and subtle pink/peach \n  sub-surface — NOT color-shifted toward orange or teal\n- Black point: lifted to RGB(28, 26, 24), never true black, \n  milky and faded\n- SKY & DISTANCE: slightly cooler than foreground, shifting \n  toward neutral grey with a whisper of teal — NOT \n  obviously teal, just noticeably less warm than the \n  foreground earth tones\n- ENVIRONMENT SPLIT: warm earth tones in foreground/ground \n  plane, gradual subtle temperature cooling in distant \n  layers — the shift is felt more than seen\n\nTONE CURVE:\n- Lifted blacks (shadow floor at 8-10% luminance)\n- Crushed contrast in midtones (flat, matte look)\n- Rolled-off highlights (peak brightness never exceeds 88%)\n- Compressed dynamic range, low overall contrast\n- Gentle S-curve with flattened toe and shoulder\n\nLIGHT:\n- Golden hour backlight, sun at 15-20 degrees above horizon\n- Atmospheric haze diffusing background details\n- Soft volumetric dust particles in the air\n- Key light is natural sun, no artificial fill\n- Ratio approximately 4:1 (key to shadow)\n- Edge light rimming subject shoulders and hair\n\nDEPTH & FOCUS:\n- Shallow depth of field, f/2.0-2.8\n- Subject sharp, background falls off softly starting 3 meters behind\n- Slight halation glow on highlight edges (film bloom)\n- No chromatic aberration\n\nGRAIN & TEXTURE:\n- Fine analog film grain, 200-400 ISO equivalent\n- Grain visible in shadows and midtones, subtle in highlights\n- Organic, non-uniform grain structure (not digital noise)\n\nSATURATION MAP:\n- Global saturation: 60-65% (heavily desaturated)\n- Reds/oranges: pulled down to earthy brown, never vivid\n- Blues: nearly absent, shifted toward muted neutral-grey \n  with only the faintest cool lean\n- Greens: nonexistent or shifted to khaki-olive\n- Yellows: muted to dusty gold, never bright\n- Skin: PROTECTED — retains natural warmth and subtle \n  color variation, only slightly desaturated (~15%), \n  not flattened into the environment color cast\n\nATMOSPHERE:\n- Dusty, arid, fine particulate haze\n- Background loses contrast and sharpness progressively\n- Aerial perspective: distant layers shift toward \n  desaturated NEUTRAL-COOL GREY — not warm, not \n  obviously teal, just the absence of warmth\n- Sky: muted overcast, slightly cooler temperature than \n  foreground but still within the same earthy family — \n  no visible teal color, just a gentle cool lean\n- Subtle warm-to-neutral depth gradient: warm subject → \n  warm-neutral midground → neutral-cool background/sky",
+          "thumb": "/axis-options/look-and-feel--arid-golden-neutral.jpg"
+        },
+        {
+          "name": "Arid Golden — Teal Sky",
+          "fragment": "COLOR PALETTE:\n- Dominant hue: desaturated burnt sienna and raw umber earth tones\n- Secondary hue: dusty ochre and muted terracotta\n- Shadow tint: cool steel-teal undertone in all shadows\n- Highlight tint: warm amber-peach, never pure white\n- Skin tones: natural warm undertone, slightly desaturated \n  but retaining healthy warmth and subtle pink/peach \n  sub-surface — NOT color-shifted toward orange or teal\n- Black point: lifted to RGB(28, 26, 24), never true black, \n  milky and faded\n- SKY & DISTANCE: pushed toward desaturated teal-slate, \n  cool and muted, creating separation from warm foreground\n- ENVIRONMENT SPLIT: warm earth tones in foreground/ground \n  plane, progressively cooler teal-grey shift in sky, \n  atmosphere, and distant layers\n\nTONE CURVE:\n- Lifted blacks (shadow floor at 8-10% luminance)\n- Crushed contrast in midtones (flat, matte look)\n- Rolled-off highlights (peak brightness never exceeds 88%)\n- Compressed dynamic range, low overall contrast\n- Gentle S-curve with flattened toe and shoulder\n\nLIGHT:\n- Golden hour backlight, sun at 15-20 degrees above horizon\n- Atmospheric haze diffusing background details\n- Soft volumetric dust particles in the air\n- Key light is natural sun, no artificial fill\n- Ratio approximately 4:1 (key to shadow)\n- Edge light rimming subject shoulders and hair\n\nDEPTH & FOCUS:\n- Shallow depth of field, f/2.0-2.8\n- Subject sharp, background falls off softly starting 3 meters behind\n- Slight halation glow on highlight edges (film bloom)\n- No chromatic aberration\n\nGRAIN & TEXTURE:\n- Fine analog film grain, 200-400 ISO equivalent\n- Grain visible in shadows and midtones, subtle in highlights\n- Organic, non-uniform grain structure (not digital noise)\n\nSATURATION MAP:\n- Global saturation: 60-65% (heavily desaturated)\n- Reds/oranges: pulled down to earthy brown, never vivid\n- Blues: nearly absent, shifted toward teal-grey\n- Greens: nonexistent or shifted to khaki-olive\n- Yellows: muted to dusty gold, never bright\n- Skin: PROTECTED — retains natural warmth and subtle \n  color variation, only slightly desaturated (~15%), \n  not flattened into the environment color cast\n\nATMOSPHERE:\n- Dusty, arid, fine particulate haze\n- Background loses contrast and sharpness progressively\n- Aerial perspective: distant layers shift toward \n  desaturated COOL TEAL-GREY (not warm grey)\n- Sky: muted teal-slate overcast, distinctly cooler than \n  foreground earth tones\n- Clear warm-to-cool depth gradient: warm subject → \n  neutral midground → cool teal background/sky",
+          "thumb": "/axis-options/look-and-feel--arid-golden-teal-sky.jpg"
+        },
+        {
+          "name": "Bleached Earth — Sepia",
+          "fragment": "COLOR PALETTE:\n- Dominant hue: heavily desaturated burnt sienna and raw \n  umber, almost monochromatic earth tones approaching \n  sepia-neutral\n- Secondary hue: faded ochre and washed-out terracotta, \n  barely distinguishable from dominant hue\n- Shadow tint: neutral-cool, no visible color cast — just \n  the absence of warmth, like shade on an overcast day\n- Highlight tint: pale warm wash, cream-amber, soft and \n  bleached, never pure white\n- Skin tones: natural warm undertone preserved but sitting \n  inside the desaturated world — subtle healthy warmth \n  and pink/peach sub-surface visible only because \n  everything else is so muted around it\n- Black point: lifted to RGB(32, 30, 28), milky faded \n  blacks, no true shadows\n- SKY & DISTANCE: desaturated warm-grey haze, same earthy \n  family as foreground but progressively lighter and \n  more washed out — like looking through layers of fine \n  dust, NOT cool-tinted, just faded and pale\n- ENVIRONMENT SPLIT: foreground retains the most color \n  density, each layer behind loses saturation and \n  contrast until the furthest layer is nearly \n  monochrome warm grey\n\nTONE CURVE:\n- Lifted blacks (shadow floor at 10-12% luminance)\n- Crushed contrast in midtones (very flat, matte, \n  almost faded photograph feel)\n- Rolled-off highlights (peak brightness never exceeds 85%)\n- Heavily compressed dynamic range, very low contrast\n- Gentle S-curve with deeply flattened toe and shoulder\n\nLIGHT:\n- Golden hour backlight, sun at 15-20 degrees above horizon\n- Atmospheric haze diffusing background details\n- Soft volumetric dust particles in the air\n- Key light is natural sun, no artificial fill\n- Ratio approximately 4:1 (key to shadow)\n- Edge light rimming subject shoulders and hair\n\nDEPTH & FOCUS:\n- Shallow depth of field, f/2.0-2.8\n- Subject sharp, background falls off softly starting \n  3 meters behind\n- Slight halation glow on highlight edges (film bloom)\n- No chromatic aberration\n\nGRAIN & TEXTURE:\n- Fine analog film grain, 200-400 ISO equivalent\n- Grain visible in shadows and midtones, subtle in highlights\n- Organic, non-uniform grain structure (not digital noise)\n\nSATURATION MAP:\n- Global saturation: 45-50% (very heavily desaturated, \n  approaching bleach bypass territory)\n- Reds/oranges: deeply muted to dusty clay-brown, no \n  vibrancy whatsoever\n- Blues: completely absent, rendered as neutral grey\n- Greens: nonexistent, rendered as khaki-grey\n- Yellows: barely present, faded to pale dusty beige\n- Skin: PROTECTED — retains natural warmth relative to \n  environment but still lives inside the desaturated \n  world, approximately 20% desaturated, the warmth \n  reads because the surroundings are so drained\n\nATMOSPHERE:\n- Dusty, arid, fine particulate haze\n- Background loses contrast and sharpness progressively\n- Aerial perspective: distant layers fade toward pale \n  desaturated WARM GREY — like dust and distance \n  bleaching the color out, no cool shift, just \n  progressive color loss\n- Sky: pale washed-out warm grey, same temperature \n  family as the desert below but lighter and emptier — \n  like an overexposed hazy sky with all color bleached \n  away by dust and light\n- Depth gradient is purely about saturation and contrast \n  loss, NOT temperature shift: rich muted subject → \n  faded midground → nearly colorless pale background",
+          "thumb": "/axis-options/look-and-feel--bleached-earth-sepia.jpg"
+        },
+        {
+          "name": "Bright Yellow Blue - High Production",
+          "fragment": "bright warm ambient lighting, clean cream-beige metallic surfaces, glossy chrome and glass finishes, golden amber rim lights, blue only on digital screens, high production value, pristine clean environment, reflective polished floors, soft diffused overhead lighting, no dark shadows, bright and airy atmosphere",
+          "thumb": "/axis-options/look-and-feel--bright-yellow-blue-high-production.jpg"
+        },
+        {
+          "name": "Cinematic Beam Interior",
+          "fragment": "COLOR: Desaturated cinematic palette — muted warm tones grounded in ochre, raw umber, and burnt sienna. Subtle cool teal pushed into the shadows and wall surfaces only, never overpowering. Orange glow restricted to the transporter pad rings and ceiling light sources, not flooding the entire room. Global saturation around 40-45%. Skin tones remain natural and warm with minimal color cast, only the faintest amber kiss from the practical lights.\n\nTONE: Low contrast, matte finish. Lifted milky blacks that never crush to true black. Highlights capped at 80-85% brightness, pale cream-amber, never blown white. Midtones slightly flat and analog. Fine organic film grain throughout. Subtle halation glow around the brightest practical sources.\n\nLIGHTING — PRACTICAL TRANSPORTER BEAMS: The glowing orange pad rings on the floor are the primary low light source, casting warm uplight onto the characters' legs and torsos with natural falloff — brightest at the feet, fading to nothing by chest level. Matching circular ceiling lights cast a softer, cooler downlight. Where floor glow and ceiling light meet on each character, subtle luminous particles drift upward — fine, sparse, not overwhelming — like dust caught in a beam. The beams have a soft volumetric haze between floor ring and ceiling light, faintly visible, not solid columns. Room walls sit in darker, cooler teal-grey shadow with only edge-light spill from the pads. No flat ambient fill — the room breathes in darkness between the beam columns.\n\nRIMLIGHT: Each character catches a subtle cool-white rimlight from the ceiling source above their pad, tracing the edges of shoulders, head, and arms. This separates them from the dark background. The sumo wrestler's bare skin catches this rim most visibly.\n\nDEPTH: Shallow depth of field locked on the sumo wrestler. All crew members fall progressively softer the further from camera. Slight halation bloom around the floor pad rings. Fine analog grain, heavier in the shadows.",
+          "thumb": "/axis-options/look-and-feel--cinematic-beam-interior.jpg"
+        },
+        {
+          "name": "Cinematic Documentary Realism",
+          "fragment": "COLOR: Desaturated cinematic palette. Ochre, raw umber, burnt sienna dominate warm tones. Cool shadows carry barely perceptible teal undertone — not blue, just enough to separate from warm practicals. Overall saturation 30-40%. Only practicals and natural light sources provide warm accent. TONE: Low-key naturalistic exposure. True deep blacks, not lifted — real shadow density. Highlights capped at 85%, cream-amber rolloff on all light sources. Flat compressed midtones with gentle S-curve. Fine organic grain visible in shadow areas and midtones. Matte finish, zero digital sheen. SKIN: Faces rendered 1-2 stops under key light. Warm amber catch on forehead crown, bridge of nose, top of cheekbones from overhead or window source. Subtle warm bounce from below catching chin, jawline from reflected environmental surfaces — not a fill light, purely incidental spill. Shadow side of face falls to deep readable shadow with minimal cool ambient fill. Natural matte skin texture, visible pores, imperfections, real human detail. No beauty lighting, no retouching look. Characters are underlit — they read as dimensional humans emerging from shadow with selective warm detail. DEPTH: Three distinct depth planes — razor sharp subject, softly defocused middle ground, painterly bokeh background dissolving into warm abstract shapes. Anamorphic oval bokeh on background practicals and highlights. SEPARATION: Characters separate from background through edge definition and color temperature differential, not exposure. Thin warm practical rim on shoulder and head edge where light catches. Background sits at slightly cooler temperature than warm-lit character edges. Separation is architectural, environmental, and tonal — never artificial",
+          "thumb": "/axis-options/look-and-feel--cinematic-documentary-realism.jpg"
+        },
+        {
+          "name": "Deep Teal Cyan",
+          "fragment": "deep teal blue shadows, rich cyan undertones, cool blue-green atmosphere, desaturated teal mood, cinematic cool tones",
+          "thumb": "/axis-options/look-and-feel--deep-teal-cyan.jpg"
+        },
+        {
+          "name": "Low-Key Tube Interior",
+          "fragment": "COLOR: Desaturated cinematic. Ochre, raw umber, burnt sienna dominate. Walls hold a barely perceptible cool teal undertone — not blue, just enough to separate from the warm practicals. Saturation 30-35%. Screens and background practicals provide the only cool accent.\n\nTONE: Low-key exposure. Blacks crushed deep, not lifted — true dark shadows. Highlights capped at 80%, cream-amber rolloff on practicals. Flat compressed midtones. Fine grain visible in shadow areas. Matte finish, no sheen.\n\nSKIN: Faces 2-3 stops underexposed relative to practicals. Warm amber overhead catch on forehead crown, bridge of nose, top of cheekbones only. Subtle warm bounce from below catching chin, jawline, and collar armor — not a fill light, just reflected practical spill off surfaces. Shadow side of face falls to near-black with minimal cool ambient fill. Natural matte skin texture, visible pores. No beauty lighting. Characters are underlit — read as silhouettes with selective detail.\n\nPRACTICALS (TUBES): Ceiling tube practicals are the brightest element in frame. Warm amber-orange, small linear surface area. They define narrow hot lines on architecture edges and shoulders without flooding the room. Background practicals read as soft bokeh shapes. Tubes are accent sources not area lights — they illuminate edges, not volumes.\n\nPRACTICAL BOUNCE: Important characters receive subtle warm upward bounce off reflective armor, console surfaces, or floor — catching the underside of chin and jaw. This is environmental bounce, not a placed light. Keep it 1 stop below the overhead practical catch. This separates the lower face from the dark neck/chest shadow.\n\nDEPTH: Shallow DOF, f/1.4-2.0 equivalent. Background practicals dissolve into smooth warm bokeh. Characters sharp, environment soft. Foreground and background both fall off.\n\nSEPARATION: Characters separate from background through edge definition, not exposure. A thin warm practical rim on shoulder/head edge. Background walls sit at a slightly cooler color temperature than the warm-lit character edges. No backlight — separation is architectural and tonal, not lit.",
+          "thumb": "/axis-options/look-and-feel--low-key-tube-interior.jpg"
+        },
+        {
+          "name": "Lurpak Commercial",
+          "fragment": "COLOR: Warm commercial palette. Skin tones rich and natural with a warm amber-orange bias from directional sunlight — not oversaturated, just alive. Blacks lifted to soft grey-black (RGB 25-30), never crushed. Shadows retain warm charcoal with a faint cool blue-teal undertone on the opposite side of the key light, creating a natural orange-blue temperature split. Highlights roll off gently into creamy amber-white, never clipped. Overall saturation +10 above neutral, warm tones slightly richer, greens clean and natural, blues cool and controlled. \n\nTONE: Gentle S-curve. Lifted toe — no crushed blacks, shadow detail preserved throughout. Highlights bloom softly from the directional source, with a gentle halation glow around the strongest light edges (Black Pro-Mist 1/4 quality — softens specular without losing sharpness). Midtones warm and three-dimensional. Clean premium finish — zero grain, zero digital noise, zero harsh texture. \n\nLIGHT: Single dominant directional light source — late afternoon sun or harsh window — creating a bright diagonal band across the subject. Strong warm falloff from lit side to shadow side. The shadow side holds cool blue-grey ambient fill, never goes black. The temperature contrast between the orange lit side and the cool shadow side is the defining aesthetic quality.\n\nSKIN: Natural warmth, visible texture but not crunchy. Pores and subtle skin detail visible on the lit side. The bright diagonal light creates a bloom of warm highlight across the face — forehead, cheekbones, nose bridge. Shadow side of face falls to soft readable cool shadow with a barely perceptible blue undertone. No beauty retouching. Real faces, real texture. Highlight detail preserved.\n\nBOKEH: Background completely dissolved into ultra-creamy painterly bokeh. Anamorphic oval bokeh shapes on background light sources and highlights. Subtle anamorphic swirl at frame edges. Subject has clean edge separation — no artificial rim, just natural light separation. Foreground razor sharp on eyes and skin, rapid falloff into dreamy blur behind. \n\nLENS CHARACTER: Soft halation glow around brightest light edges — not a flare, just a gentle bloom. Subtle anamorphic breath and micro-distortion at frame edges. Premium commercial sharpness on subject. Horizontal anamorphic lens flare streaks if direct light source is in or near frame.",
+          "thumb": "/axis-options/look-and-feel--lurpak-commercial.jpg"
+        },
+        {
+          "name": "No",
+          "fragment": "-",
+          "thumb": "/axis-options/look-and-feel--no.jpg"
+        },
+        {
+          "name": "Practical Lit Interior",
+          "fragment": "Keep the exact scene, characters, poses, and composition unchanged. Apply this color grade and lighting:\n\nCOLOR: Heavily desaturated earth tones — burnt sienna, raw umber, almost monochromatic. Lifted milky blacks that never reach true black. Highlights are pale cream-amber, never pure white. Skin tones retain natural warmth but everything else is deeply muted. Global saturation around 45-50%.\n\nTONE: Flat, matte, low contrast. Crushed midtones. Lifted shadows. Rolled-off highlights capped at 85% brightness. Faded analog film feel with fine grain.\n\nLIGHTING — PRACTICAL ONLY: All light comes from visible in-scene sources — overhead kitchen lamps, grill heat glow, display case lights, any bulbs or neons in frame. These practical lights are the ONLY light sources. They create pools of warm light with natural falloff into deep shadow. Hard contrast between lit areas and unlit areas. Visible light spill, lens flare, and bloom around bright practicals. Volumetric haze from cooking steam or smoke catching the light beams. No flat ambient fill — shadows stay dark and moody.\n\nDEPTH: Shallow focus on the main character. Background falls off soft. Slight halation glow around practical light sources. Fine analog grain throughout.",
+          "thumb": "/axis-options/look-and-feel--practical-lit-interior.jpg"
+        },
+        {
+          "name": "Practical Silhouette",
+          "fragment": "COLOR: Desaturated. Ochre, burnt sienna, raw umber. Saturation 30%. Walls carry faint teal undertone. Only color comes from warm amber practicals and faint cool ambient.\n\nEXPOSURE: Characters are near-silhouettes. Faces 2-3 stops underexposed. Practicals are the only bright elements in frame. This is not natural lighting — this is darkness with selective detail. Crush the blacks. Do not illuminate characters — reveal them.\n\nPRACTICALS: Overhead amber tube lights are the sole key source. They catch only the crown of the head, bridge of the nose, top of shoulders. Narrow hot lines, not area light. They do not flood the room. Background practicals dissolve into warm bokeh shapes.\n\nBOTTOM BOUNCE: Subtle warm reflection from below — armor, consoles, reflective surfaces — catches the underside of jaw and chin. Faint. Not a fill light. Just enough to define the jaw edge against the dark neck.\n\nFACE RULE: Most of the face lives in shadow. You see forehead, nose bridge, and jaw catch — everything between is dark. Eyes barely visible in shadow. Matte skin, visible texture where light catches. No beauty light. No ambient fill.\n\nWALLS: Dark grey with subtle cool teal shift. Architecture detail visible but receding. 2-3 stops darker than practicals. Walls are backdrop, not environment.\n\nDEPTH: Shallow DOF. Background soft. Characters sharp against dissolved environment.\n\nCRITICAL — OVERRIDE DEFAULTS: Do not default to well-lit faces. Do not add ambient fill. Do not brighten eyes. Characters emerge from darkness, they are not placed in light. Think silhouette with selective warm edge detail, not portrait with moody color grade",
+          "thumb": "/axis-options/look-and-feel--practical-silhouette.jpg"
+        },
+        {
+          "name": "Punchy Golden Amber",
+          "fragment": "rich golden amber highlights, warm honey tones, bokeh light points, saturated yellow-gold accents, cinematic warmth",
+          "thumb": "/axis-options/look-and-feel--punchy-golden-amber.jpg"
+        },
+        {
+          "name": "Teal & Amber Commercial",
+          "fragment": "light teal shadows with golden amber highlights, cyan blue atmosphere, punchy yellow-gold & Blue accents, cinematic, Commercial color contrast. Not too dark. Light, lifted shadows.",
+          "thumb": "/axis-options/look-and-feel--teal-and-amber-commercial.jpg"
+        },
+        {
+          "name": "Teal & Gold Cinematic",
+          "fragment": "deep teal shadows with golden amber highlights, cyan blue atmosphere, punchy yellow-gold accents, cinematic color contrast, desaturated midtones with saturated highlights, wet reflective surfaces",
+          "thumb": "/axis-options/look-and-feel--teal-and-gold-cinematic.jpg"
+        },
+        {
+          "name": "Travel Style",
+          "fragment": "Anamorphic. Mixed color temperature: warm practical/window light on face, cooler ambient in shadows. Natural skin texture visible, visible pores, no foundation coverage. Skin highlight hot but not blown, shadows fall to deep brown not black. Subtle film grain, organic halation around bright sources. No digital processing look.",
+          "thumb": "/axis-options/look-and-feel--travel-style.jpg"
+        },
+        {
+          "name": "Warm Tube Interior",
+          "fragment": "COLOR: Desaturated cinematic, ochre raw umber burnt sienna. Teal-blue only on screens as cool digital light. Walls neutral warm grey, architecture recedes. Saturation 35-40%.\n\nTONE: Low contrast, lifted dark grey blacks. Highlights capped 85% cream-amber rolloff. Flat midtones. Fine grain in shadows. Matte finish.\n\nSKIN: Mixed color temp on faces, warm amber from tubes on lit side, cooler teal-blue fill from screens on shadow side. Natural matte skin, visible pores and texture. Soft gradual face shadows. Subtle subsurface scattering on ears and thin skin catching backlight.\n\nTUBES VS BACKGROUND: Ceiling tubes brightest element, warm amber-orange, small surface area. Defined warm lines on architecture without flooding walls. Walls between tubes 2-3 stops darker cool neutral grey holding panel detail. Tubes read as accents not room color.\n\nTUBES VS FACE: Tubes provide overhead key catching top of head shoulders bridge of nose with warm amber. Natural falloff down the face, chin and neck darker. Face sits 1.5-2 stops below the practicals. Characters lit by the environment not placed in front of it.\n\nDEPTH: Shallow DOF. Smooth bokeh.",
+          "thumb": "/axis-options/look-and-feel--warm-tube-interior.jpg"
+        },
+        {
+          "name": "Warm Tube Interior — Soft",
+          "fragment": "COLOR: Desaturated cinematic, ochre raw umber burnt sienna. Teal-blue only on screens as cool digital light. Walls neutral warm grey, architecture recedes. Saturation 35-40%.\n\nTONE: Low contrast, lifted dark grey blacks. Highlights capped 85% cream-amber rolloff. Flat midtones. Fine grain in shadows. Matte finish.\n\nSKIN: Mixed color temp on faces, warm amber from tubes on lit side, cooler teal-blue fill from screens on shadow side. Natural matte skin, visible pores and texture. Soft gradual face shadows. Subtle subsurface scattering on ears and thin skin catching backlight.\n\nTUBES VS BACKGROUND: Ceiling tubes brightest element, warm amber-orange, small surface area. Defined warm lines on architecture without flooding walls. Walls between tubes 2-3 stops darker cool neutral grey holding panel detail. Tubes read as accents not room color.\n\nTUBES VS FACE: Tubes provide overhead key catching top of head shoulders bridge of nose with warm amber. Natural falloff down the face, chin and neck darker. Face sits 1.5-2 stops below the practicals. Characters lit by the environment not placed in front of it.\n\nDEPTH: Shallow DOF. Smooth bokeh.",
+          "thumb": "/axis-options/look-and-feel--warm-tube-interior-soft.jpg"
+        }
+      ]
+    },
+    {
+      "key": "filter",
+      "name": "Filter / Effect",
+      "max": 2,
+      "tokens": [
+        {
+          "name": "Film Grain",
+          "fragment": "film grain texture organic analog noise",
+          "thumb": "/axis-options/filter-effect--film-grain.jpg"
+        },
+        {
+          "name": "Heavy Film Grain",
+          "fragment": "heavy film grain coarse texture high ISO noisy",
+          "thumb": "/axis-options/filter-effect--heavy-film-grain.jpg"
+        },
+        {
+          "name": "Lens Flare",
+          "fragment": "lens flare anamorphic light streaks",
+          "thumb": "/axis-options/filter-effect--lens-flare.jpg"
+        },
+        {
+          "name": "JJ Abrams Lens Flare",
+          "fragment": "heavy JJ Abrams style lens flare bright light streaks multiple sources",
+          "thumb": "/axis-options/filter-effect--jj-abrams-lens-flare.jpg"
+        },
+        {
+          "name": "Chromatic Aberration",
+          "fragment": "chromatic aberration color fringing RGB split edges",
+          "thumb": "/axis-options/filter-effect--chromatic-aberration.jpg"
+        },
+        {
+          "name": "Vignette",
+          "fragment": "vignette darkened edges center focus",
+          "thumb": "/axis-options/filter-effect--vignette.jpg"
+        },
+        {
+          "name": "Heavy Vignette",
+          "fragment": "heavy vignette dark corners dramatic spotlight effect",
+          "thumb": "/axis-options/filter-effect--heavy-vignette.jpg"
+        },
+        {
+          "name": "Bokeh",
+          "fragment": "beautiful bokeh creamy out of focus background shallow depth",
+          "thumb": "/axis-options/filter-effect--bokeh.jpg"
+        },
+        {
+          "name": "Anamorphic Bokeh",
+          "fragment": "anamorphic oval bokeh elliptical out of focus lights",
+          "thumb": "/axis-options/filter-effect--anamorphic-bokeh.jpg"
+        },
+        {
+          "name": "Motion Blur",
+          "fragment": "motion blur movement speed dynamic",
+          "thumb": "/axis-options/filter-effect--motion-blur.jpg"
+        },
+        {
+          "name": "Radial Blur",
+          "fragment": "radial blur zoom effect speed lines center focus",
+          "thumb": "/axis-options/filter-effect--radial-blur.jpg"
+        },
+        {
+          "name": "Soft Focus",
+          "fragment": "soft focus dreamy glow diffused light",
+          "thumb": "/axis-options/filter-effect--soft-focus.jpg"
+        },
+        {
+          "name": "Halation",
+          "fragment": "halation red glow highlights film bleeding light",
+          "thumb": "/axis-options/filter-effect--halation.jpg"
+        },
+        {
+          "name": "Light Leak",
+          "fragment": "light leak orange red warm film exposure artifact",
+          "thumb": "/axis-options/filter-effect--light-leak.jpg"
+        },
+        {
+          "name": "Dust and Scratches",
+          "fragment": "dust scratches vintage film damage aged worn",
+          "thumb": "/axis-options/filter-effect--dust-and-scratches.jpg"
+        },
+        {
+          "name": "VHS Distortion",
+          "fragment": "VHS distortion tracking lines scan lines retro analog",
+          "thumb": "/axis-options/filter-effect--vhs-distortion.jpg"
+        },
+        {
+          "name": "Glitch Effect",
+          "fragment": "glitch effect digital distortion RGB shift corrupt",
+          "thumb": "/axis-options/filter-effect--glitch-effect.jpg"
+        },
+        {
+          "name": "Double Exposure",
+          "fragment": "double exposure overlay multiple exposure composite",
+          "thumb": "/axis-options/filter-effect--double-exposure.jpg"
+        },
+        {
+          "name": "Prism Effect",
+          "fragment": "prism effect rainbow light refraction kaleidoscope",
+          "thumb": "/axis-options/filter-effect--prism-effect.jpg"
+        },
+        {
+          "name": "Tilt Shift",
+          "fragment": "tilt shift miniature effect selective focus toy-like",
+          "thumb": "/axis-options/filter-effect--tilt-shift.jpg"
+        },
+        {
+          "name": "Fog/Haze",
+          "fragment": "atmospheric fog haze mist diffused light soft",
+          "thumb": "/axis-options/filter-effect--fog-haze.jpg"
+        },
+        {
+          "name": "Smoke Effect",
+          "fragment": "smoke effect wispy atmospheric particles volumetric",
+          "thumb": "/axis-options/filter-effect--smoke-effect.jpg"
+        },
+        {
+          "name": "Rain Drops on Lens",
+          "fragment": "rain drops on lens water droplets wet glass",
+          "thumb": "/axis-options/filter-effect--rain-drops-on-lens.jpg"
+        },
+        {
+          "name": "Lens Frost",
+          "fragment": "frosted lens ice crystals cold frozen edges",
+          "thumb": "/axis-options/filter-effect--lens-frost.jpg"
+        },
+        {
+          "name": "Barrel Distortion",
+          "fragment": "barrel distortion fisheye curved edges wide angle",
+          "thumb": "/axis-options/filter-effect--barrel-distortion.jpg"
+        },
+        {
+          "name": "Split Diopter",
+          "fragment": "split diopter deep focus dual plane sharp foreground background",
+          "thumb": "/axis-options/filter-effect--split-diopter.jpg"
+        },
+        {
+          "name": "God Rays",
+          "fragment": "god rays volumetric light beams crepuscular rays divine",
+          "thumb": "/axis-options/filter-effect--god-rays.jpg"
+        },
+        {
+          "name": "Bloom Effect",
+          "fragment": "bloom effect bright glow soft highlights dreamy",
+          "thumb": "/axis-options/filter-effect--bloom-effect.jpg"
+        },
+        {
+          "name": "Pro Mist Filter",
+          "fragment": "pro mist filter softened highlights haloed glow film",
+          "thumb": "/axis-options/filter-effect--pro-mist-filter.jpg"
+        },
+        {
+          "name": "Black Pro Mist",
+          "fragment": "black pro mist subtle glow lowered contrast cinematic",
+          "thumb": "/axis-options/filter-effect--black-pro-mist.jpg"
+        }
+      ]
+    },
+    {
+      "key": "aspect",
+      "name": "Aspect Ratio",
+      "max": 1,
+      "tokens": [
+        {
+          "name": "2.39:1 Anamorphic",
+          "fragment": "2.39:1 anamorphic widescreen cinematic aspect ratio",
+          "thumb": "/axis-options/aspect-ratio--2-39-1-anamorphic.jpg"
+        },
+        {
+          "name": "2.35:1 Scope",
+          "fragment": "2.35:1 CinemaScope widescreen aspect ratio",
+          "thumb": "/axis-options/aspect-ratio--2-35-1-scope.jpg"
+        },
+        {
+          "name": "1.85:1 Theatrical",
+          "fragment": "1.85:1 theatrical widescreen aspect ratio",
+          "thumb": "/axis-options/aspect-ratio--1-85-1-theatrical.jpg"
+        },
+        {
+          "name": "16:9 HD",
+          "fragment": "16:9 HD widescreen aspect ratio",
+          "thumb": "/axis-options/aspect-ratio--16-9-hd.jpg"
+        },
+        {
+          "name": "4:3 Academy",
+          "fragment": "4:3 Academy ratio classic film aspect ratio",
+          "thumb": "/axis-options/aspect-ratio--4-3-academy.jpg"
+        },
+        {
+          "name": "1.33:1 Full Frame",
+          "fragment": "1.33:1 full frame classic aspect ratio",
+          "thumb": "/axis-options/aspect-ratio--1-33-1-full-frame.jpg"
+        },
+        {
+          "name": "9:16 Vertical",
+          "fragment": "9:16 vertical portrait aspect ratio",
+          "thumb": "/axis-options/aspect-ratio--9-16-vertical.jpg"
+        },
+        {
+          "name": "1:1 Square",
+          "fragment": "1:1 square aspect ratio",
+          "thumb": "/axis-options/aspect-ratio--1-1-square.jpg"
+        },
+        {
+          "name": "2.76:1 Ultra Panavision",
+          "fragment": "2.76:1 Ultra Panavision 70mm aspect ratio",
+          "thumb": "/axis-options/aspect-ratio--2-76-1-ultra-panavision.jpg"
+        },
+        {
+          "name": "1.66:1 European",
+          "fragment": "1.66:1 European widescreen aspect ratio",
+          "thumb": "/axis-options/aspect-ratio--1-66-1-european.jpg"
+        }
+      ]
+    }
+  ],
+  "rules": {
+    "words_per_second": 2.5,
+    "soft_cut_budget": 6,
+    "micro_behaviour_block": "Every face stays alive: natural blink cadence, visible breath, a working throat, wet eyes with a real catchlight, and small asymmetric movements of brow, jaw and mouth. Reactions arrive a quarter second late, never instantly. Eyes are always focused on something specific, never vacant.",
+    "authoring_fps": 24
+  }
+}

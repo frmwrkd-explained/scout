@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --ink:#0D0E11; --surface:#101115; --surface-2:#14161B;
+  --raise:#1C1F26; --sunk:#0A0B0E; --void:#0B0C0E;
+  --line:#1B1E24; --border:#22252C; --border-2:#2A2E36; --border-3:#3A3F49;
+  --fg:#ECEEF2; --fg-soft:#C9CFD8; --fg-muted:#9AA3AF; --fg-faint:#7B8797;
+  --accent:#E3FF32; --accent-hover:#EEFF66; --accent-deep:#B8CC28; --on-accent:#141519;
+  --accent-05:rgba(227,255,50,.05);
+  --accent-12:rgba(227,255,50,.12);
+  --accent-35:rgba(227,255,50,.35);
+  --accent-60:rgba(227,255,50,.6);
+  --sand:#C9CFD8;
+  --ok:#3FCF8E; --warn:#F0B23A; --danger:#F05B54;
+  --marked:#5B9DFF;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--ink)}
+body{font-family:'Schibsted Grotesk',system-ui,sans-serif;color:var(--fg);-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+a:hover{color:var(--accent-hover)}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:9999px;border:3px solid var(--ink)}
+::-webkit-scrollbar-track{background:transparent}
+</style>
+</helmet>
+
+<div style="width:100%; min-height:900px; display:flex; flex-direction:column; background:var(--ink); font-family:'Schibsted Grotesk',system-ui,sans-serif">
+
+  <header style="height:48px; flex:none; display:flex; align-items:center; justify-content:space-between; gap:20px; padding:0 20px; background:var(--surface); border-bottom:1px solid var(--line)">
+    <div style="display:flex; align-items:center; gap:16px">
+      <span style="font-size:12px; font-weight:800; letter-spacing:.2em; color:var(--fg)">SCOUT</span>
+      <span style="width:1px; height:16px; background:var(--border)"></span>
+      <span style="font-size:9.5px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; color:var(--fg-muted)">{{ roleLabel }}</span>
+      <nav style="display:flex; align-items:center; gap:4px; margin-left:8px">
+        <span style="display:flex; align-items:center; height:26px; padding:0 11px; border-radius:6px; background:var(--raise); border:1px solid var(--border-3); color:var(--fg); font-size:11px; font-weight:600">Review</span>
+        <a href="Pipeline.dc.html" style="display:flex; align-items:center; height:26px; padding:0 11px; border-radius:6px; border:1px solid transparent; color:var(--fg-muted); font-size:11px; font-weight:500" style-hover="color:var(--fg-soft); border-color:var(--border-2)">Pipeline</a>
+        <a href="Record Detail.dc.html" style="display:flex; align-items:center; height:26px; padding:0 11px; border-radius:6px; border:1px solid transparent; color:var(--fg-muted); font-size:11px; font-weight:500" style-hover="color:var(--fg-soft); border-color:var(--border-2)">Record</a>
+      </nav>
+    </div>
+    <div style="display:flex; align-items:center; gap:16px">
+      <span style="font-size:9.5px; font-weight:800; letter-spacing:.14em; color:var(--fg-faint)">QUEUE</span>
+      <span style="font-family:'Spline Sans Mono',monospace; font-size:12px; font-weight:600; color:var(--fg-soft); font-variant-numeric:tabular-nums">{{ pos }} / {{ total }}</span>
+      <span style="width:1px; height:16px; background:var(--border)"></span>
+      <span style="font-family:'Spline Sans Mono',monospace; font-size:11px; font-weight:500; color:var(--fg-faint); font-variant-numeric:tabular-nums">{{ remaining }} WAITING</span>
+    </div>
+  </header>
+
+  <div style="height:2px; flex:none; background:var(--line)">
+    <div style="height:2px; background:var(--border-3); width:{{ pct }}"></div>
+  </div>
+
+  <main style="flex:1; display:flex; align-items:flex-start; justify-content:center; padding:44px 40px 40px; overflow:auto">
+    <div style="width:100%; max-width:780px; display:flex; flex-direction:column; gap:14px">
+
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:0 2px">
+        <span style="font-size:9.5px; font-weight:800; letter-spacing:.18em; text-transform:uppercase; color:var(--fg-muted)">Awaiting decision</span>
+        <span style="font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:500; color:var(--fg-faint); font-variant-numeric:tabular-nums">{{ recFile }}</span>
+      </div>
+
+      <article style="background:var(--surface-2); border:1px solid var(--border); border-radius:8px; overflow:hidden">
+
+        <div style="display:flex; gap:32px; padding:34px 40px 26px">
+          <div style="flex:none; width:96px; display:flex; flex-direction:column; gap:10px">
+            <span style="font-size:9px; font-weight:800; letter-spacing:.18em; color:var(--fg-muted)">SCORE</span>
+            <div style="display:flex; align-items:baseline; gap:4px">
+              <span style="font-family:'Spline Sans Mono',monospace; font-size:48px; font-weight:600; line-height:.9; color:var(--fg); font-variant-numeric:tabular-nums">{{ recScore }}</span>
+              <span style="font-family:'Spline Sans Mono',monospace; font-size:12px; font-weight:500; color:var(--fg-faint)">/10</span>
+            </div>
+            <div style="display:flex; gap:2px; height:7px" hint-placeholder-count="0">
+              <sc-for list="{{ ticks }}" as="t" hint-placeholder-count="10">
+                <span style="flex:1; border-radius:1px; background:{{ t.bg }}"></span>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:12px">
+            <h1 style="margin:0; font-size:34px; font-weight:500; letter-spacing:-.02em; line-height:1.1; color:var(--fg)">{{ recName }}</h1>
+            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px; font-family:'Spline Sans Mono',monospace; font-size:11.5px; font-weight:500; color:var(--fg-soft)">
+              <span>{{ recHandle }}</span>
+              <span style="color:var(--border-3)">/</span>
+              <span style="text-transform:uppercase; letter-spacing:.06em; color:var(--fg-muted)">{{ recPlatform }}</span>
+              <span style="color:var(--border-3)">/</span>
+              <span style="color:var(--fg-muted)">{{ recReach }}</span>
+            </div>
+            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px">
+              <span style="font-size:9px; font-weight:800; letter-spacing:.16em; color:var(--fg-muted)">FOUND VIA</span>
+              <span style="font-family:'Spline Sans Mono',monospace; font-size:11px; font-weight:500; color:var(--fg-soft); background:var(--sunk); border:1px solid var(--border); border-radius:6px; padding:2px 7px">{{ recVia }}</span>
+              <span style="font-size:9px; font-weight:800; letter-spacing:.16em; color:var(--fg-muted); margin-left:6px">SEEN</span>
+              <span style="font-family:'Spline Sans Mono',monospace; font-size:11px; font-weight:500; color:var(--fg-muted); font-variant-numeric:tabular-nums">{{ recSeen }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="border-top:1px solid var(--line); padding:26px 40px 28px; display:flex; flex-direction:column; gap:14px">
+          <span style="font-size:9.5px; font-weight:800; letter-spacing:.18em; color:var(--fg-muted)">WHY THE AGENT FLAGGED THIS</span>
+          <p style="margin:0; max-width:62ch; font-size:16.5px; font-weight:400; line-height:1.62; color:var(--fg-soft); text-wrap:pretty">{{ recWhy }}</p>
+        </div>
+
+        <div style="border-top:1px solid var(--line); padding:20px 40px; display:flex; align-items:center; gap:10px">
+          <span style="font-size:9px; font-weight:800; letter-spacing:.16em; color:var(--fg-muted); margin-right:4px">TAGS</span>
+          <sc-for list="{{ recTags }}" as="tag" hint-placeholder-count="3">
+            <span style="font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:500; color:var(--fg-muted); background:var(--raise); border:1px solid var(--border); border-radius:6px; padding:3px 8px">{{ tag }}</span>
+          </sc-for>
+        </div>
+
+        <div style="border-top:1px solid var(--line); padding:22px 40px 24px; display:flex; align-items:center; gap:20px">
+          <sc-if value="{{ hasShot }}" hint-placeholder-val="{{ true }}">
+            <div style="flex:none; width:150px; height:98px; border-radius:10px; background:var(--sunk); border:1px solid var(--border); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px">
+              <span style="font-size:9px; font-weight:800; letter-spacing:.16em; color:var(--fg-faint)">SCREENSHOT</span>
+              <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:var(--border-3); font-variant-numeric:tabular-nums">{{ recShotFile }}</span>
+            </div>
+          </sc-if>
+          <sc-if value="{{ noShot }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:none; width:150px; height:98px; border-radius:10px; background:var(--void); border:1px dashed var(--border-2); display:flex; align-items:center; justify-content:center">
+              <span style="font-size:9px; font-weight:800; letter-spacing:.16em; color:var(--fg-faint)">NO SCREENSHOT</span>
+            </div>
+          </sc-if>
+          <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:10px">
+            <span style="font-size:9px; font-weight:800; letter-spacing:.16em; color:var(--fg-muted)">EVIDENCE</span>
+            <a href="#" style="display:inline-flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600; color:var(--accent); width:fit-content" style-hover="color:var(--accent-hover)">
+              <span>Open {{ recPlatform }} profile</span>
+              <span style="font-family:'Spline Sans Mono',monospace; font-size:11px">&#8599;</span>
+            </a>
+            <span style="font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:500; color:var(--fg-faint)">{{ recUrl }}</span>
+          </div>
+        </div>
+
+        <div style="border-top:1px solid var(--border); background:var(--surface); padding:20px 40px 22px">
+          <sc-if value="{{ deciding }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:16px">
+              <div style="display:flex; align-items:center; gap:10px">
+                <button onClick="{{ onShortlist }}" style="display:flex; align-items:center; gap:10px; height:42px; padding:0 20px; border-radius:6px; background:var(--accent); color:var(--on-accent); font-size:13px; font-weight:600; transition:background 130ms ease" style-hover="background:var(--accent-hover)">
+                  <span>Shortlist</span>
+                  <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600; background:rgba(20,21,25,.16); border-radius:4px; padding:2px 6px">A</span>
+                </button>
+                <button onClick="{{ onRejectOpen }}" style="display:flex; align-items:center; gap:10px; height:42px; padding:0 18px; border-radius:6px; background:var(--raise); border:1px solid var(--border-2); color:var(--fg-soft); font-size:13px; font-weight:600; transition:border-color 130ms ease, color 130ms ease" style-hover="border-color:var(--border-3); color:var(--fg)">
+                  <span>Reject</span>
+                  <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600; background:var(--sunk); border:1px solid var(--border-2); border-radius:4px; padding:1px 5px; color:var(--fg-muted)">R</span>
+                </button>
+                <button onClick="{{ onSkip }}" style="display:flex; align-items:center; gap:10px; height:42px; padding:0 14px; border-radius:6px; color:var(--fg-muted); font-size:13px; font-weight:500; transition:color 130ms ease" style-hover="color:var(--fg-soft)">
+                  <span>Skip</span>
+                  <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600; border:1px solid var(--border-2); border-radius:4px; padding:1px 5px">S</span>
+                </button>
+              </div>
+              <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; letter-spacing:.06em; color:var(--fg-faint)">KEYBOARD ONLY IS FINE</span>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ rejecting }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex; flex-direction:column; gap:14px">
+              <div style="display:flex; align-items:center; gap:10px">
+                <span style="width:6px; height:6px; border-radius:9999px; background:var(--warn)"></span>
+                <span style="font-size:9.5px; font-weight:800; letter-spacing:.18em; color:var(--warn)">PICK A REASON &#8212; REQUIRED</span>
+                <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:var(--fg-faint); margin-left:auto">THIS IS THE ONLY LABEL THE AGENT LEARNS FROM</span>
+              </div>
+              <div style="display:flex; flex-wrap:wrap; gap:8px">
+                <sc-for list="{{ reasons }}" as="r" hint-placeholder-count="5">
+                  <button onClick="{{ r.pick }}" style="display:flex; align-items:center; gap:9px; height:38px; padding:0 14px 0 10px; border-radius:6px; background:var(--raise); border:1px solid var(--border-2); color:var(--fg-soft); font-size:12.5px; font-weight:500; transition:border-color 130ms ease, color 130ms ease, background 130ms ease" style-hover="border-color:var(--border-3); color:var(--fg); background:var(--surface-2)">
+                    <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600; background:var(--sunk); border:1px solid var(--border-2); border-radius:4px; padding:2px 6px; color:var(--fg-muted)">{{ r.key }}</span>
+                    <span>{{ r.label }}</span>
+                  </button>
+                </sc-for>
+                <button onClick="{{ onCancel }}" style="display:flex; align-items:center; gap:9px; height:38px; padding:0 14px; border-radius:6px; color:var(--fg-muted); font-size:12.5px; font-weight:500" style-hover="color:var(--fg-soft)">
+                  <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600; border:1px solid var(--border-2); border-radius:4px; padding:2px 6px">ESC</span>
+                  <span>Back</span>
+                </button>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </article>
+
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:2px 2px 0">
+        <span style="font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:500; color:var(--fg-faint)">NEXT &#8212; {{ nextName }}</span>
+        <span style="font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:500; color:var(--fg-faint)">{{ aheadCount }} MORE IN THIS BATCH</span>
+      </div>
+    </div>
+  </main>
+
+  <footer style="height:42px; flex:none; display:flex; align-items:center; justify-content:space-between; gap:20px; padding:0 20px; background:var(--surface); border-top:1px solid var(--line)">
+    <div style="display:flex; align-items:center; gap:18px">
+      <div style="display:flex; align-items:center; gap:7px">
+        <span style="font-size:9px; font-weight:800; letter-spacing:.16em; color:var(--fg-muted)">TODAY</span>
+        <span style="font-family:'Spline Sans Mono',monospace; font-size:11.5px; font-weight:600; color:var(--fg-soft); font-variant-numeric:tabular-nums">{{ dayTotal }}</span>
+      </div>
+      <span style="width:1px; height:14px; background:var(--border)"></span>
+      <div style="display:flex; align-items:center; gap:7px">
+        <span style="width:5px; height:5px; border-radius:9999px; background:var(--ok)"></span>
+        <span style="font-size:9px; font-weight:800; letter-spacing:.16em; color:var(--fg-muted)">SHORTLISTED</span>
+        <span style="font-family:'Spline Sans Mono',monospace; font-size:11.5px; font-weight:600; color:var(--fg-soft); font-variant-numeric:tabular-nums">{{ cShort }}</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:7px">
+        <span style="width:5px; height:5px; border-radius:9999px; background:var(--danger)"></span>
+        <span style="font-size:9px; font-weight:800; letter-spacing:.16em; color:var(--fg-muted)">REJECTED</span>
+        <span style="font-family:'Spline Sans Mono',monospace; font-size:11.5px; font-weight:600; color:var(--fg-soft); font-variant-numeric:tabular-nums">{{ cRej }}</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:7px">
+        <span style="width:5px; height:5px; border-radius:9999px; background:var(--border-3)"></span>
+        <span style="font-size:9px; font-weight:800; letter-spacing:.16em; color:var(--fg-muted)">SKIPPED</span>
+        <span style="font-family:'Spline Sans Mono',monospace; font-size:11.5px; font-weight:600; color:var(--fg-soft); font-variant-numeric:tabular-nums">{{ cSkip }}</span>
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:14px">
+      <span style="font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:500; color:var(--fg-faint)">{{ lastLabel }}</span>
+      <button onClick="{{ onUndo }}" style="display:flex; align-items:center; gap:8px; height:26px; padding:0 10px; border-radius:6px; border:1px solid var(--accent-35); color:var(--accent); font-size:11px; font-weight:600; transition:border-color 130ms ease, background 130ms ease" style-hover="border-color:var(--accent-60); background:var(--accent-05)">
+        <span>Undo</span>
+        <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600">&#8984;Z</span>
+      </button>
+    </div>
+  </footer>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;role&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Guest research&quot;,&quot;Sponsorship&quot;,&quot;Sales outreach&quot;,&quot;Production&quot;],&quot;default&quot;:&quot;Guest research&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Configuration&quot;},&quot;queueTotal&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:240,&quot;min&quot;:20,&quot;max&quot;:9999,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Configuration&quot;}}">
+class Component extends DCLogic {
+  state = {
+    idx: 0, mode: 'decide',
+    cShort: 7, cRej: 3, cSkip: 1, dayTotal: 199,
+    last: 'LAST \u2014 REJECTED / DUPLICATE / RAMON DIZON',
+    history: []
+  };
+
+  records = [
+    { name:'Maria Santos', handle:'@mariacooks', platform:'instagram', via:'#manilafoodie', score:9,
+      reach:'34k followers', seen:'2026-08-12', shot:true, shotFile:'mariacooks-0812.png',
+      file:'guests/maria-santos.md', url:'instagram.com/mariacooks',
+      why:'A nurse who started cooking on camera during the pandemic. She tells her own story rather than reviewing other people\u2019s \u2014 no brand deals in the last 40 posts. 34k followers and the comment section is people responding to her, not to the food.',
+      tags:['food','manila','storyteller'] },
+    { name:'Joel Ramirez', handle:'@joelbuildsboats', platform:'tiktok', via:'#boatbuilder', score:7,
+      reach:'11k followers', seen:'2026-08-12', shot:false, shotFile:'',
+      file:'guests/joel-ramirez.md', url:'tiktok.com/@joelbuildsboats',
+      why:'Builds wooden fishing boats in Navotas and films every stage of it. Talks openly about his father\u2019s yard closing in 2019 and what it took to reopen it under his own name. Low view counts, but the comments run long.',
+      tags:['craft','navotas','family business'] },
+    { name:'Ferdie Lim', handle:'ferdie.lim.94', platform:'facebook', via:'#tulongkabayan', score:8,
+      reach:'2.1k group reach', seen:'2026-08-11', shot:true, shotFile:'ferdielim-0811.png',
+      file:'guests/ferdie-lim.md', url:'facebook.com/ferdie.lim.94',
+      why:'Repairs donated wheelchairs out of his garage in Cainta and posts every finished unit alongside the person receiving it. Group posts only, no page, no monetisation of any kind. Names the donor every time.',
+      tags:['community','cainta','repair'] },
+    { name:'Trina Beltran', handle:'@trinaruns', platform:'instagram', via:'#manilarunners', score:6,
+      reach:'8.2k followers', seen:'2026-08-11', shot:true, shotFile:'trinaruns-0811.png',
+      file:'guests/trina-beltran.md', url:'instagram.com/trinaruns',
+      why:'Ran her first marathon eighteen months after a spinal injury and posts the training in full, including the weeks she misses. Two brand partnerships in the last 40 posts, both running gear.',
+      tags:['sport','recovery','manila'] }
+  ];
+
+  reasonList = ['off-target','bad data','duplicate','wrong tone','already contacted'];
+
+  componentDidMount(){
+    this.onKey = (e) => {
+      if (e.metaKey || e.ctrlKey) { if (e.key.toLowerCase() === 'z') { e.preventDefault(); this.undo(); } return; }
+      const k = e.key.toLowerCase();
+      if (this.state.mode === 'reject') {
+        if (k === 'escape') { e.preventDefault(); this.setState({ mode:'decide' }); return; }
+        const n = parseInt(e.key, 10);
+        if (n >= 1 && n <= 5) { e.preventDefault(); this.pick(this.reasonList[n-1]); }
+        return;
+      }
+      if (k === 'a') { e.preventDefault(); this.shortlist(); }
+      else if (k === 'r') { e.preventDefault(); this.setState({ mode:'reject' }); }
+      else if (k === 's') { e.preventDefault(); this.skip(); }
+    };
+    window.addEventListener('keydown', this.onKey);
+  }
+  componentWillUnmount(){ window.removeEventListener('keydown', this.onKey); }
+
+  rec(){ return this.records[this.state.idx % this.records.length]; }
+
+  commit(action, label){
+    const r = this.rec();
+    this.setState(s => ({
+      idx: (s.idx + 1) % this.records.length,
+      mode: 'decide',
+      dayTotal: s.dayTotal + 1,
+      cShort: s.cShort + (action === 'short' ? 1 : 0),
+      cRej: s.cRej + (action === 'rej' ? 1 : 0),
+      cSkip: s.cSkip + (action === 'skip' ? 1 : 0),
+      last: label + ' / ' + r.name.toUpperCase(),
+      history: s.history.concat([{ idx: s.idx, action, prevLast: s.last }])
+    }));
+  }
+  shortlist(){ this.commit('short', 'LAST \u2014 SHORTLISTED'); }
+  skip(){ this.commit('skip', 'LAST \u2014 SKIPPED'); }
+  pick(reason){ this.commit('rej', 'LAST \u2014 REJECTED / ' + reason.toUpperCase()); }
+  undo(){
+    this.setState(s => {
+      const h = s.history.slice();
+      const e = h.pop();
+      if (!e) return { last: 'LAST \u2014 NOTHING TO UNDO' };
+      return {
+        idx: e.idx, mode: 'decide', history: h, last: e.prevLast,
+        dayTotal: s.dayTotal - 1,
+        cShort: s.cShort - (e.action === 'short' ? 1 : 0),
+        cRej: s.cRej - (e.action === 'rej' ? 1 : 0),
+        cSkip: s.cSkip - (e.action === 'skip' ? 1 : 0)
+      };
+    });
+  }
+
+  renderVals(){
+    const r = this.rec();
+    const total = this.props.queueTotal ?? 240;
+    const pos = 12 + this.state.idx;
+    const next = this.records[(this.state.idx + 1) % this.records.length];
+    const ticks = [];
+    for (let i = 1; i <= 10; i++) ticks.push({ bg: i <= r.score ? 'var(--fg-soft)' : 'var(--border-2)' });
+    return {
+      roleLabel: this.props.role ?? 'Guest research',
+      recName: r.name, recHandle: r.handle, recPlatform: r.platform, recVia: r.via,
+      recScore: r.score, recReach: r.reach, recSeen: r.seen, recWhy: r.why,
+      recTags: r.tags, recFile: r.file, recUrl: r.url, recShotFile: r.shotFile,
+      hasShot: r.shot, noShot: !r.shot,
+      ticks,
+      pos, total, remaining: total - pos + 1,
+      pct: Math.round((pos / total) * 100) + '%',
+      nextName: next.name.toUpperCase(),
+      aheadCount: total - pos,
+      deciding: this.state.mode === 'decide',
+      rejecting: this.state.mode === 'reject',
+      reasons: this.reasonList.map((label, i) => ({ key: String(i+1), label, pick: () => this.pick(label) })),
+      cShort: this.state.cShort, cRej: this.state.cRej, cSkip: this.state.cSkip,
+      dayTotal: this.state.dayTotal, lastLabel: this.state.last,
+      onShortlist: () => this.shortlist(),
+      onRejectOpen: () => this.setState({ mode:'reject' }),
+      onSkip: () => this.skip(),
+      onCancel: () => this.setState({ mode:'decide' }),
+      onUndo: () => this.undo()
+    };
+  }
+}
+</script>
+</body>
+</html>

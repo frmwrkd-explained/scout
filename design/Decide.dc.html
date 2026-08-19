@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --ink:#0D0E11; --surface:#101115; --surface-2:#14161B;
+  --raise:#1C1F26; --sunk:#0A0B0E; --void:#0B0C0E;
+  --line:#1B1E24; --border:#22252C; --border-2:#2A2E36; --border-3:#3A3F49;
+  --fg:#ECEEF2; --fg-soft:#C9CFD8; --fg-muted:#9AA3AF; --fg-faint:#7B8797;
+  --accent:#E3FF32; --accent-hover:#EEFF66; --accent-deep:#B8CC28; --on-accent:#141519;
+  --accent-05:rgba(227,255,50,.05);
+  --accent-12:rgba(227,255,50,.12);
+  --accent-35:rgba(227,255,50,.35);
+  --accent-60:rgba(227,255,50,.6);
+  --sand:#C9CFD8;
+  --ok:#3FCF8E; --warn:#F0B23A; --danger:#F05B54;
+  --marked:#5B9DFF;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--ink)}
+body{font-family:'Schibsted Grotesk',system-ui,sans-serif;color:var(--fg);-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+a:hover{color:var(--accent-hover)}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;text-align:left}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:9999px;border:3px solid var(--ink)}
+::-webkit-scrollbar-track{background:transparent}
+</style>
+</helmet>
+
+<div style="width:100%; height:900px; display:flex; flex-direction:column; background:var(--ink); font-family:'Schibsted Grotesk',system-ui,sans-serif; overflow:hidden">
+
+  <div style="flex:1; min-height:0; display:flex">
+  <aside style="width:210px; flex:none; background:var(--surface); border-right:1px solid var(--line); display:flex; flex-direction:column; overflow:hidden">
+    <div style="flex:none; padding:10px 12px; border-bottom:1px solid var(--line)">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:7px 10px; border-radius:6px; background:var(--raise); border:1px solid var(--border-3)">
+        <span style="display:flex; flex-direction:column; gap:3px; min-width:0">
+          <span style="font-size:8.5px; font-weight:800; letter-spacing:.16em; color:var(--fg-faint)">PROJECT</span>
+          <span style="font-size:12.5px; font-weight:600; color:var(--fg); overflow:hidden; text-overflow:ellipsis; white-space:nowrap">2026-08 hazing</span>
+        </span>
+        <span style="font-family:'Spline Sans Mono',monospace; font-size:9px; color:var(--fg-muted)">&#9662;</span>
+      </div>
+    </div>
+    <div style="flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column">
+      <div style="padding:10px 12px; display:flex; flex-direction:column; gap:2px">
+          <span style="display:flex; align-items:center; justify-content:space-between; gap:8px; height:30px; padding:0 10px; border-radius:6px; background:var(--raise); border:1px solid var(--border-3); color:var(--fg); font-size:12px; font-weight:600; transition:background 130ms ease, color 130ms ease"><span>Needs you</span><span style="display:inline-flex; align-items:center; height:17px; padding:0 6px; border-radius:9999px; border:1px solid var(--warn); font-family:'Spline Sans Mono',monospace; font-size:9.5px; font-weight:600; color:var(--warn); font-variant-numeric:tabular-nums">6</span></span>
+          <a href="Today.dc.html" style="display:flex; align-items:center; justify-content:space-between; gap:8px; height:30px; padding:0 10px; border-radius:6px; border:1px solid transparent; color:var(--fg-muted); font-size:12px; font-weight:500; transition:background 130ms ease, color 130ms ease" style-hover="background:var(--surface-2); color:var(--fg-soft)"><span>Today</span></a>
+          <a href="Project.dc.html" style="display:flex; align-items:center; justify-content:space-between; gap:8px; height:30px; padding:0 10px; border-radius:6px; border:1px solid transparent; color:var(--fg-muted); font-size:12px; font-weight:500; transition:background 130ms ease, color 130ms ease" style-hover="background:var(--surface-2); color:var(--fg-soft)"><span>Project</span><span style="display:inline-flex; align-items:center; height:17px; padding:0 6px; border-radius:9999px; border:1px solid var(--border-2); font-family:'Spline Sans Mono',monospace; font-size:9.5px; font-weight:600; color:var(--fg-faint); font-variant-numeric:tabular-nums">8</span></a>
+      </div>
+      <div style="padding:6px 12px 10px; display:flex; flex-direction:column; gap:2px; border-top:1px solid var(--line)">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 10px 6px">
+          <span style="font-size:8.5px; font-weight:800; letter-spacing:.18em; color:var(--fg-muted)">COLLECTIONS</span>
+          <span style="font-family:'Spline Sans Mono',monospace; font-size:9px; font-weight:500; color:var(--fg-faint)">SAVED QUERIES</span>
+        </div>
+          <a href="Scout.dc.html" style="display:flex; align-items:center; justify-content:space-between; gap:8px; height:29px; padding:0 10px; border-radius:6px; transition:background 130ms ease" style-hover="background:var(--surface-2)"><span style="font-family:'Spline Sans Mono',monospace; font-size:11.5px; font-weight:500; color:var(--fg-muted)">#guest</span><span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:var(--fg-faint); font-variant-numeric:tabular-nums">147</span></a>
+          <a href="Scout.dc.html" style="display:flex; align-items:center; justify-content:space-between; gap:8px; height:29px; padding:0 10px; border-radius:6px; transition:background 130ms ease" style-hover="background:var(--surface-2)"><span style="font-family:'Spline Sans Mono',monospace; font-size:11.5px; font-weight:500; color:var(--fg-muted)">#group</span><span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:var(--fg-faint); font-variant-numeric:tabular-nums">12</span></a>
+          <a href="Scout.dc.html" style="display:flex; align-items:center; justify-content:space-between; gap:8px; height:29px; padding:0 10px; border-radius:6px; transition:background 130ms ease" style-hover="background:var(--surface-2)"><span style="font-family:'Spline Sans Mono',monospace; font-size:11.5px; font-weight:500; color:var(--fg-muted)">#task</span><span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:var(--fg-faint); font-variant-numeric:tabular-nums">8</span></a>
+          <a href="Scout.dc.html" style="display:flex; align-items:center; justify-content:space-between; gap:8px; height:29px; padding:0 10px; border-radius:6px; transition:background 130ms ease" style-hover="background:var(--surface-2)"><span style="font-family:'Spline Sans Mono',monospace; font-size:11.5px; font-weight:500; color:var(--fg-muted)">#topic</span><span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:var(--fg-faint); font-variant-numeric:tabular-nums">5</span></a>
+          <a href="Scout.dc.html" style="display:flex; align-items:center; justify-content:space-between; gap:8px; height:29px; padding:0 10px; border-radius:6px; transition:background 130ms ease" style-hover="background:var(--surface-2)"><span style="font-family:'Spline Sans Mono',monospace; font-size:11.5px; font-weight:500; color:var(--fg-muted)">#learning</span><span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:var(--fg-faint); font-variant-numeric:tabular-nums">24</span></a>
+        <a href="Scout.dc.html" style="display:flex; align-items:center; height:29px; padding:0 10px; border-radius:6px; color:var(--accent); font-family:'Spline Sans Mono',monospace; font-size:11.5px; font-weight:600" style-hover="background:var(--surface-2)">+ new collection</a>
+      </div>
+      <div style="padding:6px 12px 12px; display:flex; flex-direction:column; gap:2px; border-top:1px solid var(--line)">
+        <span style="font-size:8.5px; font-weight:800; letter-spacing:.18em; color:var(--fg-muted); padding:10px 10px 6px">ASSISTANTS</span>
+          <div style="display:flex; align-items:center; gap:9px; height:28px; padding:0 10px"><span style="flex:none; width:6px; height:6px; border-radius:9999px; background:var(--ok); border:1px solid var(--ok)"></span><span style="flex:1; font-family:'Spline Sans Mono',monospace; font-size:11px; font-weight:500; color:var(--fg-muted)">scout-fb</span><span style="font-family:'Spline Sans Mono',monospace; font-size:8.5px; font-weight:700; letter-spacing:.1em; color:var(--ok)">SWEEPING</span></div>
+          <div style="display:flex; align-items:center; gap:9px; height:28px; padding:0 10px"><span style="flex:none; width:6px; height:6px; border-radius:9999px; background:var(--ok); border:1px solid var(--ok)"></span><span style="flex:1; font-family:'Spline Sans Mono',monospace; font-size:11px; font-weight:500; color:var(--fg-muted)">vetter</span><span style="font-family:'Spline Sans Mono',monospace; font-size:8.5px; font-weight:700; letter-spacing:.1em; color:var(--ok)">CHECKING</span></div>
+          <div style="display:flex; align-items:center; gap:9px; height:28px; padding:0 10px"><span style="flex:none; width:6px; height:6px; border-radius:9999px; background:var(--warn); border:1px solid var(--warn)"></span><span style="flex:1; font-family:'Spline Sans Mono',monospace; font-size:11px; font-weight:500; color:var(--fg-muted)">writer</span><span style="font-family:'Spline Sans Mono',monospace; font-size:8.5px; font-weight:700; letter-spacing:.1em; color:var(--warn)">BLOCKED</span></div>
+      </div>
+    </div>
+    <div style="flex:none; border-top:1px solid var(--line); padding:8px 12px">
+      <span style="display:flex; align-items:center; height:28px; padding:0 10px; color:var(--fg-faint); font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600; letter-spacing:.1em">FILES ON DISK</span>
+    </div>
+  </aside>
+  <main style="flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden">
+
+  <div style="flex:none; height:40px; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:0 20px; background:var(--surface); border-bottom:1px solid var(--line)">
+    <div style="display:flex; align-items:center; gap:12px">
+      <span style="font-size:9px; font-weight:800; letter-spacing:.18em; color:var(--fg-muted)">DECIDE</span>
+      <span style="width:1px; height:14px; background:var(--border)"></span>
+      <span style="font-family:'Spline Sans Mono',monospace; font-size:12px; font-weight:600; color:var(--fg-soft); font-variant-numeric:tabular-nums">{{ pos }} / {{ total }}</span>
+      <span style="font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:500; color:var(--fg-faint); font-variant-numeric:tabular-nums">{{ ahead }} MORE WAITING</span>
+    </div>
+    <span style="font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:500; color:var(--fg-faint); font-variant-numeric:tabular-nums">{{ dayTotal }} DECIDED TODAY</span>
+  </div>
+
+  <div style="height:2px; flex:none; background:var(--line)">
+    <div style="height:2px; background:var(--border-3); width:{{ pct }}"></div>
+  </div>
+
+  <div style="flex:1; min-height:0; overflow-y:auto; display:flex; align-items:flex-start; justify-content:center; padding:36px 40px 32px">
+    <div style="width:100%; max-width:800px; display:flex; flex-direction:column; gap:12px">
+
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:0 2px">
+        <div style="display:flex; align-items:center; gap:10px">
+          <span style="display:inline-flex; align-items:center; height:20px; padding:0 9px; border-radius:6px; border:1px solid var(--border-2); font-family:'Spline Sans Mono',monospace; font-size:9px; font-weight:700; letter-spacing:.14em; color:var(--fg-muted)">{{ kind }}</span>
+          <span style="font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:500; color:var(--fg-faint)">{{ meta }}</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px">
+          <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; letter-spacing:.08em; color:var(--fg-faint)">{{ ageLabel }}</span>
+          <div style="display:flex; gap:2px; height:3px; width:36px">
+            <sc-for list="{{ fresh }}" as="f" hint-placeholder-count="5">
+              <span style="flex:1; border-radius:1px; background:{{ f.bg }}"></span>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+
+      <article style="background:var(--surface-2); border:1px solid var(--border); border-radius:8px; overflow:hidden">
+
+        <div style="display:flex; gap:32px; padding:36px 40px 28px">
+          <sc-if value="{{ hasScore }}" hint-placeholder-val="{{ true }}">
+            <div style="flex:none; width:92px; display:flex; flex-direction:column; gap:10px">
+              <span style="font-size:9px; font-weight:800; letter-spacing:.18em; color:var(--fg-muted)">SCORE</span>
+              <div style="display:flex; align-items:baseline; gap:4px">
+                <span style="font-family:'Spline Sans Mono',monospace; font-size:46px; font-weight:600; line-height:.9; color:var(--fg); font-variant-numeric:tabular-nums">{{ score }}</span>
+                <span style="font-family:'Spline Sans Mono',monospace; font-size:12px; font-weight:500; color:var(--fg-faint)">/10</span>
+              </div>
+              <div style="display:flex; gap:2px; height:6px">
+                <sc-for list="{{ ticks }}" as="t" hint-placeholder-count="10">
+                  <span style="flex:1; border-radius:1px; background:{{ t.bg }}"></span>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:14px">
+            <h1 style="margin:0; font-size:{{ headSize }}; font-weight:500; letter-spacing:-.015em; line-height:1.2; color:var(--fg); text-wrap:pretty">{{ head }}</h1>
+            <p style="margin:0; max-width:58ch; font-size:17px; font-weight:400; line-height:1.55; color:var(--fg-soft); text-wrap:pretty">{{ line }}</p>
+            <sc-if value="{{ hasSub }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex; flex-wrap:wrap; align-items:center; gap:9px; font-family:'Spline Sans Mono',monospace; font-size:11px; font-weight:500; color:var(--fg-muted)">
+                <sc-for list="{{ sub }}" as="s" hint-placeholder-count="3">
+                  <span style="color:{{ s.fg }}">{{ s.v }}</span>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+
+        <sc-if value="{{ hasArtifact }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:0 40px 28px">
+            <div style="padding:20px 22px; background:var(--sunk); border:1px solid var(--border); border-radius:6px; display:flex; flex-direction:column; gap:12px">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:12px">
+                <span style="font-family:'Spline Sans Mono',monospace; font-size:9.5px; font-weight:700; letter-spacing:.14em; color:var(--fg-faint)">{{ artifactMeta }}</span>
+                <button style="font-size:11.5px; font-weight:600; color:var(--accent)" style-hover="color:var(--accent-hover)">Edit the wording</button>
+              </div>
+              <p style="margin:0; font-size:14.5px; line-height:1.7; color:var(--fg-soft); text-wrap:pretty">{{ artifact }}</p>
+            </div>
+          </div>
+        </sc-if>
+
+        <div style="border-top:1px solid var(--line); padding:14px 40px; display:flex; align-items:center; gap:18px">
+          <button onClick="{{ onWhy }}" style="display:flex; align-items:center; gap:9px; font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:700; letter-spacing:.14em; color:{{ whyFg }}; transition:color 130ms ease" style-hover="color:var(--fg-soft)">
+            <span style="display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border:1px solid var(--border-2); border-radius:4px; font-size:8px">{{ whyCaret }}</span>
+            <span>WHY</span>
+            <span style="border:1px solid var(--border-2); border-radius:4px; padding:1px 5px; font-size:9px; color:var(--fg-faint)">W</span>
+          </button>
+          <sc-if value="{{ whyOpen }}" hint-placeholder-val="{{ false }}">
+            <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; letter-spacing:.1em; color:var(--fg-faint)">EVIDENCE IS ONE MORE CLICK, INSIDE</span>
+          </sc-if>
+        </div>
+
+        <sc-if value="{{ whyOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="border-top:1px solid var(--line); padding:24px 40px 26px; display:flex; flex-direction:column; gap:18px">
+            <p style="margin:0; max-width:64ch; font-size:14.5px; line-height:1.68; color:var(--fg-soft); text-wrap:pretty">{{ why }}</p>
+
+            <button onClick="{{ onEvidence }}" style="display:flex; align-items:center; gap:9px; width:fit-content; font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:700; letter-spacing:.14em; color:{{ evFg }}; transition:color 130ms ease" style-hover="color:var(--fg-soft)">
+              <span style="display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border:1px solid var(--border-2); border-radius:4px; font-size:8px">{{ evCaret }}</span>
+              <span>{{ evLabel }}</span>
+              <span style="border:1px solid var(--border-2); border-radius:4px; padding:1px 5px; font-size:9px; color:var(--fg-faint)">E</span>
+            </button>
+
+            <sc-if value="{{ evOpen }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex; gap:20px; padding:18px 20px; background:var(--sunk); border:1px solid var(--border); border-radius:6px">
+                <sc-if value="{{ hasShot }}" hint-placeholder-val="{{ false }}">
+                  <div style="flex:none; width:132px; height:88px; border-radius:10px; background:var(--void); border:1px solid var(--border); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px">
+                    <span style="font-size:9px; font-weight:800; letter-spacing:.16em; color:var(--fg-faint)">SCREENSHOT</span>
+                    <span style="font-family:'Spline Sans Mono',monospace; font-size:9.5px; font-weight:500; color:var(--border-3)">1080 &#215; 1350</span>
+                  </div>
+                </sc-if>
+                <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:9px">
+                  <sc-for list="{{ evidence }}" as="e" hint-placeholder-count="4">
+                    <div style="display:flex; gap:12px; align-items:baseline">
+                      <span style="flex:none; width:96px; font-family:'Spline Sans Mono',monospace; font-size:9.5px; font-weight:700; letter-spacing:.1em; color:var(--fg-faint)">{{ e.k }}</span>
+                      <span style="flex:1; min-width:0; font-family:'Spline Sans Mono',monospace; font-size:11px; font-weight:500; line-height:1.55; color:var(--fg-soft); font-variant-numeric:tabular-nums">{{ e.v }}</span>
+                    </div>
+                  </sc-for>
+                  <a href="#" style="font-size:11.5px; font-weight:600; color:var(--accent); width:fit-content; padding-top:2px" style-hover="color:var(--accent-hover)">{{ evLink }}</a>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <div style="border-top:1px solid var(--border); background:var(--surface); padding:20px 40px 22px">
+          <sc-if value="{{ deciding }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:16px">
+              <div style="display:flex; align-items:center; gap:10px">
+                <button onClick="{{ onYes }}" style="display:flex; align-items:center; gap:10px; height:44px; padding:0 22px; border-radius:6px; background:var(--accent); color:var(--on-accent); font-size:13.5px; font-weight:600; transition:background 130ms ease" style-hover="background:var(--accent-hover)">
+                  <span>{{ yesLabel }}</span>
+                  <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600; background:rgba(20,21,25,.16); border-radius:4px; padding:2px 6px">A</span>
+                </button>
+                <button onClick="{{ onNo }}" style="display:flex; align-items:center; gap:10px; height:44px; padding:0 18px; border-radius:6px; background:var(--raise); border:1px solid var(--border-2); color:var(--fg-soft); font-size:13.5px; font-weight:600; transition:border-color 130ms ease, color 130ms ease" style-hover="border-color:var(--border-3); color:var(--fg)">
+                  <span>{{ noLabel }}</span>
+                  <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600; background:var(--sunk); border:1px solid var(--border-2); border-radius:4px; padding:1px 5px; color:var(--fg-muted)">R</span>
+                </button>
+                <button onClick="{{ onSkip }}" style="display:flex; align-items:center; gap:10px; height:44px; padding:0 14px; border-radius:6px; color:var(--fg-muted); font-size:13.5px; font-weight:500; transition:color 130ms ease" style-hover="color:var(--fg-soft)">
+                  <span>Skip</span>
+                  <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600; border:1px solid var(--border-2); border-radius:4px; padding:1px 5px">S</span>
+                </button>
+              </div>
+              <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; letter-spacing:.06em; color:var(--fg-faint)">KEYBOARD ONLY IS FINE</span>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ rejecting }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex; flex-direction:column; gap:14px">
+              <div style="display:flex; align-items:center; gap:10px">
+                <span style="width:6px; height:6px; border-radius:9999px; background:var(--warn)"></span>
+                <span style="font-size:9.5px; font-weight:800; letter-spacing:.18em; color:var(--warn)">WHY NOT? &#8212; ONE KEY</span>
+                <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:500; color:var(--fg-faint); margin-left:auto">THIS IS THE ONLY THING THE AGENT LEARNS FROM</span>
+              </div>
+              <div style="display:flex; flex-wrap:wrap; gap:8px">
+                <sc-for list="{{ reasons }}" as="r" hint-placeholder-count="5">
+                  <button onClick="{{ r.pick }}" style="display:flex; align-items:center; gap:9px; height:38px; padding:0 14px 0 10px; border-radius:6px; background:var(--raise); border:1px solid var(--border-2); color:var(--fg-soft); font-size:12.5px; font-weight:500; transition:border-color 130ms ease, color 130ms ease, background 130ms ease" style-hover="border-color:var(--border-3); color:var(--fg); background:var(--surface-2)">
+                    <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600; background:var(--sunk); border:1px solid var(--border-2); border-radius:4px; padding:2px 6px; color:var(--fg-muted)">{{ r.key }}</span>
+                    <span>{{ r.label }}</span>
+                  </button>
+                </sc-for>
+                <button onClick="{{ onCancel }}" style="display:flex; align-items:center; gap:9px; height:38px; padding:0 14px; border-radius:6px; color:var(--fg-muted); font-size:12.5px; font-weight:500" style-hover="color:var(--fg-soft)">
+                  <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600; border:1px solid var(--border-2); border-radius:4px; padding:2px 6px">ESC</span>
+                  <span>Back</span>
+                </button>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </article>
+
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:2px 2px 0">
+        <span style="font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:500; color:var(--fg-faint)">NEXT &#8212; {{ nextLabel }}</span>
+        <span style="font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:500; color:var(--fg-faint); font-variant-numeric:tabular-nums">{{ ahead }} MORE WAITING</span>
+      </div>
+    </div>
+  </div>
+
+  <footer style="flex:none; height:42px; flex:none; display:flex; align-items:center; justify-content:space-between; gap:20px; padding:0 20px; background:var(--surface); border-top:1px solid var(--line)">
+    <div style="display:flex; align-items:center; gap:18px">
+      <div style="display:flex; align-items:center; gap:7px">
+        <span style="width:5px; height:5px; border-radius:9999px; background:var(--ok)"></span>
+        <span style="font-size:9px; font-weight:800; letter-spacing:.16em; color:var(--fg-muted)">YES</span>
+        <span style="font-family:'Spline Sans Mono',monospace; font-size:11.5px; font-weight:600; color:var(--fg-soft); font-variant-numeric:tabular-nums">{{ cYes }}</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:7px">
+        <span style="width:5px; height:5px; border-radius:9999px; background:var(--danger)"></span>
+        <span style="font-size:9px; font-weight:800; letter-spacing:.16em; color:var(--fg-muted)">NO</span>
+        <span style="font-family:'Spline Sans Mono',monospace; font-size:11.5px; font-weight:600; color:var(--fg-soft); font-variant-numeric:tabular-nums">{{ cNo }}</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:7px">
+        <span style="width:5px; height:5px; border-radius:9999px; background:var(--border-3)"></span>
+        <span style="font-size:9px; font-weight:800; letter-spacing:.16em; color:var(--fg-muted)">SKIPPED</span>
+        <span style="font-family:'Spline Sans Mono',monospace; font-size:11.5px; font-weight:600; color:var(--fg-soft); font-variant-numeric:tabular-nums">{{ cSkip }}</span>
+      </div>
+      <span style="width:1px; height:14px; background:var(--border)"></span>
+      <span style="font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:500; color:var(--fg-faint)">{{ srcFile }}</span>
+    </div>
+    <div style="display:flex; align-items:center; gap:14px">
+      <span style="font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:500; color:var(--fg-faint)">{{ lastLabel }}</span>
+      <button onClick="{{ onUndo }}" style="display:flex; align-items:center; gap:8px; height:26px; padding:0 10px; border-radius:6px; border:1px solid var(--accent-35); color:var(--accent); font-size:11px; font-weight:600; transition:border-color 130ms ease, background 130ms ease" style-hover="border-color:var(--accent-60); background:var(--accent-05)">
+        <span>Undo</span>
+        <span style="font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:600">&#8984;Z</span>
+      </button>
+    </div>
+  </footer>
+  </main>
+  </div>
+  <footer style="flex:none; height:38px; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:0 18px; background:var(--surface); border-top:1px solid var(--border)">
+    <div style="display:flex; align-items:center; gap:11px; min-width:0">
+      <span style="flex:none; width:7px; height:7px; border-radius:9999px; background:var(--ok); box-shadow:0 0 0 3px rgba(63,207,142,.14)"></span>
+      <span style="font-family:'Spline Sans Mono',monospace; font-size:11px; font-weight:600; color:var(--fg-soft)">scout-fb</span>
+      <span style="font-size:12px; font-weight:400; color:var(--fg-muted)">sweeping Nurses PH</span>
+      <span style="font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:500; color:var(--fg-faint); font-variant-numeric:tabular-nums">12 MIN / 8 FOUND</span>
+      <span style="width:1px; height:13px; background:var(--border)"></span>
+      <span style="font-family:'Spline Sans Mono',monospace; font-size:10.5px; font-weight:500; color:var(--fg-faint)">writer &#183; WAITING ON YOU</span>
+    </div>
+    <div style="flex:none; display:flex; align-items:center; gap:12px">
+
+      <a href="Scout.dc.html" style="display:flex; align-items:center; gap:8px; height:26px; padding:0 11px; border-radius:6px; border:1px solid var(--border-2); color:var(--fg-muted); font-family:'Spline Sans Mono',monospace; font-size:10px; font-weight:700; letter-spacing:.1em" style-hover="border-color:var(--border-3); color:var(--fg-soft)"><span>ACTIVITY</span><span style="font-size:9px">&#9652;</span></a>
+    </div>
+  </footer>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  state = {
+    idx: 0, mode: 'decide', why: false, ev: false,
+    cYes: 9, cNo: 4, cSkip: 1, dayTotal: 14,
+    last: 'LAST \u2014 YES / JOINED CEBU CAREGIVERS',
+    history: []
+  };
+
+  personReasons = ['off-target','bad data','duplicate','wrong tone','already contacted'];
+  draftReasons = ['wrong tone','too long','breaks group rules','wrong group','not now'];
+  landReasons  = ['too small','off topic','already tried','risky','not now'];
+  brainReasons = ['not true','too soon','already known','wrong reason','not now'];
+
+  items = [
+    {
+      kind:'PERSON FOUND', meta:'FOUND BY GROUP CRAWLER / NURSES PH',
+      age:5, ageLabel:'FOUND 2D AGO', headSize:'34px',
+      head:'Maria Santos',
+      line:'A nurse who tells her own story on camera instead of reviewing other people\u2019s.',
+      sub:[{v:'@mariacooks'},{v:'INSTAGRAM'},{v:'34k followers'},{v:'#manilafoodie'}],
+      score:9, shot:true,
+      why:'She started cooking on camera during the pandemic, on night-shift rest days. There are no brand deals in her last 40 posts, which is unusual at her size. The comment section is people responding to her rather than to the food \u2014 that is the signal that has predicted your bookings so far.',
+      evidence:[
+        {k:'SIGNALS', v:'3 of 4 matched / own story, no brand deals, replies address her'},
+        {k:'SCANNED', v:'40 posts / 2026-06-14 \u2192 2026-08-12'},
+        {k:'SOURCE', v:'instagram.com/mariacooks'},
+        {k:'FIRST SEEN', v:'2026-08-12 08:02 / sweep 41 of 60'}
+      ],
+      evLink:'Open her Instagram profile',
+      yes:'Shortlist', no:'Reject', reasons:'person',
+      file:'guests/maria-santos.md'
+    },
+    {
+      kind:'DRAFT POST', meta:'WRITTEN BY OUTREACH / 06:09',
+      age:5, ageLabel:'WRITTEN 3H AGO', headSize:'27px',
+      head:'Post this introduction in Nurses PH?',
+      line:'Your best group. 12,400 members, and the mods delete anything with a link in it.',
+      sub:[{v:'FACEBOOK GROUP'},{v:'12,400 MEMBERS'},{v:'NO LINKS', fg:'var(--warn)'}],
+      artifact:'Hi everyone \u2014 I\u2019m a producer for a Philippine podcast about work and family. I\u2019m looking for nurses willing to tell their own story on camera: night shifts, migration, the money, the parts people don\u2019t see. Nothing to sign up for. If that\u2019s you or someone you know, comment here or message me and I\u2019ll explain how it works.',
+      artifactMeta:'DRAFT / 412 CHARS / NO LINKS / READY TO POST',
+      why:'People who introduce themselves in the feed get roughly three times more replies than the ones I message cold. I kept it under 450 characters because longer posts in this group stop getting comments, and I left out the link because the mods remove those.',
+      evidence:[
+        {k:'GROUP RULES', v:'"No links, no recruiting, no selling. Introduce yourself first."'},
+        {k:'LAST POSTED', v:'2026-06-14 / 31 comments / 2 bookings'},
+        {k:'MOD ACTION', v:'0 removals against you in this group'},
+        {k:'COMPARABLE', v:'Solo Parents PH 2026-07-02 / 19 comments / 1 booking'}
+      ],
+      evLink:'Open the group rules in the reader',
+      yes:'Approve and post', no:'Reject', reasons:'draft',
+      file:'documents/nurses-ph-intro-post.md'
+    },
+    {
+      kind:'NEW TERRITORY', meta:'PROPOSED BY SCOUT / 05:41',
+      age:4, ageLabel:'FOUND 4H AGO', headSize:'27px',
+      head:'Request to join Cebu Nurses Network?',
+      line:'3,100 members, and 71% of them also post in Nurses PH \u2014 your best group.',
+      sub:[{v:'FACEBOOK GROUP'},{v:'PRIVATE'},{v:'3,100 MEMBERS'},{v:'2 MODERATORS'}],
+      why:'Nurses PH has produced 4 of your last 6 bookings, and this group shares most of its members with far less competition in the feed. Requests here are approved by two moderators and usually take about three days. If they say no I will not ask again.',
+      evidence:[
+        {k:'OVERLAP', v:'71% / 2,201 of 3,100 members also in Nurses PH'},
+        {k:'ACTIVITY', v:'14 posts per day / 62% get comments'},
+        {k:'RULES', v:'"Members only. No selling. Admin approval for surveys."'},
+        {k:'RISK', v:'low / no history of removals for this kind of post'}
+      ],
+      evLink:'Open the group in the reader',
+      yes:'Request to join', no:'Reject', reasons:'land',
+      file:'territory/cebu-nurses-network.md'
+    },
+    {
+      kind:'MEMORY UPDATE', meta:'PROPOSED BY VETTER / 06:11',
+      age:5, ageLabel:'PROPOSED 3H AGO', headSize:'27px',
+      head:'Rank people who post video above people who post photos?',
+      line:'9 of your bookings posted video of themselves. 2 posted photos only.',
+      sub:[{v:'PLAYBOOK'},{v:'11 BOOKINGS EXAMINED'},{v:'NEW CLAIM', fg:'var(--marked)'}],
+      why:'Guests who already film themselves agree to a camera faster and drop out less often before the recording. I would apply this from tomorrow\u2019s sweep and keep it under review for 30 days. It changes the order people reach you in, not who gets found.',
+      evidence:[
+        {k:'BOOKED', v:'9 video / 2 photo-only / 0 text-only'},
+        {k:'DROPPED OUT', v:'1 of 9 video / 3 of 5 photo-only'},
+        {k:'RECORDS', v:'ramon-dizon, chinky-reyes, ana-villaflor, +8'},
+        {k:'AGAINST', v:'sample is small and all from nursing groups'}
+      ],
+      evLink:'Open the 11 bookings',
+      yes:'Save to memory', no:'Reject', reasons:'brain',
+      file:'memory/playbook.md'
+    },
+    {
+      kind:'SKILL CHANGE', meta:'PROPOSED BY SCOUT / 06:12',
+      age:5, ageLabel:'PROPOSED 3H AGO', headSize:'27px',
+      head:'Stop ranking people by follower count?',
+      line:'Your last 6 bookings averaged 9k followers. Every 40k account ignored you.',
+      sub:[{v:'SCOUT'},{v:'RANKING'},{v:'IN USE SINCE 12 JUN'}],
+      why:'Follower count has not predicted a single booking in your own data. Taking it out lets the strength of the story decide the order instead. Nothing else about how I find people changes, and you can put it back at any time.',
+      evidence:[
+        {k:'BOOKED', v:'6 people / 3.1k \u2013 34k followers / mean 9,240'},
+        {k:'NO REPLY', v:'14 people / 38k \u2013 210k followers'},
+        {k:'IN USE', v:'2026-06-12 \u2192 today / weight 0.3 of ranking'},
+        {k:'AFFECTS', v:'order only / no change to what gets found'}
+      ],
+      evLink:'Open the ranking log',
+      yes:'Change it', no:'Reject', reasons:'brain',
+      file:'agents/scout/ranking.md'
+    }
+  ];
+
+  componentDidMount(){
+    this.onKey = (e) => {
+      if (e.metaKey || e.ctrlKey) { if (e.key.toLowerCase() === 'z') { e.preventDefault(); this.undo(); } return; }
+      const k = e.key.toLowerCase();
+      if (this.state.mode === 'reject') {
+        if (k === 'escape') { e.preventDefault(); this.setState({ mode:'decide' }); return; }
+        const n = parseInt(e.key, 10);
+        if (n >= 1 && n <= 5) { e.preventDefault(); this.pick(this.reasonsFor(this.item())[n-1]); }
+        return;
+      }
+      if (k === 'a') { e.preventDefault(); this.commit('yes','LAST \u2014 YES'); }
+      else if (k === 'r') { e.preventDefault(); this.setState({ mode:'reject' }); }
+      else if (k === 's') { e.preventDefault(); this.commit('skip','LAST \u2014 SKIPPED'); }
+      else if (k === 'w') { e.preventDefault(); this.setState({ why: !this.state.why, ev: false }); }
+      else if (k === 'e' && this.state.why) { e.preventDefault(); this.setState({ ev: !this.state.ev }); }
+    };
+    window.addEventListener('keydown', this.onKey);
+  }
+  componentWillUnmount(){ window.removeEventListener('keydown', this.onKey); }
+
+  item(){ return this.items[this.state.idx % this.items.length]; }
+  reasonsFor(it){
+    return it.reasons === 'person' ? this.personReasons
+      : it.reasons === 'draft' ? this.draftReasons
+      : it.reasons === 'land' ? this.landReasons
+      : this.brainReasons;
+  }
+
+  commit(action, label){
+    const it = this.item();
+    this.setState(s => ({
+      idx: (s.idx + 1) % this.items.length,
+      mode:'decide', why:false, ev:false,
+      dayTotal: s.dayTotal + 1,
+      cYes: s.cYes + (action === 'yes' ? 1 : 0),
+      cNo: s.cNo + (action === 'no' ? 1 : 0),
+      cSkip: s.cSkip + (action === 'skip' ? 1 : 0),
+      last: label + ' / ' + it.head.replace(/\?$/, '').toUpperCase(),
+      history: s.history.concat([{ idx: s.idx, action, prevLast: s.last }])
+    }));
+  }
+  pick(reason){ this.commit('no', 'LAST \u2014 NO / ' + reason.toUpperCase()); }
+  undo(){
+    this.setState(s => {
+      const h = s.history.slice();
+      const e = h.pop();
+      if (!e) return { last:'LAST \u2014 NOTHING TO UNDO' };
+      return {
+        idx: e.idx, mode:'decide', why:false, ev:false, history:h, last: e.prevLast,
+        dayTotal: s.dayTotal - 1,
+        cYes: s.cYes - (e.action === 'yes' ? 1 : 0),
+        cNo: s.cNo - (e.action === 'no' ? 1 : 0),
+        cSkip: s.cSkip - (e.action === 'skip' ? 1 : 0)
+      };
+    });
+  }
+
+  renderVals(){
+    const it = this.item();
+    const total = 12;
+    const pos = 1 + (this.state.idx % this.items.length);
+    const next = this.items[(this.state.idx + 1) % this.items.length];
+    const ticks = [];
+    for (let i = 1; i <= 10; i++) ticks.push({ bg: i <= (it.score || 0) ? 'var(--fg-soft)' : 'var(--border-2)' });
+    const fresh = [];
+    for (let i = 1; i <= 5; i++) fresh.push({ bg: i <= it.age ? 'var(--fg-muted)' : 'var(--border)' });
+
+    return {
+      kind: it.kind, meta: it.meta, ageLabel: it.ageLabel, fresh,
+      head: it.head, headSize: it.headSize, line: it.line,
+      hasSub: !!it.sub, sub: (it.sub || []).map((s, i) => ({ v: (i > 0 ? '\u00b7 ' : '') + s.v, fg: s.fg || 'var(--fg-muted)' })),
+      hasScore: !!it.score, score: it.score || 0, ticks,
+      hasArtifact: !!it.artifact, artifact: it.artifact || '', artifactMeta: it.artifactMeta || '',
+
+      why: it.why,
+      whyOpen: this.state.why,
+      whyCaret: this.state.why ? '\u25BE' : '\u25B8',
+      whyFg: this.state.why ? 'var(--fg-soft)' : 'var(--fg-muted)',
+      onWhy: () => this.setState({ why: !this.state.why, ev: false }),
+
+      evOpen: this.state.ev,
+      evCaret: this.state.ev ? '\u25BE' : '\u25B8',
+      evFg: this.state.ev ? 'var(--fg-soft)' : 'var(--fg-muted)',
+      evLabel: this.state.ev ? 'EVIDENCE' : 'SHOW ME THE EVIDENCE',
+      onEvidence: () => this.setState({ ev: !this.state.ev }),
+      evidence: it.evidence, evLink: it.evLink, hasShot: !!it.shot,
+
+      pos, total, pct: Math.round((pos / total) * 100) + '%',
+      ahead: total - pos,
+      nextLabel: next.kind + ' / ' + next.head.replace(/\?$/, '').toUpperCase(),
+      srcFile: it.file,
+
+      yesLabel: it.yes, noLabel: it.no,
+      deciding: this.state.mode === 'decide',
+      rejecting: this.state.mode === 'reject',
+      reasons: this.reasonsFor(it).map((label, i) => ({ key: String(i+1), label, pick: () => this.pick(label) })),
+
+      cYes: this.state.cYes, cNo: this.state.cNo, cSkip: this.state.cSkip,
+      dayTotal: this.state.dayTotal, lastLabel: this.state.last,
+      onYes: () => this.commit('yes','LAST \u2014 YES'),
+      onNo: () => this.setState({ mode:'reject' }),
+      onSkip: () => this.commit('skip','LAST \u2014 SKIPPED'),
+      onCancel: () => this.setState({ mode:'decide' }),
+      onUndo: () => this.undo()
+    };
+  }
+}
+</script>
+</body>
+</html>
