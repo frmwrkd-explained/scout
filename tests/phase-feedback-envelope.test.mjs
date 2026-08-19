@@ -60,14 +60,15 @@ test('the envelope carries no key, no signed URL and no home path', () => {
   assert.ok(flat.includes('fal.media/files/x/out.png'), 'lost the failing URL path');
 });
 
-test('provider state is booleans, never values', () => {
-  freshRoot();
-  saveSettings({ groqApiKey: 'gsk_ShouldNeverAppearAnywhere012345' });
-  const env = buildEnvelope(loaded());
-  for (const v of Object.values(env.app.providers)) assert.equal(typeof v, 'boolean');
-  assert.ok(!JSON.stringify(env.app).includes('ShouldNeverAppear'));
-});
-
+// 'provider state is booleans, never values' lived here — envFacts() (backend/feedback.mjs) used to
+// derive a { providers: {fal, groq, kie, …: boolean} } block from settings, so a report could say
+// "no key configured" without ever carrying the key's value. The generation providers went with the
+// film domain on 2026-08-19 and envFacts() no longer reads settings into `app` AT ALL (build/node/
+// platform/arch/os/locale/tz only), so there is nothing left in env.app that could leak a setting
+// value in the first place — the leak this test checked for is now structurally impossible rather
+// than redaction-guarded. 'the context route leaks no secret and reports providers as booleans'
+// (below) still guards the same key-shaped-value question for the one place secrets DO still flow
+// through this file: the server log/api rings via the real redact() call.
 test("the reporter's own email survives; a third party's does not", () => {
   freshRoot();
   const env = buildEnvelope(loaded({ email: '  Ada@Example.COM ', body: 'cc bob@other.com please' }));
@@ -129,7 +130,8 @@ test('a report with no network is queued to the outbox, and says so', async () =
   const r = await req('POST', '/api/feedback', loaded());
   assert.equal(r.status, 200);
   assert.equal(r.body.queued, true);
-  assert.match(r.body.code, /^FF-[0-9A-Z]{4}$/);
+  // mintCode() (backend/feedback.mjs) prefixes 'SC-' now — 'FF-' was the FrameForge codename.
+  assert.match(r.body.code, /^SC-[0-9A-Z]{4}$/);
   // Never a silent success — the tester is told where their report actually is.
   assert.match(r.body.note, /Saved on this machine/);
   assert.ok(readOutbox(r.body.code).includes('"kind": "bug"'));
@@ -151,7 +153,7 @@ test('an empty report is refused rather than filed', async () => {
   assert.match(r.body.error, /title or a description/);
 });
 
-test('the context route leaks no secret and reports providers as booleans', async () => {
+test('the context route leaks no secret', async () => {
   freshRoot();
   saveSettings({ falApiKey: 'ctx-route-secret-value-1234', groqApiKey: 'gsk_CtxRouteSecret01234567' });
   const r = await req('GET', '/api/feedback/context');
@@ -159,7 +161,9 @@ test('the context route leaks no secret and reports providers as booleans', asyn
   const flat = JSON.stringify(r.body);
   assert.ok(!flat.includes('ctx-route-secret-value-1234'));
   assert.ok(!flat.includes('gsk_CtxRouteSecret'));
-  for (const v of Object.values(r.body.app.providers)) assert.equal(typeof v, 'boolean');
+  // This test used to also assert `r.body.app.providers` values were booleans — the generation
+  // providers went with the film domain and envFacts() no longer reports them at all (see the
+  // comment by the deleted 'provider state is booleans, never values' test, above).
 });
 
 test('a placeholder or malformed feedback URL behaves as unset, not as a broken service', async () => {
@@ -183,10 +187,10 @@ test('a placeholder or malformed feedback URL behaves as unset, not as a broken 
   }
 });
 
-test('turning the module off closes the egress route', async () => {
-  freshRoot();
-  saveSettings({ enabledModules: { feedback: false } });
-  const r = await req('POST', '/api/feedback', loaded());
-  assert.equal(r.status, 403);
-  assert.equal(r.body.code, 'module-disabled');
-});
+// 'turning the module off closes the egress route' lived here. The gate was never inside
+// feedback.mjs — a generic MODULE_ROUTES table + one `app.use('/api', …)` middleware in
+// backend/index.mjs matched each module's routes by path prefix and 403'd with code
+// 'module-disabled' when settings.enabledModules[id] was false. Both the middleware and
+// enabledModules went with the film domain on 2026-08-19 (no module list left to gate), so
+// /api/feedback — like every other route — is simply ungated now. If Scout wants a per-feature
+// kill-switch again, that middleware + settings.enabledModules is the shape it had.

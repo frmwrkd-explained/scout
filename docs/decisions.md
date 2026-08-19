@@ -162,3 +162,40 @@ Every `contacted` / `replied` / `won` record carries `updated_by: crystal`. Noth
 **Caught by:** a zero-hit search on a symbol I could see on the line with `sed`. The positive control returned nothing either, which is the tell — a broken pattern fails one way, an unreadable file fails both.
 **Fix:** one-pass replacer, no sentinel. `esc.replace(/\*\*|\*/g, m => m === '**' ? '.*' : '[^/]*')`.
 **Why it matters beyond this file:** `docs/FRAMEFORGE_CLAUDE.md` documents this exact bug costing hours in `backend/store.mjs`, and its rule — *never re-introduce a raw control byte; write the escape* — is one I broke within hours of reading it. Grep cannot police this, because grep is what is broken. Every source file is now scanned with a byte-level check instead; all clean.
+
+---
+
+## 2026-08-19 · M1 — REFERENCED BY
+
+### D4 · REFERENCED BY scans frontmatter POINTERS, not only declared `relation` fields
+**Q:** T05 §2 says "documents whose **frontmatter relation** points here". A `relation` is a typed field declared in a collection schema. Should the scan therefore consider only fields a collection declares as `type: relation`?
+
+**Choice:** No — scan frontmatter *values* across every document, and mark each hit `declared: true|false` according to whether some collection the source document belongs to declares that key as a relation.
+
+**Why:** T05's own Demonstrate is *"a guest referenced by a territory, a learning and a project brief"*. Territory and learnings are **memory objects** (`territory/<id>.md`, `learnings/<id>.md` — `docs/03_MEMORY.md` §1), not collection documents: they have no schema, so they have no declared relation field and never will. A declared-relations-only scan returns **zero** for that case, so it could not satisfy the task that specifies it. The `declared` flag is what preserves T05's other requirement — that this section be "structured and typed" — without narrowing it to the point of uselessness: the surface renders a typed relation with its `#collection`, and a loose pointer with only its origin, because `#` means "a collection" everywhere else in the app and printing `#territory` would be a lie.
+
+**What keeps it honest:** the match is **exact** against the names a document answers to (its filename slug and its `id:`), never a substring — otherwise every prose field mentioning a slug becomes a false backlink, and a backlink nobody can explain is worse than a missing one. `id`/`slug` are excluded (that is what a document *is*), and so are `created_by`/`updated_by`, which are HISTORY's job (T05 §4) and would otherwise bury three real references under one row per document an agent ever touched.
+
+### D5 · Following a reference had to be able to leave the open collection
+**Q:** Once REFERENCED BY crosses collections, clicking an entry selects a path that is not in the loaded rows. What should happen before T04's document surface exists?
+**Choice:** Fetch it via `GET /api/document` and show it in the inspector, read with **its own** collection's schema. The centre pane stays on the collection the person was browsing.
+**Why:** the alternative is a button that visibly does nothing — the first thing anyone clicks after seeing the section work. Law 8 says nothing is hidden from a human who wants to look, and a reference you cannot follow is a dead end, not a compression. This is deliberately *not* T04: no editing, no `Editor|Raw`, no properties-collapse — just the read.
+
+### Note · the client-side version was not a smaller version of this, it was wrong
+The previous `App.referencedBy()` computed backlinks from the rows of the **active collection** only. Every cross-collection reference — which is to say, nearly all of them — returned nothing, and the section rendered a confident `NOTHING POINTS HERE`. In the seeded workspace, opening Maria Santos showed `REFERENCED BY 0` while `data/groups/nurses-ph.md` had `top_finds: [maria-santos, …]` on disk. A section that answers "nothing" when it means "I did not look there" is worse than an absent section.
+
+---
+
+## 2026-08-19 · Two regressions the test repair surfaced
+
+### `syncAssets` silently stopped excluding references — and it was my edit
+**What happened:** removing the film asset vocabulary (`shared/assetKinds.mjs`), I replaced `assetKindOf(folder, overrides)` with the raw folder name. That dropped two behaviours, not one: the synonym table (film, correctly gone) **and the asset/reference split** (generic, and it should have stayed). `overrides` was still fetched and then never read, and the comment directly above went on describing an exclusion that no longer happened.
+**Fix:** the rule survives without the table. An explicit `context/_folders.md` override decides first; otherwise a file in a folder is an asset with the folder as its kind, and a file at the context root is a reference and is skipped. One rule, no vocabulary, and `overrides` is load-bearing again.
+**Why it matters:** the deleted code was film, but the *rule* it enforced was not. When you remove a mechanism, separate what it did from what it was for — the tests were still asserting the rule, which is the only reason this was caught.
+
+### `CORE_API_ROUTES` advertised 17 dead routes to every agent session
+`backend/agentHome.mjs` injects a route reference into **every** session. It listed 18 routes of which 17 had been deleted with the film domain — `/api/story/*`, `/api/stylelocks`, `/api/generate`, `/api/batches*`, `/api/manual/*`. An agent following it does not get a warning; it gets a 404 mid-job. Rewritten to the 19 routes that exist, with the M2–M5 capabilities **absent rather than promised**.
+
+### The guard for it was vacuous on the first attempt
+The test I wrote searched every `backend/*.mjs` for each advertised path — a corpus that **includes `agentHome.mjs` itself**, so every path matched its own declaration. It passed with a route called `/api/definitely-not-a-route` in the list. Fixed to scan actual `app.<method>('<path>')` registrations, and then *shown to fail* before being accepted.
+**The rule:** a guard that has not been observed failing is not a guard. Break the thing it protects, watch it go red, put it back.

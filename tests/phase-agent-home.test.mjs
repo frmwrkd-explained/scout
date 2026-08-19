@@ -6,6 +6,7 @@
 import './_env.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import fsx from 'node:fs';
 import { freshRoot, seedProject, req, getStorageRoot, writeMd, readMd, fs, path, paths } from './helpers.mjs';
 import { saveSettings } from '../backend/store.mjs';
 import {
@@ -71,9 +72,31 @@ test('Index lists house-rules only when active', () => {
 test('Core API reference is generated from declared route metadata', () => {
   const ref = renderCoreApiRef('http://127.0.0.1:5199');
   assert.match(ref, /http:\/\/127\.0\.0\.1:5199/);
-  assert.match(ref, /\/api\/stylelocks/);
+  assert.match(ref, /\/api\/collections/);
   assert.match(ref, /\/api\/chat\/sessions/);
   assert.match(ref, /\| Method \| Path \| What it does \|/);
+});
+
+// This reference is injected into EVERY agent session, so a stale line here is not a lint problem —
+// an agent following it gets a 404 in the middle of a job, with no warning. It sat at 18 routes of
+// which 17 had been deleted with the film domain, and the test above passed the whole time because
+// it only checked that SOME route was present.
+//
+// The corpus is the ROUTE REGISTRATIONS, not the source text. The first version of this guard
+// searched every backend .mjs — which includes agentHome.mjs itself, so each advertised path
+// matched its own declaration and the test passed with a route called
+// '/api/definitely-not-a-route' in the list. A guard has to be shown to fail.
+test('every route the agent reference advertises is actually registered', async () => {
+  const { CORE_API_ROUTES } = await import('../backend/agentHome.mjs');
+  const dir = new URL('../backend/', import.meta.url);
+  const registered = new Set();
+  for (const file of fsx.readdirSync(dir).filter(x => x.endsWith('.mjs'))) {
+    const src = fsx.readFileSync(new URL(file, dir), 'utf8');
+    for (const m of src.matchAll(/app\.(get|post|put|patch|delete)\(\s*'([^']+)'/g)) registered.add(m[2]);
+  }
+  assert.ok(registered.size > 40, 'sanity: found ' + registered.size + ' registered routes');
+  const missing = CORE_API_ROUTES.map(r => r.path).filter(p => !registered.has(p));
+  assert.deepEqual(missing, [], 'advertised to every agent session but never registered: ' + missing.join(', '));
 });
 
 // ── pack listing + enablement ──
@@ -127,9 +150,10 @@ test('isolation: the home skills dir excludes global skills; env relocates the c
   const session = { id: 'chat-iso-2', project: null, mode: 'agent', agentCommand: 'claude' };
   const home = prepareAgentHome({ session });
   const mounted = fs.readdirSync(path.join(home.home, 'skills')).sort();
-  // EXACTLY: router (system copy) + house-rules + the built-in storyboard pack (default ON) + the one
-  // enabled repo pack — nothing global. The built-in ships with the app; a global skill never leaks.
-  assert.deepEqual(mounted, ['scout-router', 'house-rules', 'storyboard-workflow', id].sort());
+  // EXACTLY: router (system copy) + house-rules + the one enabled repo pack — nothing global. The
+  // film workflow packs (storyboard-workflow among them) went with the film domain on 2026-08-19;
+  // BUILTIN_PACKS is now [] (backend/agentHome.mjs), so no built-in pack mounts by default any more.
+  assert.deepEqual(mounted, ['scout-router', 'house-rules', id].sort());
   assert.equal(mounted.includes('leak-me'), false, 'a global skill leaked into the isolated home');
 
   // the isolation env points the CLI at the home (so ~/.claude/skills never loads)

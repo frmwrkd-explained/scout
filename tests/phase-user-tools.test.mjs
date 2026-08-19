@@ -158,10 +158,16 @@ test('the tool-builder skill mounts only for a toolsmith session', () => {
   // It rides in ## Skill packs, not a section of its own — so the router's existing "one pack
   // matches → load its SKILL.md verbatim" rule fires without teaching the router a new contract.
   assert.match(smith.indexText, /## Skill packs\nscout-toolsmith — .*\[skills\/scout-toolsmith\]/);
-  assert.match(smith.indexText, /at most four questions/, "the pack's own description carries the method");
-  // its references ride along — the skill points at them and reads them only while drafting
-  assert.ok(fs.existsSync(path.join(smith.skillsDir, 'scout-toolsmith', 'references', 'anatomy.md')));
-  assert.ok(fs.existsSync(path.join(smith.skillsDir, 'scout-toolsmith', 'references', 'patterns.md')));
+  // backend/skills/scout-toolsmith/SKILL.md was rewritten as an "M0 stub" on 2026-08-19 (its
+  // film-tool-specific authoring method went with the domain; docs/decisions.md, M4 fills in the
+  // real guidance) — this now checks the pack's OWN current description rides into the index,
+  // rather than pinning to the old method's exact wording.
+  assert.match(smith.indexText, /reusable tool their assistants can call/, "the pack's own description carries into the index");
+  // Two more assertions lived here checking that a references/ folder (anatomy.md, patterns.md)
+  // rides along with the mounted pack. The M0 stub (see the comment above) is "the shape only" —
+  // its body no longer points at any reference docs, and the folder is gone with the rest of the
+  // old, film-tool-specific authoring method. Re-add this once M4 gives the pack real reference
+  // material to carry.
 });
 
 // ── mount safety (review regressions) ──────────────────────────────────────────────────

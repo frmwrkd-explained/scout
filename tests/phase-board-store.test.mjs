@@ -3,23 +3,32 @@
 // What is actually at risk here, and therefore what is tested:
 //   1. the document stays READABLE. This format exists so an agent can edit the board with the
 //      tools it already has; a canvas that writes 14-decimal floats defeats that on the first drag.
-//   2. sanitisation FAILS CLOSED. A node with an unknown kind, or a shot node with no shot id, is
-//      dropped rather than written — a malformed node on a canvas is an invisible click target.
+//   2. sanitisation FAILS CLOSED. A node with an unknown kind is dropped rather than written — a
+//      malformed node on a canvas is an invisible click target.
 //   3. align is idempotent and id-stable, because it is the one operation both a human button and
 //      an agent call reach.
 //   4. deleting a node takes its arrows with it. An arrow anchored to nothing renders as a stub.
 //   5. describeBoard never leaks coordinates — that route exists precisely so an agent's read of
 //      the board costs a paragraph rather than four hundred integers.
+//
+// Shots (and syncShots, which pulled them onto the board) went with the film domain on 2026-08-19.
+// board.mjs's own comments call this out as interim: NODE_KINDS (frontend/boardLayout.js, shared
+// with the UI) still lists 'shot' and is re-cut at T15, so cleanNode no longer has a shot-specific
+// branch at all — a bare `t: 'shot'` now sanitises like any other still-recognised kind instead of
+// requiring a `shot` id. Every assertion below that depended on shot nodes was removed at its old
+// site with a comment; the five risks above are still demonstrated, just through asset/note/frame
+// nodes instead. See docs/decisions.md.
 import './_env.mjs';
+import { writeFolderKind } from '../backend/memory.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { freshRoot, seedProject, seedShot, req } from './helpers.mjs';
+import { freshRoot, seedProject, req } from './helpers.mjs';
 import { readMd, paths } from '../backend/store.mjs';
 import {
   getBoard, saveBoard, addNodes, patchNodes, removeNodes,
-  syncShots, syncAssets, alignBoard, setShow, describeBoard, cleanNode, SHOW_MODES
+  syncAssets, alignBoard, setShow, describeBoard, cleanNode, SHOW_MODES
 } from '../backend/board.mjs';
 import { saveContextFile } from '../backend/store.mjs';
 
@@ -28,9 +37,6 @@ const boardFile = pid => path.join(paths.projectDir(pid), 'board.md');
 function seedBoardProject(pid = 'bd') {
   freshRoot();
   seedProject(pid);
-  seedShot(pid, 'SH010', { no: 1, scene: 1, title: 'Ferry leaves' });
-  seedShot(pid, 'SH020', { no: 2, scene: 1, title: 'Wheelhouse' });
-  seedShot(pid, 'SH030', { no: 3, scene: 2, title: 'Deck at night' });
   return pid;
 }
 
@@ -66,8 +72,11 @@ test('an unknown node kind is dropped, never written', () => {
   assert.equal(cleanNode({ t: 'wormhole', id: 'a' }, 'a'), null);
 });
 
-test('a shot node with no shot id and an asset with no name are both refused', () => {
-  assert.equal(cleanNode({ t: 'shot', id: 'a' }, 'a'), null);
+// A shot node with no shot id used to be refused here too. Shots went with the film domain on
+// 2026-08-19 and cleanNode no longer has a shot-specific branch at all, so a bare `t: 'shot'` now
+// sanitises like any other still-recognised kind (see the file header). The still-live half of
+// this rule — an asset with no name or no scope is refused — is what remains below.
+test('an asset with no name or no scope is refused', () => {
   assert.equal(cleanNode({ t: 'asset', id: 'a', scope: 'p' }, 'a'), null);
   assert.equal(cleanNode({ t: 'asset', id: 'a', name: 'x.png' }, 'a'), null);
   assert.ok(cleanNode({ t: 'asset', id: 'a', scope: 'p', name: 'x.png' }, 'a'));
@@ -140,27 +149,21 @@ test('deleting a node deletes the arrows attached to it', () => {
 });
 
 // ── sync + align ────────────────────────────────────────────────────────────────────────────────
-test('sync pulls in every shot once and never twice', () => {
-  const pid = seedBoardProject();
-  const first = syncShots(pid);
-  assert.equal(first.added.length, 3);
-  saveBoard(pid, { nodes: first.board.nodes });
-  const second = syncShots(pid);
-  assert.equal(second.added.length, 0, 'already-placed shots are left alone');
-});
-
-test('align populates an empty board rather than returning it empty', () => {
-  const pid = seedBoardProject();
-  const b = alignBoard(pid, 'scene-grid');
-  assert.equal(b.nodes.filter(n => n.t === 'shot').length, 3);
-  assert.equal(b.nodes.filter(n => n.t === 'frame').length, 2, 'one frame per scene');
-  assert.equal(b.layout, 'scene-grid');
-});
+// Two tests lived here: 'sync pulls in every shot once and never twice' (syncShots — the whole
+// function went with the film domain, see the file header) and 'align populates an empty board
+// rather than returning it empty' via scene-grid, which auto-populated FROM shots and now has
+// nothing to populate from (alignBoard hardcodes an empty shots list — backend/board.mjs). Both
+// rules still hold, demonstrated below through the still-live producer of auto-content: syncAssets
+// is idempotent ('syncAssets is idempotent — the same file never lands twice'), and 'production'/
+// 'by-kind' still populate an otherwise-empty board from assets ('the production layout populates
+// assets from an empty board', 'by-kind on an empty board pulls the assets in rather than
+// returning nothing').
 
 test('aligning twice is stable — same ids, same coordinates', () => {
   const pid = seedBoardProject();
-  const one = alignBoard(pid, 'scene-grid');
-  const two = alignBoard(pid, 'scene-grid');
+  seedAssets(pid);
+  const one = alignBoard(pid, 'by-kind');
+  const two = alignBoard(pid, 'by-kind');
   const key = b => b.nodes.map(n => [n.id, n.t, n.x, n.y].join(':')).sort().join('|');
   assert.equal(key(one), key(two));
 });
@@ -198,35 +201,45 @@ test('every operation appends to the board log — this is what makes an agent e
   alignBoard(pid, 'shot-strip');
   const log = getBoard(pid).log;
   assert.match(log, /agent added a note/);
-  assert.match(log, /auto-aligned · shot-strip — 3 shots, 2 scenes/);
+  // shot-strip has no shots to place any more (alignBoard hardcodes an empty shots list), so it
+  // passes the one note straight through — the log line now just counts nodes, not shots/scenes.
+  assert.match(log, /auto-aligned · shot-strip — 1 node/);
 });
 
 // ── the agent digest ────────────────────────────────────────────────────────────────────────────
+// describeBoard no longer returns a `shots` field at all (its shot-digest line went with syncShots
+// — see the file header), so this is built from frame/note/text nodes added directly rather than
+// from a scene-grid align, which has nothing left to auto-populate a frame from.
 test('describeBoard summarises without leaking coordinates', () => {
   const pid = seedBoardProject();
-  alignBoard(pid, 'scene-grid');
-  addNodes(pid, [{ t: 'note', text: 'keep the fog' }, { t: 'text', text: 'ACT ONE' }]);
+  addNodes(pid, [
+    { t: 'frame', label: 'SCENE 1' }, { t: 'frame', label: 'SCENE 2' },
+    { t: 'note', text: 'keep the fog' }, { t: 'text', text: 'ACT ONE' }
+  ]);
   const d = describeBoard(pid);
-  assert.equal(d.counts.shot, 3);
   assert.equal(d.counts.frame, 2);
-  assert.deepEqual(d.shots.sort(), ['SH010', 'SH020', 'SH030']);
+  assert.equal(d.counts.note, 1);
+  assert.equal(d.counts.text, 1);
   assert.deepEqual(d.frames, ['SCENE 1', 'SCENE 2']);
   assert.deepEqual(d.text.sort(), ['ACT ONE', 'keep the fog']);
   // the digest carries an overall extent but no per-node x/y — that is the whole point of it
   const json = JSON.stringify(d);
   assert.equal(json.includes('"x":'), true, 'bounds is present');
-  assert.equal(d.total, 7, "3 shots + 2 scene frames from the align, plus the note and the heading");
-  assert.equal(json.length < 600, true, 'a five-node board describes in well under a paragraph: ' + json.length);
+  assert.equal(d.total, 4, '2 frames + a note + a heading');
+  assert.equal(json.length < 600, true, 'a four-node board describes in well under a paragraph: ' + json.length);
 });
 
 // ── the document on disk ────────────────────────────────────────────────────────────────────────
 test('the board is plain markdown an agent can read: frontmatter record, log body', () => {
   const pid = seedBoardProject();
+  // scene-grid has no shots to place any more, so a hand-added node stands in for "a node record
+  // that actually landed on this board" — the rule under test (flat, readable YAML) is unchanged.
+  addNodes(pid, [{ t: 'note', text: 'x' }]);
   alignBoard(pid, 'scene-grid');
   const text = fs.readFileSync(boardFile(pid), 'utf8');
   assert.ok(text.startsWith('---\n'), 'frontmatter first');
   assert.match(text, /## Board log|auto-aligned/, 'and a human-readable body');
-  assert.match(text, /t: shot/, 'nodes are flat readable records');
+  assert.match(text, /t: note/, 'nodes are flat readable records');
   assert.ok(!/\d\.\d{6}/.test(text), 'no long floats anywhere in the document');
 });
 
@@ -237,21 +250,36 @@ test('the board is plain markdown an agent can read: frontmatter record, log bod
 function seedAssets(pid) {
   const png = Buffer.from('89504e470d0a1a0a', 'hex');   // a header is enough; nothing decodes these
   saveContextFile(pid, 'ferry-captain.png', png, 'cast');
-  saveContextFile(pid, 'deckhand.png', png, 'characters');   // synonym folder → same kind
+  saveContextFile(pid, 'deckhand.png', png, 'characters');
   saveContextFile(pid, 'harbour.png', png, 'locations');
   saveContextFile(pid, 'lantern.png', png, 'props');
-  saveContextFile(pid, 'grain-ref.png', png, 'moodboard');   // a REFERENCE board, not production
+  saveContextFile(pid, 'grain-ref.png', png, '');            // dropped at the ROOT — a reference
   saveContextFile(pid, 'notes.md', Buffer.from('# hi'), 'cast'); // not media
 }
 
-test('syncAssets pulls production assets only, and skips references and non-media', () => {
+// The film asset vocabulary (cast / locations / wardrobe / props, with synonyms) went with the film
+// domain on 2026-08-19. The RULE it enforced did not: a board that pulls in every loose reference
+// buries the useful cards. What decides asset-vs-reference now is the folder, plus an explicit
+// context/_folders.md override. These guard that, and they caught the day the exclusion silently
+// stopped happening because `overrides` was fetched and then ignored.
+test('syncAssets pulls filed assets only, and skips root-level references and non-media', () => {
   const pid = seedBoardProject();
   seedAssets(pid);
   const { added } = syncAssets(pid);
   const names = added.map(a => a.name).sort();
   assert.deepEqual(names, ['deckhand.png', 'ferry-captain.png', 'harbour.png', 'lantern.png']);
-  assert.equal(added.find(a => a.name === 'grain-ref.png'), undefined, 'the moodboard is a reference board');
+  assert.equal(added.find(a => a.name === 'grain-ref.png'), undefined, 'a file at the context root is a reference');
   assert.equal(added.find(a => a.name === 'notes.md'), undefined, 'a markdown note is not an asset card');
+});
+
+test('a per-folder override beats the default, in both directions', () => {
+  const pid = seedBoardProject();
+  seedAssets(pid);
+  writeFolderKind(pid, 'props', 'reference');   // demote a filed folder
+  writeFolderKind(pid, '', 'asset');            // promote the root
+  const names = syncAssets(pid).added.map(a => a.name).sort();
+  assert.ok(!names.includes('lantern.png'), 'props was demoted to a reference board');
+  assert.ok(names.includes('grain-ref.png'), 'the root was promoted, so its files are assets');
 });
 
 test('an asset node carries the identity triple plus its resolved kind', () => {
@@ -264,7 +292,7 @@ test('an asset node carries the identity triple plus its resolved kind', () => {
   assert.equal(cap.kind, 'cast');
   const hand = added.find(a => a.name === 'deckhand.png');
   assert.equal(hand.folder, 'characters');
-  assert.equal(hand.kind, 'cast', 'a synonym folder resolves to the canonical kind');
+  assert.equal(hand.kind, 'characters', 'the kind IS the folder name — no synonym table any more');
 });
 
 test('syncAssets is idempotent — the same file never lands twice', () => {
@@ -282,14 +310,17 @@ test('syncAssets can be narrowed to specific kinds', () => {
   assert.deepEqual(added.map(a => a.name), ['lantern.png']);
 });
 
-test('the production layout populates BOTH shots and assets from an empty board', () => {
+// 'production' used to run assets AND shots (the scenes below the cast/locations, per
+// boardLayout.js's own header). With no shots to place it reduces to exactly 'by-kind' — still
+// worth its own test, since a caller reasonably expects /production to keep working on its own.
+test('the production layout populates assets from an empty board', () => {
   const pid = seedBoardProject();
   seedAssets(pid);
   const b = alignBoard(pid, 'production');
-  assert.equal(b.nodes.filter(n => n.t === 'shot').length, 3, 'shots came in');
   assert.equal(b.nodes.filter(n => n.t === 'asset').length, 4, 'assets came in');
   const labels = b.nodes.filter(n => n.t === 'frame').map(f => f.label).sort();
-  assert.deepEqual(labels, ['CAST', 'LOCATIONS', 'PROPS', 'SCENE 1', 'SCENE 2']);
+  // four, not three: 'characters' is its own kind now that the synonym table is gone
+  assert.deepEqual(labels, ['CAST', 'CHARACTERS', 'LOCATIONS', 'PROPS']);
 });
 
 test('by-kind on an empty board pulls the assets in rather than returning nothing', () => {

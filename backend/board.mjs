@@ -292,10 +292,24 @@ export function syncAssets(pid, { kinds = null, folders = null, limit = 200 } = 
   for (const it of items) {
     if (added.length >= limit) break;
     if (!MEDIA_RE.test(it.name)) continue;
-    const kind = (it.folder || '').split('/').pop() || '';
-    // Default: production assets only. A board that pulled in every reference and note as well
-    // would bury the cast under the moodboard on the first click.
-    if (!kind) continue;
+    // ASSET or REFERENCE. FrameForge decided this from a film vocabulary (cast / locations /
+    // wardrobe / props, with synonyms) in shared/assetKinds.mjs, which went with the film domain.
+    // The *rule* it enforced is generic and stays: a board that pulled in every loose reference
+    // would bury the useful cards on the first click.
+    //
+    // What decides it now, in order:
+    //   1. an explicit per-folder override in context/_folders.md — 'asset' or 'reference'
+    //   2. otherwise: filed into a folder ⇒ asset, kind = the folder name
+    //                 dropped at the context root ⇒ reference, skipped
+    //
+    // One rule, no table, and `overrides` is load-bearing again — it was fetched and ignored for
+    // a while after the vocabulary was removed, which is how the reference exclusion silently
+    // stopped happening. T15 replaces this with Scout's own node kinds.
+    const folder = (it.folder || '').split('/').pop() || '';
+    const override = overrides[it.folder] || overrides[folder];
+    if (override === 'reference') continue;
+    if (!folder && override !== 'asset') continue;
+    const kind = folder;
     if (kinds && !kinds.includes(kind)) continue;
     if (folders && !folders.includes(it.folder)) continue;
     if (have.has(pid + '/' + (it.folder || '') + '/' + it.name)) continue;

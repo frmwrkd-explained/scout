@@ -93,9 +93,14 @@ export default function Inspector({ collection, doc, referencedBy = [], open, on
                 <button key={i} onClick={() => onOpen && onOpen(null, r.path)}
                   style={{ ...sx('display:flex;flex-direction:column;gap:3px;width:100%;text-align:left;padding:7px 0;cursor:pointer;background:transparent;border:none;border-bottom:1px solid var(--line)') }}>
                   <span style={sx('font-size:12px;font-weight:500;color:var(--fg-soft)')}>{r.title}</span>
-                  {/* the pointing FIELD name is the whole point of this section */}
+                  {/* The pointing FIELD name is the whole point of this section. A DECLARED
+                      relation is typed — it gets the marked colour and a #collection, because `#`
+                      means "a collection" everywhere else in this app. A loose frontmatter pointer
+                      from a memory object (territory/, learnings/) is a real reference but is not
+                      schema, so it says where it came from WITHOUT claiming to be a collection. */}
                   <span style={{ ...mono('font-size:9.5px;font-weight:500'), color: 'var(--fg-faint)' }}>
-                    <span style={{ color: 'var(--marked)' }}>{r.field}:</span> #{r.collection}
+                    <span style={{ color: r.declared ? 'var(--marked)' : 'var(--fg-muted)' }}>{r.field}:</span>
+                    {' '}{r.declared ? '#' + r.collection : r.source}
                   </span>
                 </button>
               ))

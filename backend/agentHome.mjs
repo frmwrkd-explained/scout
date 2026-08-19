@@ -247,25 +247,39 @@ export function setProjectTool(pid, id, enabled) {
 // ── the Core API route reference (GENERATED from declared metadata, never hand-maintained prose) ──
 // Declare the routes the router may drive; renderCoreApiRef() turns the metadata into the markdown
 // file the Index points at. Adding a route here regenerates the reference — no prose to keep in sync.
+// The route reference injected into EVERY agent session. It must describe routes that exist:
+// an agent following a stale line here does not get a warning, it gets a 404 in the middle of a
+// job. This list was 18 routes of which 17 had been deleted with the film domain, and nothing
+// caught it because a reference is not code — keep it honest by hand, and only add a line when the
+// route is real. Missing capabilities are M2-M5; they are absent rather than promised.
 export const CORE_API_ROUTES = [
-  { method: 'GET',  path: '/api/state', summary: 'Full app state: projects, items, shots, settings, skillRepos, integrations.' },
+  { method: 'GET',  path: '/api/state', summary: 'Full app state: projects, items, settings, skillRepos, ledger, jobs.' },
+
+  { method: 'GET',  path: '/api/collections', summary: 'Every collection and its schema, plus the legal field types. A collection is a SAVED QUERY — a document belongs to it because it matches, and may belong to several.' },
+  { method: 'GET',  path: '/api/collections/:id', summary: 'One collection\'s schema (frontmatter of .scout/collections/<id>.md).' },
+  { method: 'GET',  path: '/api/collections/:id/documents', summary: 'The documents matching a collection. ?view=<id> applies a saved view (filter + sort + group); ?bind=<json> is the subtable case — a collection plus a bound parameter. Rollups and formulas are computed on read; a value written in frontmatter always wins over the computed one.' },
+  { method: 'POST', path: '/api/collections', summary: 'Create or replace a collection. Validated: exactly one primary field, at most one gate:true status field, relation targets must exist. An unknown field type is rejected with the legal set named.' },
+  { method: 'POST', path: '/api/collections/:id/fields', summary: 'Add one field to a collection. Adding a field never rewrites existing documents — missing is empty.' },
+
+  { method: 'GET',  path: '/api/views/:collection', summary: 'Saved views, stored in the vault at .scout/views/<collection>.json so they travel with the data. If none are saved, a default is inferred from the collection\'s shape.' },
+  { method: 'PUT',  path: '/api/views/:collection', summary: 'Save a view. Body: { id, label, type: table|board|list|gallery, filter[], sort[], group, fields[] }.' },
+
+  { method: 'GET',  path: '/api/document', summary: 'One document by its path in the store (?path=data/guests/maria-santos.md). Returns frontmatter, body, summary, and every collection it belongs to.' },
+  { method: 'GET',  path: '/api/document/references', summary: 'What points AT this document, and through which field (?path=…). Declared relations and loose frontmatter pointers from memory objects both count.' },
+
+  { method: 'GET',  path: '/api/search', summary: 'Structured search: key:value filters plus free text. Secrets are never searched or returned.' },
+
+  { method: 'GET',  path: '/api/memory/:pid', summary: 'A project\'s memory document.' },
+  { method: 'POST', path: '/api/memory/:pid/learnings', summary: 'Append a learning, deduped against what is already there.' },
+
+  { method: 'GET',  path: '/api/board/:pid/describe', summary: 'What is on a project\'s whiteboard, without the coordinates — counts, frame labels and text. Ask for this rather than the raw document.' },
+
   { method: 'GET',  path: '/api/chat/sessions', summary: 'List chat sessions (?project=<id> | ?all=1).' },
   { method: 'GET',  path: '/api/chat/sessions/:id', summary: 'One session with its transcript.' },
-  { method: 'POST', path: '/api/chat/sessions/:id/bind', summary: 'Promote a standalone chat to a project. Create the project first via POST /api/projects, then bind this session to it. Body: { project }. Moves the session + transcript into the project and flips its scope; the same session id continues, now carrying the project (Production Panel and project-scoped generation become available).' },
-  { method: 'GET',  path: '/api/projects/:id/shots', summary: 'List a project\'s shots.', note: 'see /api/state.shots' },
-  { method: 'POST', path: '/api/story/:pid/breakdown', summary: 'Break a story into shots. Body: { story?, mode? "replace"|"merge" }. Regenerates the list via the model — for a STAGED, user-confirmed breakdown emit a `proposal.breakdown` directive carrying the proposed shots instead, and let the app write them on confirm via POST /api/story/:pid/shots.' },
-  { method: 'PATCH', path: '/api/story/:pid/shots/:id', summary: 'Patch a single shot by id. Body: { patch: { title?, type?, dur?, status?, cast?, loc?, look?, ... }, log? }. Use this to refine one shot ("make shot 30 a close-up") — never regenerate the whole list. Also: PATCH /api/story/:pid/shots/reorder { order:[id…] } to reorder, POST /api/story/:pid/shots to create one.' },
-  { method: 'GET',  path: '/api/stylelocks', summary: 'List locked styles (ids + summaries, composed at generate time).' },
-  { method: 'GET',  path: '/api/manifest/:project', summary: 'Final selects in shot order.' },
-  { method: 'POST', path: '/api/generate', summary: 'Start a generation. Body: { project, prompt, model, sessionId?, ... }. Pass sessionId to attribute the spend to this chat session. Money gate applies.' },
-  { method: 'GET',  path: '/api/generations/:pid', summary: 'List a project\'s generations (id, status queued|running|done|failed, cost, reviewState new|kept|killed, rating, batchId). Read reviewState/rating here to enumerate kept vs rejected candidates — filter by batchId to answer "the rejected ones of that batch" without asking the user to restate them. Emit a `generation` directive referencing the id(s); the app renders the live card.' },
-  { method: 'POST', path: '/api/batches/estimate', summary: 'Estimate a batch cost WITHOUT queueing. Body: { model, shotIds, variantCount }. Use this for the money gate before /api/batches.' },
-  { method: 'POST', path: '/api/batches', summary: 'Queue a multi-variant batch (one generation per variant). Body: { pid, prompt, model, shotIds, variantCount, sessionId?, ... }. Pass sessionId to attribute the spend to this chat session. Emit a `generation.batch` directive referencing the returned batch id; the app renders one grid card.' },
-  { method: 'GET',  path: '/api/manual/:pid', summary: 'Manual round-trip state: { inbox (files waiting to be filed, with state ready|settling|partial|ignored), handoffs, open, dir }. The user rendered these frames OUTSIDE Scout and dropped them in projects/<pid>/inbox/.' },
-  { method: 'POST', path: '/api/manual/:pid/handoff', summary: 'Record prompts handed out to an external tool (Google Flow, Midjourney…). Body: { entries:[{shot,title,prompt,model,aspect}], perShot }. Returns { id, sheet, plain } — `sheet` is the paste-ready text. The ORDER is the point: it is what lets downloads be matched back for free. `prompt` must be the COMPOSED prompt (look joined in), never the bare shot.prompt.' },
-  { method: 'POST', path: '/api/manual/:pid/scan', summary: 'Free match pass over the inbox — filename first, then the recorded handoff order. Returns { counts, proposals:[{file,shot,confidence,matchedBy,why,prompt}] }. PROPOSES ONLY; nothing is written. Always run this before spending a turn on /sort.' },
-  { method: 'POST', path: '/api/manual/:pid/sort', summary: 'Ask the agent CLI to look at inbox files and match them to shots. Body: { files:[name…] } — send ONLY what /scan left unmatched. Returns proposals in the same shape. Costs subscription tokens; PROPOSES ONLY.' },
-  { method: 'POST', path: '/api/manual/:pid/apply', summary: 'File confirmed matches. Body: { decisions:[{file,shot|null,prompt,matchedBy,confidence,handoff}] }. Moves each file into renders/ and writes a normal generation record (reviewState new), so it enters the review inbox like any other candidate. This is the ONLY route here that writes — run it on the user\'s explicit confirmation, never on your own reading of a scan.' },
+  { method: 'POST', path: '/api/chat/sessions/:id/bind', summary: 'Promote a standalone chat to a project. Create the project first via POST /api/projects, then bind. Body: { project }. The same session id continues, now carrying the project.' },
+
+  { method: 'GET',  path: '/api/actions', summary: 'The append-only action journal — what changed, when, and by whom.' },
+  { method: 'GET',  path: '/api/jobs', summary: 'Background jobs and their status.' }
 ];
 export function renderCoreApiRef(apiBase = selfApiBase()) {
   const lines = [

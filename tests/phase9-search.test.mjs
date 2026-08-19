@@ -2,7 +2,7 @@
 import './_env.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { freshRoot, seedProject, seedItem, seedShot, seedGen, req, paths, getStorageRoot, fs, path } from './helpers.mjs';
+import { freshRoot, seedProject, seedItem, seedShot, seedGen, req } from './helpers.mjs';
 import { parseQuery } from '../backend/search.mjs';
 
 test('parseQuery splits typed filters, aliases, has:, and free text', () => {
@@ -25,34 +25,20 @@ function seedSearchRoot() {
   seedItem('neon', 'legacy1', { st: 'new', type: 'clip', name: 'old clip', note: 'camera drift' });
 }
 
-test('project + type + rating filters combine and free text matches', async () => {
-  seedSearchRoot();
-  const r = await req('GET', '/api/search?q=' + encodeURIComponent('p:neon rating:>=4 amber'));
-  assert.equal(r.status, 200);
-  const ids = r.body.results.map(x => x.id);
-  assert.ok(ids.includes('g2'), 'expected g2 (rating 5, "amber") — got ' + JSON.stringify(ids));
-  assert.ok(!ids.includes('g1'), 'g1 (rating 2) should be filtered out');
-});
-
-test('has:failure surfaces failed generations; final:true finds the selected candidate', async () => {
-  seedSearchRoot();
-  const fail = await req('GET', '/api/search?q=' + encodeURIComponent('has:failure'));
-  assert.ok(fail.body.results.some(x => x.id === 'g3'), 'failed generation not found via has:failure');
-  const fin = await req('GET', '/api/search?q=' + encodeURIComponent('final:true'));
-  assert.ok(fin.body.results.some(x => x.id === 'g2'), 'final candidate not found via final:true');
-});
-
-test('results carry exact location objects for navigation', async () => {
-  seedSearchRoot();
-  const r = await req('GET', '/api/search?q=' + encodeURIComponent('SH030'));
-  const shot = r.body.results.find(x => x.type === 'shot');
-  assert.ok(shot, 'shot result missing');
-  assert.equal(shot.location.page, 'project');
-  assert.equal(shot.location.projectId, 'neon');
-  assert.equal(shot.location.entity.type, 'shot');
-  assert.equal(shot.location.entity.id, 'SH030');
-});
-
+/* Three tests lived here, all walking the search results for 'shot' and 'generation' rows: filter
+ * combination (project + rating + free text), has:failure / final:true, and exact location objects
+ * for a shot. backend/search.mjs's rows() was rewritten with the film domain on 2026-08-19 and now
+ * builds only project / item / asset rows — there is no 'shot' or 'generation' row type left to
+ * search, so every one of these threw or asserted on results that can never come back.
+ *
+ * The rule each guarded still holds — matchFilters() and rows() are the same subject-agnostic code
+ * for whichever row types exist, and 'secret settings are never returned by search' below still
+ * exercises that engine end-to-end (a real request through matchFilters + the free-text scan). What
+ * is not re-proven here is filter-combination / has: / tag: / exact-location specifically for the
+ * new project/item/asset rows — that would be new coverage for the current search surface, not a
+ * like-for-like port of a dead one, so it is left for whoever next touches search.mjs rather than
+ * invented against a shot/generation fixture that no longer means anything.
+ */
 test('secret settings are never returned by search', async () => {
   seedSearchRoot();
   // put a secret in settings.md
@@ -63,10 +49,8 @@ test('secret settings are never returned by search', async () => {
   assert.ok(!/SUPERSECRET|TOPSECRET/.test(blob), 'secret string present in search response');
 });
 
-test('shot:SH030 filter scopes to that shot; tag: filter matches shot tags', async () => {
-  seedSearchRoot();
-  const r = await req('GET', '/api/search?q=' + encodeURIComponent('shot:SH030'));
-  assert.ok(r.body.results.every(x => !x.fields || x.fields.shot === 'SH030' || x.type !== 'generation'));
-  const tag = await req('GET', '/api/search?q=' + encodeURIComponent('tag:drone'));
-  assert.ok(tag.body.results.some(x => x.type === 'shot' && x.id === 'SH030'));
-});
+// 'shot:SH030 filter scopes to that shot; tag: filter matches shot tags' lived here — same removal
+// as the block above (no 'shot' row type left). Note its first assertion (`!x.fields || ...`) was
+// already vacuous before the strip: search() strips `fields` off every result before it reaches
+// JSON (see the `.map(({ haystack, fields, score, ...r }) => r)` in search()), so `x.fields` was
+// always undefined and `!x.fields` always true — it never actually checked the shot: filter.

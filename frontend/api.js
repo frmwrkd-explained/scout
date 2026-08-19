@@ -30,6 +30,10 @@ export const api = {
   views: collection => fetch('/api/views/' + encodeURIComponent(collection)).then(j),
   saveView: (collection, view) => fetch('/api/views/' + encodeURIComponent(collection), { method: 'PUT', ...opts(view) }).then(j),
   document: path => fetch('/api/document?path=' + encodeURIComponent(path)).then(j),
+  // REFERENCED BY (T05 §2). A whole-store scan, so it is its own call: the document surface opens
+  // without paying for it. Crosses collections AND reaches memory objects, which is exactly what
+  // computing this from the loaded rows could never do.
+  references: path => fetch('/api/document/references?path=' + encodeURIComponent(path)).then(j),
   // dictation — VoiceInput ships the recorded blob raw; ?name= carries the extension so the
   // provider's format sniff works. See backend/index.mjs POST /api/groq/transcribe.
   transcribe: file => fetch('/api/groq/transcribe?name=' + encodeURIComponent(file.name || 'audio.m4a'),

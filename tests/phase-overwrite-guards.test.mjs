@@ -9,12 +9,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'frfg-guards-'));
+const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'scout-guards-'));
 process.env.SCOUT_DATA = ROOT;
 
 const store = await import('../backend/store.mjs');
 const lib = await import('../backend/library.mjs');
-const story = await import('../backend/story.mjs');
 
 const ctx = name => path.join(ROOT, 'projects', 'neon', 'context', name);
 
@@ -64,11 +63,9 @@ test('writeMeta preserves sidecar keys outside readMeta\'s shape', () => {
   assert.deepEqual(after.tags, ['unrelated']);
 });
 
-test('a new shot never takes an id another shot already owns', () => {
-  // A reorder renumbers `no` but never renumbers `id`, so a shot can hold SH030 while its no is 2.
-  // max(no)+1 = 3 derives SH030, and writeShot merges onto whatever is at that path.
-  const existing = [{ id: 'SH010', no: 1 }, { id: 'SH030', no: 2 }];
-  assert.equal(story.freeShotNo(existing, 3), 4, 'SH030 is taken, so 3 must be skipped');
-  assert.equal(story.freeShotNo(existing, 5), 5, 'a free number is returned unchanged');
-  assert.equal(story.freeShotNo([], 1), 1, 'an empty project still starts at 1');
-});
+/* The fifth guard here checked that a new shot never took an id another shot already owned
+ * (backend/story.mjs freeShotNo). Shots went with the film domain on 2026-08-19. The rule it
+ * encoded outlives them: when ids are derived from a count but reordering renumbers something
+ * else, max()+1 can collide with a live id, and a merging writer will silently overwrite it.
+ * Scout mints record slugs — check this the moment slug derivation stops being the title.
+ */
