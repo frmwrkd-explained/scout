@@ -2,22 +2,16 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "frameforge-ui",
+      "name": "scout-ui",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
-      "port": 5175,
+      "port": 5178,
       "autoPort": true
     },
     {
-      "name": "frameforge-api",
+      "name": "scout-api",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "server"],
-      "port": 5176
-    },
-    {
-      "name": "frameforge-landing",
-      "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "5177", "--directory", "landingpage"],
       "port": 5177
     }
   ]

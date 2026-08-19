@@ -1,19 +1,19 @@
-// FrameForge auto-update. Deliberately conservative: check once at launch, download in the
+// Scout auto-update. Deliberately conservative: check once at launch, download in the
 // background, install when the user quits. Nothing in here ever restarts the app — a
 // generation batch can run for many minutes and a mid-session relaunch would kill it.
 // That is why `quitAndInstall()` is never called: electron-updater's own
 // `autoInstallOnAppQuit` applies the staged update on the next normal quit.
 //
-// The feed is NOT the private DevFrmwrkd/frameforge repo. A private GitHub feed needs a
+// The feed is NOT the private DevFrmwrkd/scout repo. A private GitHub feed needs a
 // PAT baked into the shipped app, and anything in the bundle is extractable — so the
 // provider is `generic` (any HTTPS host: R2, S3, a plain static server).
 //
 // Feed resolution, highest precedence first:
-//   1. FRFG_UPDATE_URL          — runtime override, points this build at another feed
+//   1. SCOUT_UPDATE_URL          — runtime override, points this build at another feed
 //   2. resources/app-update.yml — baked in at build time from package.json `build.publish`
 //                                 (override per build with `-c.publish.url=…`)
-// FRFG_UPDATE_CHANNEL swaps the channel (latest / beta / alpha).
-// FRFG_NO_UPDATE=1 disables the whole thing.
+// SCOUT_UPDATE_CHANNEL swaps the channel (latest / beta / alpha).
+// SCOUT_NO_UPDATE=1 disables the whole thing.
 const { app, Notification } = require('electron');
 
 // what happened, for logging and for anything that later wants to surface it in the UI
@@ -23,7 +23,7 @@ function log(...args) { console.log('[updater]', ...args); }
 
 function initUpdater() {
   try {
-    if (process.env.FRFG_NO_UPDATE === '1') return log('disabled by FRFG_NO_UPDATE');
+    if (process.env.SCOUT_NO_UPDATE === '1') return log('disabled by SCOUT_NO_UPDATE');
     // In dev there is no app-update.yml and no installer to replace; electron-updater
     // throws rather than no-ops, so bail before requiring it.
     if (!app.isPackaged) return log('skipped — not a packaged build');
@@ -35,12 +35,12 @@ function initUpdater() {
     autoUpdater.allowPrerelease = false;
     autoUpdater.logger = { info: log, warn: log, error: log, debug: () => {} };
 
-    const url = String(process.env.FRFG_UPDATE_URL || '').trim();
+    const url = String(process.env.SCOUT_UPDATE_URL || '').trim();
     if (url) {
-      autoUpdater.setFeedURL({ provider: 'generic', url, channel: process.env.FRFG_UPDATE_CHANNEL || 'latest' });
+      autoUpdater.setFeedURL({ provider: 'generic', url, channel: process.env.SCOUT_UPDATE_CHANNEL || 'latest' });
       log('feed overridden →', url);
-    } else if (process.env.FRFG_UPDATE_CHANNEL) {
-      autoUpdater.channel = process.env.FRFG_UPDATE_CHANNEL;
+    } else if (process.env.SCOUT_UPDATE_CHANNEL) {
+      autoUpdater.channel = process.env.SCOUT_UPDATE_CHANNEL;
     }
 
     // Every listener is best-effort. A dead feed, an offline machine or an unsigned macOS
@@ -59,7 +59,7 @@ function initUpdater() {
       try {
         if (Notification.isSupported()) {
           new Notification({
-            title: 'FrameForge update ready',
+            title: 'Scout update ready',
             body: `Version ${v} installs the next time you quit. Your work is untouched.`
           }).show();
         }

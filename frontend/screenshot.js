@@ -1,8 +1,8 @@
 // One screenshot API, two paths underneath. The panel never branches on which one it got.
 //
-//   shipped app  → window.frameforge.capture() → webContents.capturePage()
+//   shipped app  → window.scout.capture() → webContents.capturePage()
 //                  Real compositor output: WebGL (the 3D stage), <video>, everything. Captures
-//                  the FrameForge window only, so nothing else on the tester's screen can be
+//                  the Scout window only, so nothing else on the tester's screen can be
 //                  caught by accident. No permission prompt.
 //
 //   npm run dev  → getDisplayMedia({ preferCurrentTab: true })
@@ -13,7 +13,7 @@
 // return a picture that disagrees with what the user saw — which, for a bug report, is worse than
 // no picture. If neither path works, the report sends without a screenshot and says so.
 
-export const isDesktopCapture = () => !!(typeof window !== 'undefined' && window.frameforge && window.frameforge.capture);
+export const isDesktopCapture = () => !!(typeof window !== 'undefined' && window.scout && window.scout.capture);
 
 /**
  * @param {{x:number,y:number,width:number,height:number}} [rect] CSS pixels, window-relative
@@ -21,7 +21,7 @@ export const isDesktopCapture = () => !!(typeof window !== 'undefined' && window
  */
 export async function capture(rect) {
   if (isDesktopCapture()) {
-    const dataUrl = await window.frameforge.capture(rect || null).catch(() => null);
+    const dataUrl = await window.scout.capture(rect || null).catch(() => null);
     if (dataUrl) return { dataUrl, via: 'desktop' };
     return null;
   }

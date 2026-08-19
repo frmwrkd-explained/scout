@@ -31,7 +31,7 @@ class ErrorBoundary extends React.Component {
           </pre>
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
             <div onClick={() => window.location.reload()} style={{ flex: 1, textAlign: 'center', padding: '9px 16px', borderRadius: 8, background: 'var(--accent)', color: 'var(--on-accent)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
-              Reload FrameForge
+              Reload Scout
             </div>
             {/* React is gone, so the panel cannot open here. Stash the rings, reload, and let the
                 app open the report on the way back with the crash already attached. */}

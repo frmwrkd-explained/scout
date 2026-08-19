@@ -24,7 +24,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const BUCKET = 'frameforge-releases';
+const BUCKET = 'scout-releases';
 const DRY = process.argv.includes('--dry-run');
 
 /* Where the build actually landed. Defaults to release/, but on this machine the build
@@ -32,8 +32,8 @@ const DRY = process.argv.includes('--dry-run');
    loses a read-after-write race against it (docs/RELEASE.md). So the output goes to an
    APFS path and gets pointed at here. CI, where the checkout is on ext4/APFS/NTFS
    already, just uses the default. */
-const RELEASE_DIR = process.env.FRFG_RELEASE_DIR
-  ? path.resolve(process.env.FRFG_RELEASE_DIR)
+const RELEASE_DIR = process.env.SCOUT_RELEASE_DIR
+  ? path.resolve(process.env.SCOUT_RELEASE_DIR)
   : path.join(ROOT, 'release');
 
 /* The manifests. These are the feed itself — electron-updater fetches one of these by
@@ -58,7 +58,7 @@ function human(bytes) {
 
 function put(file, { immutable }) {
   const key = path.basename(file);
-  /* Installers are content-addressed by filename — FrameForge-0.1.0-arm64.dmg is that
+  /* Installers are content-addressed by filename — Scout-0.1.0-arm64.dmg is that
      build forever — so they cache hard. Manifests are the opposite: the same name has
      to return new content on every release, so they must never be cached anywhere. */
   const cache = immutable

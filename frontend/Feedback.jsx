@@ -40,7 +40,7 @@ const SECTIONS = [
   { id: 'console', label: 'Console', describe: e => count(e.client && e.client.console) + ' from the browser log' },
   { id: 'network', label: 'API calls', describe: e => count(e.client && e.client.network) + ' — method, path, status, timing. No request or response bodies' },
   { id: 'interactions', label: 'What you clicked', describe: e => count(e.client && e.client.interactions) + ' — button names and page changes. Never anything you typed' },
-  { id: 'serverLog', label: 'Server log', describe: e => count(e.server && e.server.log) + ' lines from FrameForge\'s own engine' },
+  { id: 'serverLog', label: 'Server log', describe: e => count(e.server && e.server.log) + ' lines from Scout\'s own engine' },
   { id: 'serverApi', label: 'Server-side calls', describe: e => count(e.server && e.server.api) + ' as the engine saw them' },
   { id: 'failures', label: 'Recent failures', describe: e => count(e.server && e.server.failures) + ' from the job queue' }
 ];
@@ -470,7 +470,7 @@ export default class Feedback extends React.Component {
         <div style={{ fontSize: 10.5, color: 'var(--fg-faint)', marginTop: 7, lineHeight: 1.5 }}>
           Drag to mark. <b>blur</b> permanently destroys those pixels before the image is sent — use it on
           anything private that ended up in the shot.
-          {S.shotVia === 'desktop' ? ' Captured from the FrameForge window only.' : ''}
+          {S.shotVia === 'desktop' ? ' Captured from the Scout window only.' : ''}
         </div>
       </Card>
     );
@@ -485,7 +485,7 @@ export default class Feedback extends React.Component {
             {S.previewErr}
             <br /><br />
             Sending is blocked, because you should not have to take our word for what is in the payload.
-            This is itself a bug in FrameForge.
+            This is itself a bug in Scout.
           </div>
         </Card>
       );
@@ -547,7 +547,7 @@ export default class Feedback extends React.Component {
           <div style={{ ...mono, fontSize: 20, letterSpacing: '.06em', color: 'var(--accent)' }}>{r.code}</div>
           <div style={{ fontSize: 12, color: 'var(--fg-soft)', lineHeight: 1.6, marginTop: 8 }}>
             {r.queued
-              ? <>Could not reach us just now, so the report is queued on your machine and goes out automatically next time FrameForge starts. {r.note ? <span style={{ color: 'var(--fg-faint)' }}>({r.note})</span> : null}</>
+              ? <>Could not reach us just now, so the report is queued on your machine and goes out automatically next time Scout starts. {r.note ? <span style={{ color: 'var(--fg-faint)' }}>({r.note})</span> : null}</>
               : r.duplicateOf
                 ? <>Someone has already reported this one — your report was added to it, which tells us it is hitting more than one person.</>
                 : <>It will be read, classified and turned into a tracked issue automatically. If the description is not enough, we will ask.</>}

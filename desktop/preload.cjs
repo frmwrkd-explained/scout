@@ -13,7 +13,7 @@
 // with its own validation — never widen this one.
 const { contextBridge, ipcRenderer } = require('electron');
 
-contextBridge.exposeInMainWorld('frameforge', {
+contextBridge.exposeInMainWorld('scout', {
   // rect is optional { x, y, width, height } in CSS pixels; omitted means the whole window.
   // Returns a PNG data URL, or null when the capture failed for any reason — callers fall back
   // to the browser path rather than blocking a report on a screenshot.

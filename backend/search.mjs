@@ -3,7 +3,6 @@
 // client can open the precise entity. Secrets (settings/API keys) are NEVER searched or returned.
 // NB: settings.md (API keys, secrets) is deliberately NOT imported or scanned here (Phase 9 rule).
 import { listProjects, listItems } from './store.mjs';
-import { listAllShots, getStory } from './story.mjs';
 import { listAssets } from './library.mjs';
 import { listGenerations } from './generate.mjs';
 
@@ -50,22 +49,6 @@ function rows() {
       haystack: [p.name, p.sub, p.brief].filter(Boolean).join(' ').toLowerCase(),
       fields: { project: p.id, type: 'project' },
       location: { page: 'project', projectId: p.id, tab: 'references' }
-    });
-    // story body is searchable text under the project
-    const story = getStory(p.id);
-    if (story.content) out.push({
-      type: 'story', id: p.id, pid: p.id, title: p.name + ' — story', sub: 'story',
-      haystack: story.content.toLowerCase(), fields: { project: p.id, type: 'story' },
-      location: { page: 'project', projectId: p.id, tab: 'story' }
-    });
-  }
-
-  for (const s of listAllShots()) {
-    out.push({
-      type: 'shot', id: s.id, pid: s.proj, title: s.id + ' · ' + (s.title || ''), sub: projName(s.proj),
-      haystack: [s.id, s.title, s.desc, s.prompt, s.videoPrompt, (s.tags || []).join(' ')].filter(Boolean).join(' ').toLowerCase(),
-      fields: { project: s.proj, type: 'shot', status: s.status, shot: s.id, tag: (s.tags || []).map(String), final: s.selectedCandidate ? 'true' : 'false', has: s.selectedCandidate ? ['route'] : [] },
-      location: { page: 'project', projectId: s.proj, tab: 'story', entity: { type: 'shot', id: s.id } }
     });
   }
 

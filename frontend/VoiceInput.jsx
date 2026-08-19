@@ -51,11 +51,11 @@ export class VoiceInput extends React.Component {
   componentDidMount() {
     if (this.props.global) {
       this._onToggle = () => this.toggle();
-      window.addEventListener('frameforge:voice-toggle', this._onToggle);
+      window.addEventListener('scout:voice-toggle', this._onToggle);
     }
   }
   componentWillUnmount() {
-    if (this._onToggle) window.removeEventListener('frameforge:voice-toggle', this._onToggle);
+    if (this._onToggle) window.removeEventListener('scout:voice-toggle', this._onToggle);
     this.teardown();
   }
 

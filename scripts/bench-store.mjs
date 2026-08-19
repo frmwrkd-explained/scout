@@ -125,11 +125,11 @@ function apiStatePayload(ctx) {
 // top-level code, hence dynamic import. `tests/_env.mjs` documents the same trap and solves it with
 // a separate first-imported module; a single-file script has to do it this way.
 async function loadBackend(dataRoot, configFile) {
-  process.env.FRFG_CONFIG = configFile;
-  process.env.FRFG_DATA = dataRoot;
+  process.env.SCOUT_CONFIG = configFile;
+  process.env.SCOUT_DATA = dataRoot;
   // Same hermetic switch the tests use: gates only startGeneration's queue runner and the agent CLI
   // spawn, neither of which is on a measured path. Keeps a stray subprocess out of the numbers.
-  process.env.FRFG_TEST = '1';
+  process.env.SCOUT_TEST = '1';
   const [store, story, library, generate, ledger, jobs, batches, sessions, search, indexer, agentHome, providers, groq, fal, integrations] = await Promise.all([
     import('../backend/store.mjs'), import('../backend/story.mjs'), import('../backend/library.mjs'),
     import('../backend/generate.mjs'), import('../backend/ledger.mjs'), import('../backend/jobs.mjs'),
@@ -229,7 +229,7 @@ function seedTier(ctx, root, cfg) {
   writeMd(path.join(root, 'costs.md'), {
     entries,
     rollup: { '2026-01': { total: 1.5, count: 500, byService: { fal: 1.5 }, byOp: { image: 1.5 } } }
-  }, 'FrameForge cost ledger.\n');
+  }, 'Scout cost ledger.\n');
 }
 
 // ── timing ──
@@ -246,8 +246,8 @@ async function runChild() {
   const metric = opt('metric');
   const run = METRICS[metric];
   if (!root || !run) { process.stderr.write('bench child: bad --root/--metric\n'); process.exit(2); }
-  // No FRFG_CONFIG file is ever written in child mode, so getStorageRoot() falls through to
-  // DEFAULT_ROOT = FRFG_DATA = the tier root. Nothing here can reach the parent's config pointer.
+  // No SCOUT_CONFIG file is ever written in child mode, so getStorageRoot() falls through to
+  // DEFAULT_ROOT = SCOUT_DATA = the tier root. Nothing here can reach the parent's config pointer.
   const ctx = await loadBackend(root, path.join(root, '.bench-child-config.md'));
   const pid = projectId(0);
   ctx.pid = pid;
@@ -320,7 +320,7 @@ async function runParent() {
   if (only && !TIERS[only]) { process.stderr.write('unknown tier: ' + only + ' (small|medium|large)\n'); process.exit(2); }
   const tiers = only ? [only] : Object.keys(TIERS);
 
-  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'frameforge-bench-'));
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'scout-bench-'));
   // Removed on a clean exit, on SIGINT, and on a thrown error — the temp corpus is up to ~26k files
   // at the large tier and must never be left behind.
   let cleaned = false;

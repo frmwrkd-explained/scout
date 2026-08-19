@@ -24,7 +24,6 @@ import { getSettings, getStorageRoot, writeMd, readMd, SECRET_SETTING_KEYS } fro
 import { redact, signature } from '../shared/redact.mjs';
 import { resolveModules } from '../shared/integrations.mjs';
 import { providersStatus } from './providers.mjs';
-import { videoToolsStatus } from './video.mjs';
 import { listJobs } from './jobs.mjs';
 
 const require = createRequire(import.meta.url);
@@ -90,8 +89,6 @@ export function envFacts() {
   const s = getSettings();
   let providers = {};
   try { providers = providersStatus(s); } catch { /* a probe failure is not worth failing a report */ }
-  let binaries = {};
-  try { binaries = videoToolsStatus(); } catch { /* ditto */ }
 
   return {
     app: pkg.version,
@@ -107,7 +104,6 @@ export function envFacts() {
     // bug (a path with a '#' in it, an external volume), the name in it never is.
     storageRoot: getStorageRoot(),
     providers,      // { fal: true, groq: false, … } — configured-ness, never the key
-    binaries,       // { ffmpeg: true, ytdlp: false, ffprobe: true }
     modules: resolveModules(s),
     locale: Intl.DateTimeFormat().resolvedOptions().locale,
     tz: Intl.DateTimeFormat().resolvedOptions().timeZone

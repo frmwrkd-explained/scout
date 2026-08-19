@@ -1,4 +1,4 @@
-// FrameForge desktop wrapper. Double-click launches this: it starts the bundled Express server
+// Scout desktop wrapper. Double-click launches this: it starts the bundled Express server
 // (via Electron's own Node runtime — no system Node required), waits for it to answer, then
 // opens a window pointing at it. The server still spawns the `claude` CLI for agent jobs, so
 // nothing about the backend changes; this file only owns process lifecycle + the window.
@@ -52,8 +52,8 @@ function startServer(port) {
       ...process.env,
       PORT: String(port),
       HOST: '127.0.0.1',
-      FRFG_CONFIG: CONFIG_MD,
-      FRFG_DATA: DATA_DIR
+      SCOUT_CONFIG: CONFIG_MD,
+      SCOUT_DATA: DATA_DIR
     },
     stdio: 'pipe'
   });
@@ -71,7 +71,7 @@ async function createWindow() {
     minWidth: 960,
     minHeight: 640,
     backgroundColor: '#0B0C0E',
-    title: 'FrameForge',
+    title: 'Scout',
     show: false,
     // contextIsolation/nodeIntegration are unchanged; the preload adds exactly one function
     // (see desktop/preload.cjs) so bug reports can carry a real screenshot of the window.
@@ -90,7 +90,7 @@ async function createWindow() {
   } catch (e) {
     await win.loadURL('data:text/html,' + encodeURIComponent(
       '<body style="background:#0B0C0E;color:#ECEEF2;font-family:sans-serif;padding:40px">' +
-      '<h2>FrameForge could not start its engine.</h2><p>' + String(e.message) + '</p></body>'));
+      '<h2>Scout could not start its engine.</h2><p>' + String(e.message) + '</p></body>'));
   }
   win.show();
 }
