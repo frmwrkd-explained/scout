@@ -32,6 +32,9 @@ import { testAgentPipeline } from './agentRunner.mjs';
 import { registerUserToolRoutes } from './userTools.mjs';
 import { search as structuredSearch } from './search.mjs';
 import { registerFeedbackRoutes, installLogRing, recordApiCall, flushOutbox } from './feedback.mjs';
+import { listCollections, getCollection, saveCollection, addField, FIELD_TYPE_NAMES } from './collections.mjs';
+import { documentsFor, documentAt, collectionsOf, allDocuments } from './documents.mjs';
+import { listViews, getView, saveView, deleteView, applyView, defaultView } from './views.mjs';
 
 const APP_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.argv[2]) || Number(process.env.PORT) || 5177;
@@ -193,6 +196,72 @@ app.put('/api/ui-state', (req, res) => {
   next.updated = stamp();
   writeMd(uiStateMd(), next, 'Scout UI state — last location + non-sensitive prefs. No secrets.\n');
   res.json(next);
+});
+
+// ── collections · documents · views (M1) ───────────────────────────────────────────────────────
+// A collection is a saved query; a document matches or it does not. Nothing here writes a document
+// file — that is records.mjs's job at M2, and adding a second writer now would bypass dedupe,
+// provenance and the gate undetectably.
+
+app.get('/api/collections', (_req, res) => res.json({ collections: listCollections(), fieldTypes: FIELD_TYPE_NAMES }));
+
+app.get('/api/collections/:id', (req, res) => {
+  const c = getCollection(req.params.id);
+  if (!c) return res.status(404).json({ error: 'no collection "' + req.params.id + '"' });
+  res.json(c);
+});
+
+app.post('/api/collections', (req, res) => {
+  try { res.json(saveCollection(req.body || {})); }
+  catch (e) { res.status(e.status || 400).json({ error: e.message }); }
+});
+
+app.patch('/api/collections/:id', (req, res) => {
+  const c = getCollection(req.params.id);
+  if (!c) return res.status(404).json({ error: 'no collection "' + req.params.id + '"' });
+  try { res.json(saveCollection({ ...c, ...(req.body || {}), id: req.params.id })); }
+  catch (e) { res.status(e.status || 400).json({ error: e.message }); }
+});
+
+app.post('/api/collections/:id/fields', (req, res) => {
+  try { res.json(addField(req.params.id, req.body || {})); }
+  catch (e) { res.status(e.status || 400).json({ error: e.message }); }
+});
+
+// ?view=<id> applies a saved view; ?bind=<json> is the subtable case (a collection plus a bound
+// parameter — one mechanism, no second storage).
+app.get('/api/collections/:id/documents', (req, res) => {
+  let bind = null;
+  if (req.query.bind) { try { bind = JSON.parse(String(req.query.bind)); } catch { return res.status(400).json({ error: 'bind must be JSON' }); } }
+  const found = documentsFor(req.params.id, { bind });
+  if (!found) return res.status(404).json({ error: 'no collection "' + req.params.id + '"' });
+  const view = getView(req.params.id, req.query.view ? String(req.query.view) : null) || defaultView(found.collection);
+  const { rows, groups } = applyView(view, found.documents);
+  res.json({ collection: found.collection, view, total: found.documents.length, rows, groups });
+});
+
+app.get('/api/views/:collection', (req, res) => {
+  const found = listViews(req.params.collection);
+  if (!found) return res.status(404).json({ error: 'no collection "' + req.params.collection + '"' });
+  res.json(found);
+});
+
+app.put('/api/views/:collection', (req, res) => {
+  try { res.json({ views: saveView(req.params.collection, req.body || {}) }); }
+  catch (e) { res.status(e.status || 400).json({ error: e.message }); }
+});
+
+app.delete('/api/views/:collection/:id', (req, res) => {
+  try { res.json({ views: deleteView(req.params.collection, req.params.id) }); }
+  catch (e) { res.status(e.status || 400).json({ error: e.message }); }
+});
+
+// One document, by its path in the store. Law 8: every record shows its path and the path is how
+// you reach it — the same string the UI prints is the one the API takes.
+app.get('/api/document', (req, res) => {
+  const doc = documentAt(String(req.query.path || ''));
+  if (!doc) return res.status(404).json({ error: 'no document at that path' });
+  res.json({ ...doc, collections: collectionsOf(doc) });
 });
 
 // ── dictation ──────────────────────────────────────────────────────────────────────────────────

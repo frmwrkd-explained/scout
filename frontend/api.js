@@ -18,6 +18,18 @@ const opts = body => ({ headers: { 'Content-Type': 'application/json' }, body: J
 
 export const api = {
   state: () => fetch('/api/state').then(j),
+
+  // ── collections · documents · views (M1) ──────────────────────────────────────────────────
+  collections: () => fetch('/api/collections').then(j),
+  collection: id => fetch('/api/collections/' + encodeURIComponent(id)).then(j),
+  saveCollection: body => fetch('/api/collections', { method: 'POST', ...opts(body) }).then(j),
+  addField: (id, field) => fetch('/api/collections/' + encodeURIComponent(id) + '/fields', { method: 'POST', ...opts(field) }).then(j),
+  // bind is the subtable case — a collection plus a bound parameter, one mechanism
+  documents: (id, view, bind) => fetch('/api/collections/' + encodeURIComponent(id) + '/documents'
+    + '?view=' + encodeURIComponent(view || '') + (bind ? '&bind=' + encodeURIComponent(JSON.stringify(bind)) : '')).then(j),
+  views: collection => fetch('/api/views/' + encodeURIComponent(collection)).then(j),
+  saveView: (collection, view) => fetch('/api/views/' + encodeURIComponent(collection), { method: 'PUT', ...opts(view) }).then(j),
+  document: path => fetch('/api/document?path=' + encodeURIComponent(path)).then(j),
   // dictation — VoiceInput ships the recorded blob raw; ?name= carries the extension so the
   // provider's format sniff works. See backend/index.mjs POST /api/groq/transcribe.
   transcribe: file => fetch('/api/groq/transcribe?name=' + encodeURIComponent(file.name || 'audio.m4a'),
