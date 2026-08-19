@@ -126,3 +126,33 @@ In both files the removed block is replaced by a comment saying what it guarded 
 
 ### `frontend/api.js` trimmed to the surviving routes
 48 of 95 client methods pointed at routes that no longer exist (`reel*`, `remotion*`, `videoImport*`, `control*`, `falCatalog`, `modelSchema`, …). Removed, and every remaining method's path was verified against a live backend module. A client method for a deleted route is a 404 waiting for a caller, and it is also a lie about what the app can do.
+
+---
+
+## 2026-08-19 · Seeding the example workspace — seven ambiguities the spec has
+
+Found by writing 30 real records against `docs/02_DATA_MODEL.md` rather than reading it. Several are spec bugs, not judgement calls; they are listed here so the owner can fix the doc rather than have every future agent rediscover them.
+
+### 1 · `multiselect` silently requires a non-empty `options[]`
+§2's field table does not say so, but `backend/collections.mjs` rejects a bare `tags: multiselect`. **Choice:** enumerated the 16 tag values actually used across the seed guests. **Either the doc should state the requirement, or the validator should allow an open vocabulary for `multiselect`** — a tag field whose options must be declared up front is not really a tag field.
+
+### 2 · The design's three sample datasets contradict each other
+`Scout.dc.html`'s structured `from:` (guest→group) disagrees with `Territory.dc.html`'s prose "LAST THREE FINDS" for the same people — Rowena Cruz is `solo-parents` in one and under OFW Stories in the other; Kaye Ilagan likewise. **Choice:** the structured field is authoritative, the prose is flavour. Worth knowing before anyone treats the mockups as a fixture.
+
+### 3 · No screen's status vocabulary matches any other
+`Scout.dc.html` uses `needs review / shortlisted / contacted / gone cold / rejected`; `Pipeline.dc.html` uses `inbox / shortlist / contacted / replied / won`. Neither has both `replied` and `gone cold`. **Choice:** modelled "gone cold" as *old* `contacted` rather than a status of its own — the `gone-cold` saved view is a `contacted` filter sorted oldest-first. **Why:** staleness is already a first-class idea (Law 3, `verified_at`, the freshness meter). Making it a status too would give one fact two homes that could disagree, and Law 5 reserves `archived` for a deliberate reason, which mere ageing is not.
+
+### 4 · `Today.dc.html`'s goal arithmetic is stale
+It hardcodes "9 DAYS LEFT" for *Book 8 guests by 30 September* while its own `dateOf()` fixes today at 2026-08-19 — which is 42 days, not 9. **Choice:** used the correct count. A mockup's stale number must not become seed data.
+
+### 5 · `group` has no computed yield, so "my best" had no field to sort on
+`docs/03_MEMORY.md` §3 gives `territory/<id>.md` a `yield` / `hit_rate`, and `CLAUDE.md` names `backend/territory.mjs` its sole writer — but that is M3, and a `group` collection today has only raw `finds` and `booked`. **Choice:** sorted `my-best` by `booked` desc. Sorting by `finds` would put Manila Foodies (62 finds, **0** bookings) first, which is precisely backwards — and that record is in the seed set specifically so the mistake is visible.
+
+### 6 · §3 shows one view object, not the file that holds several
+The multi-view wrapper is unspecified. **Choice:** a bare JSON array, confirmed against `backend/views.mjs` (`Array.isArray(parsed) ? parsed : (parsed.views || [])`, so both work). §3 should show the file, not just a view.
+
+### 7 · `group.platform` had no options list
+Unlike `guest.platform`, which §1 spells out. **Choice:** `[facebook, instagram, tiktok, reddit]`, since `Territory.dc.html`'s ground list includes hashtags and subreddits even though all eight seeded groups are Facebook.
+
+### And the gate holds in the data
+Every `contacted` / `replied` / `won` record carries `updated_by: crystal`. Nothing agent-authored sits past `shortlist`. Verified programmatically, because seed data that modelled a Law 4 violation would teach the wrong shape to everything built on top of it.
