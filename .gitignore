@@ -7,6 +7,12 @@ release/
 *.log
 .DS_Store
 
+# macOS AppleDouble sidecars. This repo lives on an exFAT volume, where macOS writes a `._X`
+# beside almost every file. They are not cosmetic: `npm test` runs a bare `node --test`, whose
+# discovery picks up `._phase-*.test.mjs` as real test files and FAILS them. Sweep with
+#   find . -name "._*" -not -path "./node_modules/*" -delete
+._*
+
 # a workspace is a user's data — never in this repo
 workspace/
 .scout/index/
