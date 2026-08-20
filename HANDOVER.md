@@ -1,6 +1,6 @@
-# HANDOVER — Scout, as of 2026-08-19
+# HANDOVER — Scout, as of 2026-08-20
 
-**M0–M5 are built. `npm test` is green (586 tests, 584 pass, 2 skipped, 0 fail) and
+**M0–M5 are built. `npm test` is green (590 tests, 588 pass, 2 skipped, 0 fail) and
 `npm run demonstrate` walks GOAL.md's ten gates against a real running app and prints the
 evidence for each one — currently 10 of 10.**
 
@@ -31,7 +31,7 @@ Then `docs/02_DATA_MODEL.md`, `03_MEMORY.md`, `04_AGENT_CONTRACT.md`, `05_UI_SPE
 ```bash
 npm ci
 find . -name "._*" -not -path "./node_modules/*" -delete   # ALWAYS, see §3
-npm test                     # 586 tests
+npm test                     # 590 tests
 npm run demonstrate          # the ten gates, against a throwaway copy of workspace/
 npm run server               # express on 5177
 npm run dev                  # vite on 5178, proxies /api → 127.0.0.1:5177
