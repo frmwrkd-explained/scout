@@ -18,9 +18,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+// Hermetic root. `SCOUT_DATA` alone is NOT enough: `getStorageRoot()` reads the `config.md`
+// POINTER first, and that file lives outside the storage root by design — so a config.md in the
+// checkout (or one written by a dev server run) silently outranks SCOUT_DATA and this whole file
+// reads somebody else's workspace. Claim both, the way tests/_env.mjs does.
 function freshRoot(tag) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'scout-' + tag + '-'));
   process.env.SCOUT_DATA = root;
+  process.env.SCOUT_CONFIG = path.join(root, 'config.md');
   return root;
 }
 
