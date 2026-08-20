@@ -38,6 +38,58 @@
      state being visibly not-accent. */
   --marked:#5B9DFF;
 }
+
+/* ── LIGHT — the same contract, re-tinted (docs/05_UI_SPEC.md §4) ──
+   Two token sets, one contract. NO COMPONENT MAY BRANCH ON THEME: the only thing that
+   changes between light and dark is the value behind a var(). If you find yourself writing
+   `theme === 'light' ? … : …` in a component, the token you need does not exist yet — add
+   it here and in tokens.js, do not branch.
+
+   `frontend/theme.js` always stamps an explicit data-theme on <html> ('dark' or 'light'),
+   resolving prefers-color-scheme itself, so this is the only selector in the file that has
+   to exist and nothing anywhere has to ask the OS a second time. `:root[data-theme]` is
+   (0,2,0) against `:root`'s (0,1,0), so it wins on specificity rather than on source order.
+
+   THE ACCENT IS THE SAME ROLE, NOT A SECOND BRAND. Acid green at full brightness on white
+   is 1.1:1 — invisible. Light mode takes the same "click this" role down to a deep olive
+   (#3D4A00, the acid hue's own hue-angle at low lightness) with a pale accent text on top.
+   §4 gives no light counterpart for the four accent alpha steps, because they are defined
+   against the acid hue; they are DERIVED here from the light accent's rgb — rgb(61,74,0) —
+   at exactly the four steps the dark set uses, so the light theme has four steps and only
+   four, for the same four jobs. tests/phase-theme-contrast.test.mjs proves the result.
+
+   THREE VALUES DEVIATE FROM §4's TABLE, and only because §4's own rule — every pair clears
+   4.5:1 — refuses them. Measured against `--raise #EFEFEC`, the darkest light ground and
+   therefore the worst case for text:
+     --fg-muted  #6B7078 → #565A61   (4.33:1 → 6.01:1; dark's counterpart is 6.46:1)
+     --fg-faint  #8B9099 → #676C75   (2.78:1 → 4.58:1; dark's counterpart is 4.52:1, the floor)
+     --warn      #9A6800 → #916200   (4.19:1 → 4.61:1)
+   Each keeps §4's hue and saturation and moves only lightness, so the ramp reads as the
+   table intended and the four text steps stay visibly distinct. Recorded in docs/decisions.md. */
+:root[data-theme="light"]{
+  /* surfaces — "recessed" reads DARKER on a light ground, which is why raise is the darkest
+     step here and the lightest one in dark. --void keeps the same one-step-from-sunk
+     relationship it has in the dark set. */
+  --ink:#FBFBFA; --surface:#FFFFFF; --surface-2:#F6F6F4;
+  --raise:#EFEFEC; --sunk:#F2F2EF; --void:#F4F4F1;
+  /* lines — --border-2 (the input border) is not in §4 either; it sits between --border and
+     --border-3 exactly as it does in dark. */
+  --line:#E8E8E4; --border:#DEDEDA; --border-2:#D1D1CC; --border-3:#C4C4BE;
+  /* text */
+  --fg:#1A1B1E; --fg-soft:#3C3F45; --fg-muted:#565A61; --fg-faint:#676C75;
+  /* accent — deep olive. --accent-hover moves AWAY from the page ground (darker) because
+     that is what "more" means on a light surface; --accent-deep moves one step TOWARD it,
+     the same relationship the dark set's #B8CC28 has to #E3FF32. */
+  --accent:#3D4A00; --accent-hover:#2E3800; --accent-deep:#55671A; --on-accent:#F4FFC0;
+  --accent-05:rgba(61,74,0,.05);  /* faintest wash — row tint, hover bed */
+  --accent-12:rgba(61,74,0,.12);  /* tinted surface — chips, active rows */
+  --accent-35:rgba(61,74,0,.35);  /* borders, outlined-primary           */
+  --accent-60:rgba(61,74,0,.6);   /* strong edge, focus-adjacent         */
+  --sand:#3C3F45;
+  /* status — still its own channel, still never the accent */
+  --ok:#127C4F; --warn:#916200; --danger:#B3322C;
+  --marked:#2E5FCC;
+}
 html,body{margin:0;height:100%;background:var(--ink);color:var(--fg);font-family:'Schibsted Grotesk',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
 #root{height:100%}
 a{color:var(--accent)}
@@ -182,3 +234,21 @@ textarea,input{font-family:inherit}
    the providers do not report progress, and a fake percentage would be a lie. */
 @keyframes dl-tick{0%{width:12%}50%{width:64%}100%{width:12%}}
 .dlTick{position:absolute;top:0;left:0;height:1.5px;background:var(--accent);animation:dl-tick 2.6s ease-in-out infinite}
+
+/* The glass shell's bed is the one place in this file that cannot be a token: it is a
+   translucent colour whose whole job is to let the page show through, and the page is a
+   different colour in each theme. So the recipe is re-stated for light rather than
+   branched on — same three declarations, same blur, a near-white bed instead of a near-black
+   one. Still no component involvement: a component asks for .glass and gets the right bed.
+   (These rgba values live OUTSIDE :root deliberately — see the note above .glass.) */
+:root[data-theme="light"] .glass{
+  background:rgba(255,255,255,.62);
+  border:1px solid rgba(196,196,190,.75);
+  box-shadow:0 24px 60px rgba(26,27,30,.14),0 2px 8px rgba(26,27,30,.08);
+}
+:root[data-theme="light"] .glassPop{
+  background:rgba(255,255,255,.85);
+  box-shadow:0 24px 60px rgba(26,27,30,.18);
+}
+:root[data-theme="light"] .glassPill{ background:rgba(255,255,255,.7) }
+:root[data-theme="light"] .mTile:hover{ box-shadow:0 18px 44px rgba(26,27,30,.16) }

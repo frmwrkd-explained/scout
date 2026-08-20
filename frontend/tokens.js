@@ -30,5 +30,47 @@ export const TOKENS = {
   marked: '#5B9DFF',
 };
 
+// The light set — mirrors `:root[data-theme="light"]` in styles.css, same rule, same commit.
+// tests/phase-theme-contrast.test.mjs fails if these drift, and asserts every foreground /
+// background pair here clears 4.5:1.
+//
+// TOKENS above stays the DARK set on purpose: it is what the existing JS sinks already read,
+// and tests/phase-design-tokens.test.mjs asserts it mirrors the bare `:root` block name-for-name.
+// A sink that needs the live theme should read the CSS variable, or `themeTokens()` below —
+// never branch on the theme itself (docs/05_UI_SPEC.md §4).
+export const LIGHT = {
+  ink: '#FBFBFA',
+  surface: '#FFFFFF',
+  'surface-2': '#F6F6F4',
+  raise: '#EFEFEC',
+  sunk: '#F2F2EF',
+  void: '#F4F4F1',
+  line: '#E8E8E4',
+  border: '#DEDEDA',
+  'border-2': '#D1D1CC',
+  'border-3': '#C4C4BE',
+  fg: '#1A1B1E',
+  'fg-soft': '#3C3F45',
+  'fg-muted': '#565A61',
+  'fg-faint': '#676C75',
+  accent: '#3D4A00',
+  'accent-hover': '#2E3800',
+  'accent-deep': '#55671A',
+  'on-accent': '#F4FFC0',
+  sand: '#3C3F45',
+  ok: '#127C4F',
+  warn: '#916200',
+  danger: '#B3322C',
+  marked: '#2E5FCC',
+};
+
+// The dark set under its own name, so a reader of this file does not have to know that the
+// unqualified `TOKENS` means "dark". TOKENS is kept as the export everything already imports.
+export const DARK = TOKENS;
+
+// For the few JS sinks that paint their own pixels (canvas, Three.js, an exported swatch) and
+// therefore cannot resolve var(--x). Pass the resolved theme from `theme.js` — do not sniff it.
+export function themeTokens(theme) { return theme === 'light' ? LIGHT : DARK; }
+
 export const ACCENT = TOKENS.accent;
 export const MONO = "'Spline Sans Mono',monospace";
