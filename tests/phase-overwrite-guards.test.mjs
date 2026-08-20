@@ -11,6 +11,11 @@ import path from 'node:path';
 
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'scout-guards-'));
 process.env.SCOUT_DATA = ROOT;
+// SCOUT_DATA alone is NOT enough: `getStorageRoot()` reads the `config.md` POINTER first, and that
+// file lives outside the storage root by design — so a config.md in the checkout (or one written
+// by a dev server run) silently outranks SCOUT_DATA and this file reads somebody else's workspace.
+// Claim both, the way tests/_env.mjs does.
+process.env.SCOUT_CONFIG = path.join(ROOT, 'config.md');
 
 const store = await import('../backend/store.mjs');
 const lib = await import('../backend/library.mjs');

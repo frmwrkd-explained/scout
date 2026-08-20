@@ -91,6 +91,49 @@ Anything between these is noise, not a decision.
   carries ProjectGenerate's marked-selection band as well as running state, and `--busy`
   would misname half of its call sites. No further blues.
 
+### Light — the second token set, not a second design
+
+`frontend/styles.css` `:root[data-theme="light"]`, mirrored in `frontend/tokens.js` `LIGHT`.
+**No component may branch on theme.** The only thing that changes is the value behind a
+`var()`; if you reach for `theme === 'light' ? … : …`, the token you need does not exist yet.
+`frontend/theme.js` resolves `prefers-color-scheme` once and stamps `data-theme` on `<html>`,
+so nothing else ever asks the OS. `⌥⌘L` toggles; the choice persists; default is the OS.
+
+| Token | Dark | Light | |
+|---|---|---|---|
+| `--ink` | `#0D0E11` | `#FBFBFA` | page ground |
+| `--surface` | `#101115` | `#FFFFFF` | panels |
+| `--surface-2` | `#14161B` | `#F6F6F4` | raised panels |
+| `--raise` | `#1C1F26` | `#EFEFEC` | chips, row hover — **the worst-case text bed in light** |
+| `--sunk` | `#0A0B0E` | `#F2F2EF` | wells, code blocks |
+| `--void` | `#0B0C0E` | `#F4F4F1` | deepest recess |
+| `--line` / `--border` / `--border-2` / `--border-3` | `#1B1E24` `#22252C` `#2A2E36` `#3A3F49` | `#E8E8E4` `#DEDEDA` `#D1D1CC` `#C4C4BE` | |
+| `--fg` / `--fg-soft` / `--fg-muted` / `--fg-faint` | `#ECEEF2` `#C9CFD8` `#9AA3AF` `#7B8797` | `#1A1B1E` `#3C3F45` `#565A61` `#676C75` | |
+| `--accent` / `--accent-hover` / `--accent-deep` / `--on-accent` | `#E3FF32` `#EEFF66` `#B8CC28` `#141519` | `#3D4A00` `#2E3800` `#55671A` `#F4FFC0` | |
+| `--sand` | `#C9CFD8` | `#3C3F45` | still aliases `--fg-soft` |
+| `--ok` / `--warn` / `--danger` | `#3FCF8E` `#F0B23A` `#F05B54` | `#127C4F` `#916200` `#B3322C` | |
+| `--marked` | `#5B9DFF` | `#2E5FCC` | |
+
+**The accent is the same role re-tinted, not a second brand.** Acid green at full brightness
+on white is 1.1:1 — invisible. Light takes "click this" down to a deep olive on the same hue
+axis (green > red > blue in both) and puts a pale accent text on top of it. On a light ground
+`--accent-hover` moves *away* from the page (darker) and `--accent-deep` one step *toward* it
+— the same two relationships the dark set has, mirrored.
+
+**The four alpha steps are derived, not given.** `docs/05_UI_SPEC.md` §4 has no light
+counterpart for them because they are written against the acid hue. Light uses the light
+accent's own `rgb(61,74,0)` at the identical four stops — `.05` row tint · `.12` chips and
+active rows · `.35` outlined-primary borders · `.6` strong edge. Four, and only four, in both
+themes.
+
+**Three light values deviate from §4's table**, because §4's own 4.5:1 rule refuses the ones
+it prints: `--fg-muted` `#6B7078`→`#565A61`, `--fg-faint` `#8B9099`→`#676C75`,
+`--warn` `#9A6800`→`#916200`. Each keeps the table's hue and saturation and moves only
+lightness. `tests/phase-theme-contrast.test.mjs` computes WCAG relative luminance over every
+text-on-surface pair, both accent washes composited over every ground, and `--on-accent` on
+all three solid steps — 111 pairs per theme, all ≥ 4.5:1. Worst pair: dark `--fg-faint` on
+`--raise` at 4.52:1 (the designed floor), light `--ok` on `--raise` at 4.53:1.
+
 ## The accent spend rule
 
 `--accent` means one thing: **"click this."**

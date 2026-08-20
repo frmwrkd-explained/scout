@@ -6,14 +6,18 @@
 // The second is prose — wikilinks someone wrote in a body. Collapsing them into one list is what
 // makes a tags feature stop feeling like a database.
 //
-// PROPERTIES is the same typed row set the document surface uses (./cells), for when the centre
-// pane holds a table rather than a document.
+// PROPERTIES is the SAME COMPONENT the document surface renders — PropertyRows.jsx, at the
+// inspector's density. Not a second row implementation that happens to look similar (Law 10): the
+// difference between reading a property here and editing it on the document surface is one prop.
 
 import React from 'react';
+import { api } from './api';
+import { ActivityRow } from './Activity';
+import { GraphPreview } from './Whiteboard';
 import { sx } from './sx';
 import { MONO } from './tokens';
 import { Eyebrow } from './ui';
-import { Cell } from './cells';
+import PropertyRows, { rowsFor } from './PropertyRows';
 
 export const INSPECTOR_W = 302;
 const mono = (extra = '') => ({ ...sx(extra), fontFamily: MONO });
@@ -34,23 +38,27 @@ function Section({ id, name, count, open, onToggle, children }) {
   );
 }
 
-function Row({ k, children }) {
-  return (
-    <div style={sx('display:flex;align-items:center;gap:10px;min-height:26px;padding:3px 0')}>
-      {/* A long key (evidence_weight) used to run under its own value at a fixed 74px. It
-          truncates instead — the full key is on the title, and the VALUE is what the eye is
-          here for. */}
-      <span title={k} style={{ ...mono('flex:none;width:74px;font-size:9.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'), color: 'var(--fg-faint)' }}>{k}</span>
-      <span style={sx('flex:1;min-width:0')}>{children}</span>
-    </div>
-  );
-}
-
 function Nothing({ children }) {
   return <span style={{ ...mono('font-size:9.5px;font-weight:500;letter-spacing:.08em'), color: 'var(--fg-faint)' }}>{children}</span>;
 }
 
-export default function Inspector({ collection, doc, referencedBy = [], open, onToggle, onOpen }) {
+// `onChange(key, value)` is optional and is the ONLY difference between this panel reading a
+// record and editing it. Pass it and every non-derived property row here becomes live.
+export default function Inspector({ collection, doc, referencedBy = [], open, onToggle, onOpen, onChange, onOpenPath, onOpenBoard}) {
+  // HISTORY is the event log filtered to this one file — who changed what, agent or human,
+  // newest first (T05 §4). It is fetched per selection rather than carried in the row, because a
+  // table of 150 rows must not pay for 150 histories nobody opened.
+  const [history, setHistory] = React.useState([]);
+  const docPath = doc && doc.path;
+  React.useEffect(() => {
+    if (!docPath) { setHistory([]); return undefined; }
+    let alive = true;
+    api.history(docPath)
+      .then(r => { if (alive) setHistory(r.events || []); })
+      .catch(() => { if (alive) setHistory([]); });
+    return () => { alive = false; };
+  }, [docPath]);
+
   if (!doc) {
     return (
       <aside style={{ ...sx('flex:none;background:var(--surface);border-left:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden'), width: INSPECTOR_W }}>
@@ -64,8 +72,9 @@ export default function Inspector({ collection, doc, referencedBy = [], open, on
     );
   }
 
-  const defs = collection?.fields || [];
-  const shown = defs.filter(f => doc.fields[f.key] !== undefined && doc.fields[f.key] !== '');
+  // The row set (and therefore the count on the collapsed header) is decided in one place, by the
+  // component that renders it.
+  const shown = rowsFor(collection, doc.fields, { hideEmpty: true });
   // Body wikilinks, split by direction. Outgoing is what this document says; incoming is what
   // other bodies say about it — prose, not schema, which is why it is not REFERENCED BY.
   const linksOut = [...String(doc.body || '').matchAll(/\[\[([^\]]+)\]\]/g)].map(m => m[1]);
@@ -83,7 +92,7 @@ export default function Inspector({ collection, doc, referencedBy = [], open, on
       <div style={sx('flex:1;min-height:0;overflow-y:auto')}>
         <Section id="props" name="PROPERTIES" count={shown.length} open={open === 'props'} onToggle={onToggle}>
           {shown.length
-            ? shown.map(f => <Row key={f.key} k={f.key}><Cell field={f} value={doc.fields[f.key]} onOpen={onOpen} /></Row>)
+            ? <PropertyRows collection={collection} values={doc.fields} onChange={onChange} onFollow={onOpen} variant="inspector" hideEmpty />
             : <Nothing>NO PROPERTIES SET</Nothing>}
         </Section>
 
@@ -116,12 +125,23 @@ export default function Inspector({ collection, doc, referencedBy = [], open, on
           ) : <Nothing>NO WIKILINKS IN THE BODY</Nothing>}
         </Section>
 
-        <Section id="history" name="HISTORY" count={null} open={open === 'history'} onToggle={onToggle}>
-          <Nothing>M2 — THE EVENT LOG</Nothing>
+        <Section id="history" name="HISTORY" count={history.length || null} open={open === 'history'} onToggle={onToggle}>
+          {history.length
+            ? history.map((ev, i) => <ActivityRow key={ev.id || i} ev={ev} onOpenPath={onOpenPath} />)
+            : <Nothing>NOTHING HAS HAPPENED TO THIS RECORD YET</Nothing>}
         </Section>
 
+        {/* A PREVIEW that opens INTO the whiteboard — never a second graph feature (T05 §5).
+            `GraphPreview` is exported by Whiteboard.jsx, so there is one implementation of the
+            relation view and the big canvas is the same code as the small one. */}
         <Section id="graph" name="GRAPH" count={null} open={open === 'graph'} onToggle={onToggle}>
-          <Nothing>M5 — OPENS INTO THE WHITEBOARD</Nothing>
+          <GraphPreview doc={doc} references={referencedBy} onOpen={onOpenPath} />
+          {onOpenBoard ? (
+            <button type="button" onClick={onOpenBoard}
+              style={{ ...mono('display:block;margin-top:10px;padding:0;background:none;border:none;cursor:pointer;font-size:9.5px;font-weight:700;letter-spacing:.12em'), color: 'var(--accent)' }}>
+              OPEN THE WHITEBOARD →
+            </button>
+          ) : null}
         </Section>
       </div>
     </aside>

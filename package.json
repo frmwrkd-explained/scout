@@ -10,6 +10,7 @@
     "server": "node backend/index.mjs",
     "test": "node --test",
     "bench": "node scripts/bench-store.mjs",
+    "demonstrate": "node scripts/demonstrate.mjs",
     "start": "npm run build && node backend/index.mjs",
     "app": "npm run build && electron .",
     "dist:mac": "npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --publish never",
@@ -41,6 +42,7 @@
       "backend/**",
       "shared/**",
       "skills/**",
+      "scripts/**",
       "dist/**",
       "package.json"
     ],

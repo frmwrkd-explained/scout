@@ -11,7 +11,7 @@ Base: `http://127.0.0.1:5177`
 | `GET /api/index` | Capabilities: collections, their fields, enabled tools, active project |
 | `GET /api/territory/:id` | A group's rules, access state, post history |
 | `GET /api/playbook/:id` | One playbook body — only the ones the context named |
-| `POST /api/search` | Records. Never list `data/` in bulk. |
+| `GET /api/search?q=` | Records and memory. Free text plus typed filters — `collection:guest status:shortlist`, `type:territory`, `tag:manila`. Never list `data/` in bulk. |
 
 ## Write
 
@@ -48,14 +48,14 @@ curl -s -X POST http://127.0.0.1:5177/api/records/upsert \
 | `POST /api/fields/propose` | `{collection, key, type, options, why}` — `why` is mandatory and shown to them |
 | `POST /api/territory/propose` | a group you want to join |
 | `POST /api/outbound/propose` | `{channel, territory, body}` — the exact wording |
-| `POST /api/views` | **allowed without approval.** Views are cheap and reversible. |
+| `PUT /api/views/:collection` | **allowed without approval.** Views are cheap and reversible. |
 
 ## Facts you may write directly
 
 | Route | For |
 |---|---|
 | `PATCH /api/territory/:id` | `last_swept`, `access`, `access_changed`, `rules`, `posted[]` |
-| `POST /api/tasks/:id/claim` | returns 409 if someone beat you — take another |
-| `POST /api/runs` / `POST /api/runs/:id/steps` | your own activity, so they can see what you did |
+| `POST /api/tasks/:id/claim` | answers `{ won: true｜false }`. **`won: false` means someone beat you — back off and take another.** It is a 200, not a 409: check the body, not the status. |
+| `POST /api/runs` | your own activity, so they can see what you did without asking |
 
 Never `PATCH` `finds`, `wins` or `hit_rate` — they are computed from records.
