@@ -120,8 +120,15 @@ export function saveView(collectionId, view) {
   const collection = getCollection(collectionId);
   if (!collection) throw new ViewError('no collection "' + collectionId + '"');
   validateView(collection, view);
-  const saved = readFile(collectionId).filter(v => v.id !== view.id);
-  const next = [...saved, { ...view, generated: undefined }];
+  // Replace IN PLACE. Filtering the old one out and appending re-ordered the strip on every
+  // save, so switching a view's shape or its density made its tab jump to the end of the row —
+  // the control moved because you used it. Only a genuinely new view appends.
+  const saved = readFile(collectionId);
+  const at = saved.findIndex(v => v.id === view.id);
+  const entry = { ...view, generated: undefined };
+  const next = at >= 0
+    ? saved.map((v, i) => (i === at ? entry : v))
+    : [...saved, entry];
   fs.mkdirSync(viewsDir(), { recursive: true });
   // tmp + rename, like every other write in this codebase: a half-written views file would not
   // error on read, it would silently resolve to zero views.

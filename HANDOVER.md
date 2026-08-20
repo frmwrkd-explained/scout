@@ -1,6 +1,6 @@
 # HANDOVER — Scout, as of 2026-08-20
 
-**M0–M5 are built. `npm test` is green (590 tests, 588 pass, 2 skipped, 0 fail) and
+**M0–M5 are built. `npm test` is green (593 tests, 591 pass, 2 skipped, 0 fail) and
 `npm run demonstrate` walks GOAL.md's ten gates against a real running app and prints the
 evidence for each one — currently 10 of 10.**
 
@@ -31,7 +31,7 @@ Then `docs/02_DATA_MODEL.md`, `03_MEMORY.md`, `04_AGENT_CONTRACT.md`, `05_UI_SPE
 ```bash
 npm ci
 find . -name "._*" -not -path "./node_modules/*" -delete   # ALWAYS, see §3
-npm test                     # 590 tests
+npm test                     # 593 tests
 npm run demonstrate          # the ten gates, against a throwaway copy of workspace/
 npm run server               # express on 5177
 npm run dev                  # vite on 5178, proxies /api → 127.0.0.1:5177
@@ -149,6 +149,53 @@ Several components "passed a build" while being entirely unreferenced. To check 
 ```bash
 ./node_modules/.bin/esbuild frontend/X.jsx --bundle --format=esm --platform=browser --jsx=automatic --outfile=/dev/null
 ```
+
+### The references are real repos and they are worth cloning
+`docs/06_REUSE.md` names four sources with URLs and licences. **`geckse/tesseract-md-app` (MIT)** is
+the one that answers most UI questions — it names individual component files for the property
+editor, the typed cells, the table toolbar and the saved-view modal. Clone it and read it before
+rebuilding any of those. Obsidian is the other reference and it is installed:
+
+```bash
+npx @electron/asar extract-file /Applications/Obsidian.app/Contents/Resources/obsidian.asar app.css
+```
+
+`app.css` carries the real properties metrics (`--metadata-gap: 3px`, `--metadata-label-width: 9em`).
+Guessing at them from a screenshot is how the property rows ended up at 40px.
+
+### Capability with no affordance is worse than a missing capability
+The pattern behind almost every complaint so far. `views.mjs` has shipped view types, nine filter
+operators, grouping and `density` since M1 and none of it had a control; `api.archiveRecord` sat in
+`api.js` uncalled since M2; `density` had never had a reader at all. From outside, "the app cannot
+do this" and "the app can do this and never says so" look identical — except the second is worse,
+because the person stops asking. **When you add a route, add the affordance in the same commit, or
+write down where it is going to live.**
+
+### A surface that echoes its own state will rewrite every file you open
+A live-preview editor adopts the text it is handed. That adoption looked like a keystroke, the save
+path sent it back, and the server took it: `updated`, `updated_by` and `verified_at` rewritten on
+every record merely OPENED, with an `update` event carrying `changed: []`. `updated_by` is what Law
+4 reads to ignore an agent-authored promotion and what decay reads to judge staleness, so a day of
+that tells the agent everything was re-verified by a person who only scrolled past it.
+
+Two defences, both wanted: the editor marks an adopted value so it is not reported as an edit, and
+**`patchRecord` refuses a patch that changes nothing** (`tests/phase-review-regressions.test.mjs`
+D4). If you add a third door onto a record, assume it will echo, and let the server be the one that
+does not care.
+
+### A green suite proves nothing about the doors only a human uses
+Both harnesses drive the app the way an AGENT does — `npm test` calls modules and routes,
+`npm run demonstrate` calls routes. Neither clicks anything. On 2026-08-20 the first person to use
+the app found four broken capabilities with all 590 tests green and 10 of 10 gates demonstrated:
+`+ Add property` had **never** worked (the route was handed `{...field, actor}` and the schema
+validator rejects unknown keys), nothing in the app called `api.archiveRecord` though it had sat in
+`api.js` since M2, opening a record was double-click-only with no affordance anywhere, and `boot()`
+switched you to `collections[0]` after a schema change so a guest rendered through the group schema.
+See `docs/decisions.md` "What the first person to actually use the app found".
+
+The pattern in all four: **the agent's path was exercised and the human's was not.** When a
+capability has two doors, test the route with the body the UI actually sends — not the function the
+route calls.
 
 ### A fixture that is easier than production tests the easy case
 Three serious defects survived 580 passing tests, all because `tests/phase-records.test.mjs`

@@ -16,6 +16,7 @@ import path from 'node:path';
 import { freshRoot, writeMd } from './helpers.mjs';
 import { getStorageRoot } from '../backend/store.mjs';
 import { upsertRecord, batchUpsert, patchRecord, readRecord } from '../backend/records.mjs';
+import { readEvents } from '../backend/log.mjs';
 import { documentsFor } from '../backend/documents.mjs';
 import { viewFor } from '../backend/documents.mjs';
 import { territoryStats } from '../backend/territory.mjs';
@@ -214,3 +215,49 @@ test('saveGoal keeps a created date the caller supplied', () => {
     'a goal that has been running a month was stamped as starting today, so it had no runway to be '
     + 'measured against');
 });
+
+// ── D4 · opening a record must not rewrite it ─────────────────────────────────────────────────
+// Found the moment a live-preview editor replaced the textarea: the editor adopts the text it is
+// handed, that adoption looked like a keystroke, and the save path PATCHed the body back. The
+// server took it — `updated`, `updated_by` and `verified_at` were all rewritten and an `update`
+// event with `changed: []` went into the log. Scrolling past a record reassigned it from the
+// assistant that found it to the human who looked at it.
+//
+// `updated_by` is not decoration. Law 4 reads it to ignore an agent-authored promotion, and
+// decay.mjs reads the dates to decide what is stale — so a no-op write does not merely add noise,
+// it tells the agent that everything was re-verified today.
+//
+// The editor no longer reports an adopted value as an edit (frontend/MarkdownEditor.jsx), and the
+// server refuses the write regardless, because a surface that lies about an edit is exactly what
+// this guard exists to survive.
+test('D4 · a patch that changes nothing does not touch provenance and does not log', () => {
+  freshRoot();
+  seed();
+  const { path: p } = upsertRecord({ ...AS_DOCUMENTED, body: 'A nurse.\n' }, { actor: 'scout-fb' });
+  const before = readRecord(p);
+  const eventsBefore = readEvents({ limit: 200, target: p }).length;
+
+  // Exactly what a surface echoing its own state sends: every value it was just given.
+  const out = patchRecord(p, {
+    name: before.data.name, status: before.data.status, handle: before.data.handle,
+    body: before.content,
+  }, { actor: 'crystal' });
+
+  assert.equal(out.unchanged, true, 'the write was not recognised as a no-op');
+  const after = readRecord(p);
+  assert.equal(after.data.updated_by, 'scout-fb', 'provenance was reassigned by a no-op patch');
+  assert.equal(String(after.data.updated), String(before.data.updated), '`updated` moved on a no-op patch');
+  assert.equal(String(after.data.verified_at), String(before.data.verified_at), '`verified_at` moved on a no-op patch');
+  assert.equal(
+    readEvents({ limit: 200, target: p }).length, eventsBefore,
+    'a no-op patch wrote an event into the log',
+  );
+
+  // And a REAL change still goes through, with only the key that actually moved named.
+  const real = patchRecord(p, { handle: '@mariacooks' }, { actor: 'crystal' });
+  assert.ok(!real.unchanged);
+  assert.equal(readRecord(p).data.updated_by, 'crystal');
+  const last = readEvents({ limit: 5, target: p })[0];
+  assert.deepEqual(last.detail.changed, ['handle']);
+});
+

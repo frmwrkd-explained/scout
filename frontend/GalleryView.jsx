@@ -11,7 +11,7 @@ import React from 'react';
 import { sx } from './sx';
 import { MONO } from './tokens';
 import { Cell } from './cells';
-import { Empty } from './ui';
+import { Empty, OpenRecord } from './ui';
 import { RenderTile } from './RenderMedia';
 
 const mono = (extra = '') => ({ ...sx(extra), fontFamily: MONO });
@@ -112,13 +112,21 @@ export default function GalleryView({ collection, view, views, rows, counts, sel
               style={{ background: on ? 'var(--raise)' : 'var(--surface)' }}
               placeholder={<Plate label={mediaName(value)} />}
               footer={
-                <div style={sx('display:flex;flex-direction:column;gap:6px;padding:9px 10px')}>
-                  <span style={{ ...sx('font-size:12px;font-weight:600;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'), color: on ? 'var(--fg)' : 'var(--fg-soft)' }}>
-                    {r.title}
+                <div className="rvH" style={sx('display:flex;flex-direction:column;gap:6px;padding:9px 10px')}>
+                  <span style={sx('display:flex;align-items:center;gap:8px;min-width:0')}>
+                    <span style={{ ...sx('min-width:0;font-size:12px;font-weight:600;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'), color: on ? 'var(--fg)' : 'var(--fg-soft)' }}>
+                      {r.title}
+                    </span>
+                    <OpenRecord onOpen={() => onOpen(r)} />
                   </span>
                   {defs.length ? (
                     <div style={sx('display:flex;align-items:center;gap:9px;flex-wrap:wrap')}>
-                      {defs.map(f => <Cell key={f.key} field={f} value={r.fields[f.key]} onOpen={onOpen} />)}
+                      {/* `onFollow`, not `onOpen`. Cell's relation chip hands back (collection, id);
+                          the row handler takes a row. This tile was still passing the row handler
+                          under the old single-prop name, so every relation chip in the gallery
+                          looked clickable and did nothing — the exact defect the table and the list
+                          were fixed for. One prop name, one meaning. */}
+                      {defs.map(f => <Cell key={f.key} field={f} value={r.fields[f.key]} onFollow={onFollow} />)}
                     </div>
                   ) : null}
                 </div>

@@ -11,7 +11,7 @@ import React from 'react';
 import { sx } from './sx';
 import { MONO } from './tokens';
 import { Cell } from './cells';
-import { Empty } from './ui';
+import { Empty, OpenRecord } from './ui';
 
 const mono = (extra = '') => ({ ...sx(extra), fontFamily: MONO });
 
@@ -124,7 +124,9 @@ export default function ListView({ collection, view, views, rows, counts, select
           {day.items.map(r => {
             const on = selected === r.path;
             return (
-              <div key={r.path}
+              // `rvH` arms OpenRecord's reveal-on-hover. The double-click still opens; the chip
+              // is what tells a person it does.
+              <div key={r.path} className="rvH"
                 onClick={() => onSelect(r)}
                 onDoubleClick={() => onOpen(r)}
                 style={{
@@ -136,6 +138,7 @@ export default function ListView({ collection, view, views, rows, counts, select
                 <span style={{ ...sx('flex:none;font-size:12.5px;font-weight:600;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'), color: on ? 'var(--fg)' : 'var(--fg-soft)' }}>
                   {r.title}
                 </span>
+                <OpenRecord onOpen={() => onOpen(r)} />
                 {r.summary ? (
                   <span style={sx('flex:1;min-width:0;font-size:11.5px;color:var(--fg-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>
                     {r.summary}

@@ -36,7 +36,6 @@ import Hire from './Hire';
 import Project from './Project';
 import Files from './Files';
 import Whiteboard from './Whiteboard';
-import AddField from './AddField';
 import Interview from './Interview';
 
 const HUMAN = 'crystal';   // the UI is never an agent. Law 4 reads the actor, so this is load-bearing.
@@ -50,7 +49,7 @@ export default class App extends React.Component {
     selected: null, docPath: null, section: 'props',
     referencedBy: [], refsFor: null, external: null,
     assistants: [], memoryCounts: {}, needsYou: 0, project: null, projects: [],
-    activityOpen: false, nonce: 0, refreshKey: 0, addingField: false, findings: null,
+    activityOpen: false, nonce: 0, refreshKey: 0, findings: null,
     firstRun: false,
     loading: true, error: null, toast: null,
   };
@@ -84,7 +83,15 @@ export default class App extends React.Component {
         .then(pairs => this.setState(st => ({
           counts: { ...st.counts, ...Object.fromEntries(pairs.filter(Boolean)) },
         })));
-      if (collections.length) await this.pickCollection(collections[0].id, null, { navigate: false });
+      // Stay where the person is standing. `boot()` runs again after a schema change (adding a
+      // property re-reads the collections), and jumping to collections[0] there yanked them off
+      // #guest onto #group mid-edit — the document surface then read a guest through the group
+      // schema, so the collapsed row showed `members` and `swept` on a person. Only a first boot,
+      // or an active collection that no longer exists, falls back to the first one.
+      const here = this.state.active && collections.some(c => c.id === this.state.active)
+        ? this.state.active
+        : (collections[0] && collections[0].id);
+      if (here) await this.pickCollection(here, this.state.view && this.state.view.id, { navigate: false });
     } catch (e) {
       this.setState({ loading: false, error: e.message });
     }
@@ -193,6 +200,31 @@ export default class App extends React.Component {
       }));
     } catch (e) { this.setState({ error: e.message }); }
   }
+
+  // A view is data in the vault (docs/02_DATA_MODEL.md §3), so changing its shape, its density or
+  // its filters is a WRITE — one route, `PUT /api/views/:collection`, whether the change came from
+  // this bar, from an agent, or from someone editing the JSON in Obsidian. There is no
+  // second, session-local notion of "how I like this collection", because two people looking at
+  // one collection and seeing different screens is worse than either screen.
+  saveView = async v => {
+    const id = this.state.active;
+    if (!id) return;
+    try {
+      await api.saveView(id, v);
+      await this.pickCollection(id, v.id, { navigate: false });
+    } catch (e) { this.setState({ toast: e.message }); throw e; }
+  };
+
+  deleteView = async viewId => {
+    const id = this.state.active;
+    if (!id) return;
+    try {
+      const { views } = await api.deleteView(id, viewId);
+      // Never leave the screen pointing at a view that no longer exists.
+      await this.pickCollection(id, (views[0] && views[0].id) || null, { navigate: false });
+      this.setState({ toast: 'View removed. The records are untouched — a view is only a saved query.' });
+    } catch (e) { this.setState({ toast: e.message }); }
+  };
 
   // PROJECT's one solid accent fill. Scout does not own the agent process (04_AGENT_CONTRACT §1),
   // so "put the team to work" means: open every task that is not claimed or done, and let whichever
@@ -362,7 +394,20 @@ export default class App extends React.Component {
             onOpenPath={this.openPath}
             onSaved={this.reload}
             onBack={() => this.go('collection')}
-            onAddProperty={activeCollection ? () => this.setState({ addingField: true }) : undefined}
+            // Presence says adding is allowed; the composer itself lives in the property list.
+            onFieldAdded={activeCollection ? f => {
+              this.setState({ toast: '"' + f.key + '" is on every #' + activeCollection.id + ' from now on.' });
+              this.boot();
+            } : undefined}
+            // Law 5: archived, never deleted, and never without a reason — the surface collects
+            // one and `records.mjs` refuses the write if it somehow arrives without. Afterwards
+            // the record is no longer where the person is standing, so this leaves the surface
+            // instead of holding them on a document that has moved.
+            onArchived={({ reason }) => {
+              this.setState({ screen: 'collection', docPath: null, selected: null, toast: 'Archived as "' + reason + '". It is still on disk, with the reason attached.' });
+              if (active) this.pickCollection(active, view?.id, { navigate: false });
+              this.reload();
+            }}
           />
         );
 
@@ -393,6 +438,8 @@ export default class App extends React.Component {
             onOpen={r => this.openPath(r.path)}
             onFollow={this.openRelation}
             onPickView={id => this.pickCollection(active, id, { navigate: false })}
+            onSaveView={this.saveView}
+            onDeleteView={this.deleteView}
             onMove={this.onMove}
           />
         );
@@ -451,18 +498,9 @@ export default class App extends React.Component {
                 app ever says to the person, and it must not require dismissing a modal. */}
             {/* A field is a schema change. An AGENT proposing one lands a card in DECIDE
                 (docs/02_DATA_MODEL.md §6); the human IS the disposer, so hers is created. Both
-                paths end in the same schema writer, which is why there is only one of them. */}
-            {this.state.addingField && activeCollection ? (
-              <AddField
-                collection={activeCollection}
-                actor={HUMAN}
-                onCancel={() => this.setState({ addingField: false })}
-                onDone={f => {
-                  this.setState({ addingField: false, toast: '"' + f.key + '" is on every #' + activeCollection.id + ' from now on.' });
-                  this.boot();
-                }}
-              />
-            ) : null}
+                paths end in the same schema writer, which is why there is only one of them.
+                The composer used to be mounted HERE, as a dialog over a dimmed page. It is now a
+                row inside the property list it edits (Document.jsx → AddField.jsx). */}
             {toast ? (
               <button type="button" onClick={() => this.setState({ toast: null })}
                 style={sx('position:absolute;left:50%;bottom:18px;transform:translateX(-50%);max-width:520px;padding:9px 14px;border-radius:8px;background:var(--surface-2);border:1px solid var(--border-3);color:var(--fg-soft);font-size:12px;cursor:pointer;text-align:left;box-shadow:0 12px 32px rgba(0,0,0,.45)')}>

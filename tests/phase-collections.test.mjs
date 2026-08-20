@@ -116,6 +116,36 @@ test('an unknown option on a known field type is refused rather than silently ig
   assert.equal(r.status, 400, 'a typo in an option sat silently in the schema: ' + JSON.stringify(r.body));
 });
 
+// The HUMAN's `+ Add property` door, which the unit test above never went through. It shipped
+// broken for the whole build: AddField.jsx posts `{ ...field, actor }`, and `validateField`
+// rejects every key outside the type's allowlist — deliberately, so a typo cannot sit unnoticed
+// in a schema — so EVERY manual field add 400'd with `"actor" is not an option of type text`.
+// The agent's path never hit it (proposals.mjs hands `card.field` over clean), which is exactly
+// why 590 green tests said nothing: the only door that was broken was the one only a person uses.
+// The route has to destructure the actor off. Reverted, this goes red.
+test('the human door: POST /fields takes an actor beside the field and does not mistake it for one', async () => {
+  freshRoot();
+  seedGuests();
+  const r = await req('POST', '/api/collections/guest/fields', { key: 'home_city', type: 'text', actor: 'crystal' });
+  assert.equal(r.status, 200, 'the actor was validated as a field option: ' + JSON.stringify(r.body));
+  assert.ok((r.body.fields || []).some(f => f.key === 'home_city'), 'the field was not added');
+  // The actor belongs in the log, not in the schema — a field carrying `actor` would fail
+  // validation on the NEXT write of this collection, from anywhere.
+  const added = (r.body.fields || []).find(f => f.key === 'home_city');
+  assert.equal(added.actor, undefined, 'the actor was stored on the field');
+});
+
+test('a schema change is a mutation, so it lands in the event log with who did it', async () => {
+  freshRoot();
+  seedGuests();
+  await req('POST', '/api/collections/guest/fields', { key: 'home_city', type: 'text', actor: 'crystal' });
+  const { body } = await req('GET', '/api/activity?limit=20');
+  const ev = (body.events || []).find(e => e.type === 'schema' && e.detail && e.detail.field === 'home_city');
+  assert.ok(ev, 'no schema event was logged: ' + JSON.stringify(body.events));
+  assert.equal(ev.actor, 'crystal');
+  assert.equal(ev.target, '.scout/collections/guest.md');
+});
+
 test('adding a field never rewrites existing documents — missing reads as empty', () => {
   freshRoot();
   seedGuests();

@@ -98,7 +98,9 @@ function DateCell({ value, field }) {
   if (!value) return <Dash />;
   if (field?.display === 'freshness') return <Freshness value={value} />;
   if (field?.display === 'relative') return <Freshness value={value} width={0} />;
-  return <span style={{ ...mono(), color: 'var(--fg-muted)' }}>{String(value)}</span>;
+  // Same trim as the editor, and for the same reason: a table cell printing a full ISO instant
+  // is twenty-four characters where ten carry the meaning. See dateFieldText.
+  return <span style={{ ...mono(), color: 'var(--fg-muted)' }}>{dateFieldText(value, !!field?.time)}</span>;
 }
 
 function LinkCell({ value, kind }) {
@@ -163,6 +165,48 @@ export const TYPE_ABBR = {
   checkbox: 'Y/N', url: 'URL', email: '@', phone: 'TEL', relation: 'REL', rollup: 'Σ',
   formula: 'FX', file: 'FIL', actor: 'WHO', json: '{ }',
 };
+
+// ── the type icon ──────────────────────────────────────────────────────────────────────────────
+// Tesseract's `PropertyRow` marks a row's type with an ICON, not a word (docs/06_REUSE.md —
+// `TypePickerDropdown.svelte` carries one per type). Scout used a three-letter mono abbreviation
+// in a 30px gutter — `TXT STA SEL REL NUM DTE Y/N TAG WHO` down the left of every record — which
+// is nine more words to read on a surface whose whole job is to be scanned. An icon is recognised
+// without being read.
+//
+// Inline SVG on `currentColor`, no icon font: Scout has three runtime dependencies and this is not
+// worth a fourth. 16px box, 1.5 stroke — the lucide geometry Obsidian also uses, drawn by hand.
+// `TYPE_ABBR` stays exported: the type PICKER names types in words, and a picker that only showed
+// glyphs would make someone guess.
+const P = d => <path d={d} />;
+const ICONS = {
+  text: <>{P('M4 7h16')}{P('M4 12h10')}{P('M4 17h13')}</>,
+  number: <>{P('M6 4 4 20')}{P('M14 4l-2 16')}{P('M3 9h17')}{P('M2 15h17')}</>,
+  select: <>{P('M6 9l6 6 6-6')}</>,
+  multiselect: <>{P('M3 6h13')}{P('M3 12h8')}{P('M3 18h13')}{P('M19 9l2 3-2 3')}</>,
+  status: <><circle cx="12" cy="12" r="8" />{P('M12 8v4l3 2')}</>,
+  date: <><rect x="3" y="5" width="18" height="16" rx="2" />{P('M3 10h18')}{P('M8 3v4')}{P('M16 3v4')}</>,
+  checkbox: <><rect x="3" y="3" width="18" height="18" rx="3" />{P('M8 12l3 3 5-6')}</>,
+  url: <>{P('M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1')}{P('M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1')}</>,
+  email: <><rect x="2" y="5" width="20" height="14" rx="2" />{P('M2 7l10 7 10-7')}</>,
+  phone: <>{P('M5 3h4l2 5-3 2a13 13 0 0 0 6 6l2-3 5 2v4a2 2 0 0 1-2 2A17 17 0 0 1 3 5a2 2 0 0 1 2-2z')}</>,
+  relation: <><circle cx="6" cy="6" r="3" /><circle cx="18" cy="18" r="3" />{P('M6 9v6a3 3 0 0 0 3 3h6')}</>,
+  rollup: <>{P('M5 4h14L9 12l10 8H5')}</>,
+  formula: <>{P('M7 20V8a4 4 0 0 1 4-4h1')}{P('M5 12h8')}{P('M14 11l6 8')}{P('M20 11l-6 8')}</>,
+  file: <>{P('M14 3v5h5')}{P('M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z')}</>,
+  actor: <><circle cx="12" cy="8" r="4" />{P('M4 21a8 8 0 0 1 16 0')}</>,
+  json: <>{P('M9 4H7a2 2 0 0 0-2 2v4l-2 2 2 2v4a2 2 0 0 0 2 2h2')}{P('M15 4h2a2 2 0 0 1 2 2v4l2 2-2 2v4a2 2 0 0 1-2 2h-2')}</>,
+};
+
+export function FieldIcon({ type, size = 15, title, style }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden={title ? undefined : 'true'} focusable="false"
+      fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"
+      style={{ ...sx('flex:none;display:block'), ...style }}>
+      {title ? <title>{title}</title> : null}
+      {ICONS[type] || ICONS.text}
+    </svg>
+  );
+}
 
 export function isDerived(field) {
   return field?.type === 'rollup' || field?.type === 'formula';
@@ -373,10 +417,24 @@ function MultiSelectEditor({ field, value, onChange }) {
 // surface today and the wrong one again when light mode lands (M5/T16). A mono ISO field is
 // token-clean in both themes, and frontmatter dates are ISO strings anyway.
 // `display: freshness` reuses Freshness — Law 3 has ONE meter and this is it.
+// A frontmatter date reaches the browser as whatever JSON made of it — usually a full ISO
+// instant, `2026-08-15T00:00:00.000Z`. Printing that verbatim put twenty-four characters of
+// machine punctuation in a property row whose real content is ten. The editor writes
+// `YYYY-MM-DD` (or `YYYY-MM-DD HH:MM`), so it should READ the same shape; the file keeps whatever
+// it had until someone actually edits the row. Trimming here rather than at each call site
+// because cells.jsx is where a field type becomes UI, and a second trimmer is a second truth.
+export function dateFieldText(value, time = false) {
+  if (value == null || value === '') return '';
+  const s = String(value instanceof Date ? value.toISOString() : value);
+  const m = s.match(/^(\d{4}-\d{2}-\d{2})(?:[T ](\d{2}:\d{2}))?/);
+  if (!m) return s;
+  return time && m[2] ? m[1] + ' ' + m[2] : m[1];
+}
+
 function DateEditor({ field, value, onChange }) {
   const time = !!field?.time;
   const shape = time ? 'YYYY-MM-DD HH:MM' : 'YYYY-MM-DD';
-  const str = value == null ? '' : String(value);
+  const str = dateFieldText(value, time);
   const bad = !!str && Number.isNaN(Date.parse(str));
   return (
     <span style={sx('display:inline-flex;align-items:center;gap:10px;flex-wrap:wrap')}>

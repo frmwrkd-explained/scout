@@ -35,13 +35,19 @@
 //   onPromote(nextStage)       optional. Present ⇒ the one solid accent button in the header,
 //                              which moves the gate field one stage on. Absent ⇒ no button, and
 //                              the stage is still visible as a chip.
-//   onAddProperty()            optional. Present ⇒ `+ Add property` under the last row. A new
-//                              field is a SCHEMA change (docs/02_DATA_MODEL.md §6), so it is
-//                              handed up rather than written here.
+//   onFieldAdded(field)        optional. Present ⇒ the inline `+ Add property` row is offered and
+//                              the composer opens IN the property list. Fires after the field
+//                              exists so the caller can reload the schema. A new field is a SCHEMA
+//                              change (docs/02_DATA_MODEL.md §6) — the composer calls the route,
+//                              this surface never writes a schema itself.
 //   onBack()                   optional. Present ⇒ a back control left of the title, for when the
 //                              surface is the whole centre pane rather than a slide-over.
 //   onDirty(bool)              optional. Fires whenever unsaved edits appear or clear.
 //   onSaved(doc)               optional. Fires after every accepted write, with { data, content }.
+//   onArchived({ path, reason })  optional. Present ⇒ the record can be ARCHIVED from here. Fires
+//                              after the server confirms, so the caller can leave the surface and
+//                              reload. Scout never deletes (Law 5) — this is the only removal the
+//                              app has, and it cannot happen without one of the five reasons.
 
 import React from 'react';
 import { sx } from './sx';
@@ -51,8 +57,10 @@ import { Btn, Empty, Eyebrow, InlineEdit } from './ui';
 import { Cell } from './cells';
 import PropertyRows from './PropertyRows';
 import { Freshness } from './Freshness';
-import Markdown from './Markdown';
+import MarkdownEditor from './MarkdownEditor';
 import { ConflictNotification } from './Conflict';
+import AddField from './AddField';
+import { REJECT_REASONS } from './DecideCards';
 
 const mono = (extra = '') => ({ ...sx(extra), fontFamily: MONO });
 
@@ -146,7 +154,7 @@ function seedOf(doc) {
 
 export default function Document({
   path, collection, collections, doc, actor = 'crystal',
-  onOpen, onOpenPath, onPromote, onAddProperty, onBack, onDirty, onSaved,
+  onOpen, onOpenPath, onPromote, onFieldAdded, onBack, onDirty, onSaved, onArchived,
 }) {
   const seed = seedOf(doc);
   const [loading, setLoading] = React.useState(!seed);
@@ -155,16 +163,39 @@ export default function Document({
   const [body, setBody] = React.useState(seed ? seed.content : '');
   const [summary, setSummary] = React.useState(seed ? (seed.summary != null ? seed.summary : firstParagraph(seed.content)) : '');
   const [flags, setFlags] = React.useState(null);
+  // Which collection THIS document belongs to, as the server computed it (records.mjs
+  // `collectionOf`). The surface used to render whatever collection the RAIL had selected, so
+  // opening a group while #guest was active drew a group through the guest schema: `Score`,
+  // `On camera` and `Found in` appeared as editable rows on a Facebook group, and writing one
+  // put a guest's field into a group's frontmatter. A schema is a property of the record, not of
+  // the screen you arrived from.
+  const [ownCollection, setOwnCollection] = React.useState(null);
+
+  // THE schema this surface renders by. The document's own collection wins; the prop is the
+  // fallback for the frame before the read lands, and for a memory object (territory/, playbook/)
+  // that is in no collection at all and whose rows are inferred from its frontmatter.
+  const schema = React.useMemo(() => {
+    if (!ownCollection) return collection;
+    if (collection && collection.id === ownCollection) return collection;
+    return (collections || []).find(c => c.id === ownCollection) || collection;
+  }, [ownCollection, collection, collections]);
+
   const [mode, setMode] = React.useState('editor');
   const [propsOpen, setPropsOpen] = React.useState(() => readPref(collection?.id));
   const [bodyOpen, setBodyOpen] = React.useState(false);
-  const [bodyEditing, setBodyEditing] = React.useState(false);
   const [save, setSave] = React.useState('saved');
   const [saveError, setSaveError] = React.useState(null);
   const [savedAt, setSavedAt] = React.useState(null);
   const [conflict, setConflict] = React.useState(null);
   const [raw, setRaw] = React.useState(null);
   const [options, setOptions] = React.useState({});
+  // null = not archiving · 'picking' = the reason strip is up · 'busy' = the write is in flight.
+  // Law 5 has no path out of a removal without a reason, so there is no state that archives
+  // without one — the button opens the picker, and only the picker calls the API.
+  const [archiving, setArchiving] = React.useState(null);
+  const [archiveError, setArchiveError] = React.useState(null);
+  // The add-property composer is a row in the list, not a dialog over the page — see AddField.jsx.
+  const [addingProperty, setAddingProperty] = React.useState(false);
 
   // Refs shadow the state the save path reads, so a debounced flush firing three keystrokes later
   // writes what is on screen and not what was on screen when the timer was set.
@@ -180,7 +211,7 @@ export default function Document({
   const seedRef = React.useRef(seed);
   seedRef.current = seed;
 
-  const primary = (collection?.fields || []).find(f => f.primary);
+  const primary = (schema?.fields || []).find(f => f.primary);
   const title = (primary && data[primary.key]) || data.name || data.title
     || String(path || '').split('/').pop().replace(/\.md$/, '');
 
@@ -191,19 +222,19 @@ export default function Document({
   const readDisk = React.useCallback(async () => {
     try {
       const r = await api.record(path);
-      return { data: r.data || {}, content: r.content || '', rev: r.rev ?? null, flags: r.flags || null, summary: r.summary };
+      return { data: r.data || {}, content: r.content || '', rev: r.rev ?? null, flags: r.flags || null, summary: r.summary, collection: r.collection || null };
     } catch (e) {
       if (e.status && e.status !== 404) throw e;
       const d = await api.document(path);
-      return { data: d.data || {}, content: d.content || '', rev: d.rev ?? null, flags: null, summary: d.summary };
+      return { data: d.data || {}, content: d.content || '', rev: d.rev ?? null, flags: null, summary: d.summary, collection: (d.collections || [])[0] || null };
     }
   }, [path]);
 
   React.useEffect(() => {
     aliveRef.current = true;
     let cancelled = false;
-    setLoadError(null); setConflict(null); setRaw(null);
-    setSave('saved'); setSaveError(null); setBodyOpen(false); setBodyEditing(false);
+    setLoadError(null); setConflict(null); setRaw(null); setOwnCollection(null);
+    setSave('saved'); setSaveError(null); setBodyOpen(false);
     pendingRef.current = {}; bodyDirtyRef.current = false;
     // Switching documents re-seeds synchronously, so the surface never shows the PREVIOUS
     // record's fields under the new record's path for a frame.
@@ -218,7 +249,7 @@ export default function Document({
     readDisk().then(d => {
       if (cancelled) return;
       dataRef.current = d.data; bodyRef.current = d.content; revRef.current = d.rev;
-      setData(d.data); setBody(d.content); setFlags(d.flags);
+      setData(d.data); setBody(d.content); setFlags(d.flags); setOwnCollection(d.collection || null);
       setSummary(d.summary != null ? d.summary : firstParagraph(d.content));
       setLoading(false);
     }).catch(e => { if (!cancelled) { setLoadError(e.message); setLoading(false); } });
@@ -236,7 +267,7 @@ export default function Document({
 
   // The preference is per collection, so switching collections re-reads it; switching DOCUMENTS
   // inside one collection deliberately does not.
-  React.useEffect(() => { setPropsOpen(readPref(collection?.id)); }, [collection?.id]);
+  React.useEffect(() => { setPropsOpen(readPref(schema?.id)); }, [schema?.id]);
 
   // Closing the window is the other way to lose a pending edit. Electron and the browser both fire
   // this; `flush()` is idempotent, so a save already in flight is not duplicated.
@@ -370,8 +401,8 @@ export default function Document({
   React.useEffect(() => {
     if (!propsOpen) return;
     let cancelled = false;
-    const rels = (collection?.fields || []).filter(f => f.type === 'relation' && f.target);
-    const actors = (collection?.fields || []).filter(f => f.type === 'actor');
+    const rels = (schema?.fields || []).filter(f => f.type === 'relation' && f.target);
+    const actors = (schema?.fields || []).filter(f => f.type === 'actor');
     (async () => {
       const next = {};
       await Promise.all(rels.map(async f => {
@@ -415,14 +446,39 @@ export default function Document({
       if (editable(e.target)) return;
       if (e.key === 'p' || e.key === 'P') {
         e.preventDefault();
-        setPropsOpen(v => { writePref(collection?.id, !v); return !v; });
+        setPropsOpen(v => { writePref(schema?.id, !v); return !v; });
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [collection?.id, flush]);
+  }, [schema?.id, flush]);
 
-  const toggleProps = () => setPropsOpen(v => { writePref(collection?.id, !v); return !v; });
+  const toggleProps = () => setPropsOpen(v => { writePref(schema?.id, !v); return !v; });
+
+  // Opening another record must not leave the previous one's reason strip armed over it.
+  React.useEffect(() => { setArchiving(null); setArchiveError(null); setAddingProperty(false); }, [path]);
+
+  // The ONE removal in the app. `records.mjs` refuses a reasonless archive with a 400 that names
+  // the five, so the picker is not politeness — sending nothing would simply fail. The pending
+  // edit is flushed first: archiving a record while a debounced keystroke is still in the air
+  // would write it back a moment after it moved.
+  const archive = async reason => {
+    setArchiveError(null);
+    setArchiving('busy');
+    try {
+      await flush();
+      const out = await api.archiveRecord(path, reason, actor);
+      if (!aliveRef.current) return;
+      setArchiving(null);
+      if (onArchived) onArchived({ path, reason, result: out });
+    } catch (e) {
+      if (!aliveRef.current) return;
+      // Verbatim: the route's message names the legal reasons, and a friendlier sentence would
+      // say less.
+      setArchiveError(e.message);
+      setArchiving('picking');
+    }
+  };
 
   // ── render ──────────────────────────────────────────────────────────────────────────────────
   if (loading) return <div style={sx('flex:1;min-width:0')} />;
@@ -434,8 +490,8 @@ export default function Document({
     );
   }
 
-  const { gate, num, date, fallbackDate } = collapsedFields(collection, data);
-  const rowCount = (collection?.fields || []).length || Object.keys(data).length;
+  const { gate, num, date, fallbackDate } = collapsedFields(schema, data);
+  const rowCount = (schema?.fields || []).length || Object.keys(data).length;
   const look = SAVE_LOOK[save] || SAVE_LOOK.saved;
   const saveText = save === 'saved' && savedAt
     ? 'SAVED ' + savedAt.toTimeString().slice(0, 5)
@@ -496,6 +552,18 @@ export default function Document({
             style={{ ...mono('font-size:10px;font-weight:500;font-variant-numeric:tabular-nums;white-space:nowrap'), color: look.colour }}>
             {saveText}
           </span>
+          {/* Archive is secondary chrome on purpose: it is a real action a person needs and could
+              not reach before (the route existed, nothing in the app called it), but it is not
+              what this screen is for. It never says "delete", because Scout never deletes — the
+              record and its reason stay on disk, and the rejects are the training data (Law 5). */}
+          {onArchived ? (
+            <Btn variant="ghost" size="sm" onClick={() => setArchiving(a => (a ? null : 'picking'))}
+              disabled={archiving === 'busy'}
+              title="Archive this record. Scout never deletes — it stays on disk with the reason attached."
+              style={{ color: archiving ? 'var(--danger)' : undefined }}>
+              {archiving === 'busy' ? 'Archiving…' : 'Archive'}
+            </Btn>
+          ) : null}
           {nextStage ? (
             // The one solid accent fill on this screen (docs/05_UI_SPEC.md §6) — the primary action.
             <Btn variant="primary" size="md" onClick={() => onPromote(nextStage)} style={sx('height:32px')}>
@@ -507,6 +575,25 @@ export default function Document({
           ) : null}
         </div>
       </div>
+
+      {/* The reason strip — the same shape as NOT SAVED below, and the same five reasons the
+          DECIDE queue rejects with (REJECT_REASONS mirrors records.mjs ARCHIVE_REASONS). Importing
+          that list rather than retyping it is the point: a sixth reason added in one place must not
+          leave a fifth-reason picker behind on this screen. */}
+      {archiving ? (
+        <div style={{ ...sx('flex:none;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:9px 22px'), background: 'var(--surface-2)', borderBottom: '1px solid var(--border)', borderLeft: '2px solid var(--danger)' }}>
+          <span style={{ ...mono('font-size:9px;font-weight:700;letter-spacing:.14em;white-space:nowrap'), color: 'var(--danger)' }}>ARCHIVE — WHY?</span>
+          {REJECT_REASONS.map(r => (
+            <Btn key={r.id} variant="secondary" size="sm" disabled={archiving === 'busy'} onClick={() => archive(r.id)}>
+              {r.label}
+            </Btn>
+          ))}
+          <span style={{ ...sx('flex:1;min-width:0;font-size:11px'), color: archiveError ? 'var(--danger)' : 'var(--fg-faint)' }}>
+            {archiveError || 'It stays on disk with the reason attached, and the reason moves the source’s score.'}
+          </span>
+          <Btn variant="ghost" size="sm" disabled={archiving === 'busy'} onClick={() => { setArchiving(null); setArchiveError(null); }}>Cancel</Btn>
+        </div>
+      ) : null}
 
       {conflict ? (
         <ConflictNotification conflict={conflict} onTakeDisk={takeDisk} onKeepMine={keepMine} onMerge={mergeBoth} />
@@ -582,14 +669,24 @@ export default function Document({
               <div style={sx('padding:6px 14px 10px')}>
                 {/* The SAME component the inspector's PROPERTIES section renders. */}
                 <PropertyRows
-                  collection={collection}
+                  collection={schema}
                   values={data}
                   onChange={queue}
                   onFollow={onOpen}
                   options={options}
                   variant="document"
                   showAuto
-                  onAddProperty={onAddProperty}
+                  onAddProperty={onFieldAdded ? () => setAddingProperty(true) : undefined}
+                  // In the row's own slot — a property is composed where the property will be,
+                  // above SYSTEM, not on a dimmed copy of the page and not under the provenance.
+                  addComposer={addingProperty && schema ? (
+                    <AddField
+                      collection={schema}
+                      actor={actor}
+                      onCancel={() => setAddingProperty(false)}
+                      onDone={f => { setAddingProperty(false); onFieldAdded(f); }}
+                    />
+                  ) : null}
                 />
               </div>
             ) : null}
@@ -628,30 +725,26 @@ export default function Document({
               <>
                 <div style={sx('padding:0 22px 6px')}><span style={{ ...sx('display:block;height:1px'), background: 'var(--border)' }} /></div>
                 <div style={sx('padding:12px 22px 30px;display:flex;flex-direction:column;gap:12px')}>
-                  <div style={sx('display:flex;align-items:center;justify-content:space-between;gap:12px')}>
+                  {/* No EDIT / DONE toggle any more. It existed because the two states were two
+                      different components — a textarea and a read-only render — so the app had to
+                      ask which one you wanted. A live-preview editor is both at once: the note
+                      reads as a note and takes a keystroke wherever you click. The mode switch
+                      that remains is Editor / Raw in the header, which is a different question
+                      (the rendered document vs. the bytes on disk, Law 8). */}
+                  <div style={sx('display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap')}>
                     <Eyebrow style={sx('font-size:9px;font-weight:800;letter-spacing:.18em')}>THE NOTE</Eyebrow>
-                    <button type="button" onClick={() => setBodyEditing(v => !v)} className="hFgL"
-                      style={{ ...mono('font-size:10px;font-weight:700;letter-spacing:.12em;background:none;border:none;padding:0;cursor:pointer'), color: bodyEditing ? 'var(--accent)' : 'var(--fg-faint)' }}>
-                      {bodyEditing ? 'DONE' : 'EDIT'}
-                    </button>
+                    <span style={{ ...mono('font-size:9.5px;font-weight:500;letter-spacing:.06em'), color: 'var(--fg-faint)' }}>
+                      MARKDOWN · SAVES AS YOU TYPE
+                    </span>
                   </div>
-                  {bodyEditing ? (
-                    <textarea
-                      defaultValue={body}
-                      spellCheck
-                      onKeyDown={e => e.stopPropagation()}
-                      onBlur={e => { if (e.target.value !== bodyRef.current) queueBody(e.target.value); }}
-                      style={{
-                        ...sx('width:100%;max-width:74ch;min-height:280px;padding:12px;border-radius:8px;box-sizing:border-box;line-height:1.7;font-size:13.5px;outline:none;resize:vertical'),
-                        color: 'var(--fg-soft)', background: 'var(--sunk)', border: '1px solid var(--border-2)',
-                        fontFamily: 'inherit',
-                      }}
-                    />
-                  ) : body.trim() ? (
-                    <Markdown text={body} style={sx('max-width:74ch')} />
-                  ) : (
-                    <Empty size="inline" style={sx('max-width:420px')} title="This note is empty" body="Press EDIT and write the part a human would want to read." />
-                  )}
+                  <MarkdownEditor
+                    key={path}
+                    value={body}
+                    onChange={queueBody}
+                    minHeight={260}
+                    placeholder="Write the part a human would want to read."
+                    style={sx('max-width:74ch')}
+                  />
                 </div>
               </>
             ) : null}

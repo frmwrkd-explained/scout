@@ -18,7 +18,7 @@ import React from 'react';
 import { sx } from './sx';
 import { MONO } from './tokens';
 import { Cell, StatusChip } from './cells';
-import { Empty, Eyebrow } from './ui';
+import { Empty, Eyebrow, OpenRecord } from './ui';
 import { Freshness } from './Freshness';
 
 const mono = (extra = '') => ({ ...sx(extra), fontFamily: MONO });
@@ -135,14 +135,20 @@ function BoardCard({ collection, row, defs, selected, dragging, draggable, onSel
       onDragEnd={onDragEnd}
       onClick={() => onSelect(row)}
       onDoubleClick={() => onOpen(row)}
+      // `rvH` arms OpenRecord. A card that can only be opened by a gesture nobody can see is a
+      // card that cannot be opened — the same reason the table, the list and the gallery carry it.
+      className="rvH"
       style={{
         ...sx('display:flex;flex-direction:column;gap:6px;padding:9px 10px;border-radius:8px;cursor:pointer;transition:background 130ms ease,border-color 130ms ease'),
         background: selected ? 'var(--raise)' : 'var(--surface-2)',
         border: '1px solid ' + (selected ? 'var(--border-3)' : 'var(--border)'),
         opacity: dragging ? 0.45 : 1,
       }}>
-      <span style={{ ...sx('font-size:12.5px;font-weight:600;line-height:1.35'), color: selected ? 'var(--fg)' : 'var(--fg-soft)' }}>
-        {row.title}
+      <span style={sx('display:flex;align-items:flex-start;justify-content:space-between;gap:8px;min-width:0')}>
+        <span style={{ ...sx('min-width:0;font-size:12.5px;font-weight:600;line-height:1.35'), color: selected ? 'var(--fg)' : 'var(--fg-soft)' }}>
+          {row.title}
+        </span>
+        <OpenRecord onOpen={() => onOpen(row)} style={sx('margin-top:1px')} />
       </span>
       {defs.length ? (
         <div style={sx('display:flex;align-items:center;gap:10px;flex-wrap:wrap')}>

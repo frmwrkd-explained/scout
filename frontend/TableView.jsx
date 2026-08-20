@@ -10,7 +10,8 @@ import React from 'react';
 import { sx } from './sx';
 import { MONO } from './tokens';
 import { Cell } from './cells';
-import { Empty } from './ui';
+import { Empty, OpenRecord } from './ui';
+import { densityOf } from './ViewBar';
 
 const mono = (extra = '') => ({ ...sx(extra), fontFamily: MONO });
 
@@ -24,6 +25,9 @@ const mono = (extra = '') => ({ ...sx(extra), fontFamily: MONO });
 // gallery at the same time instead of on the table alone.
 
 export default function TableView({ collection, view, views, rows, counts, selected, onSelect, onOpen, onFollow, onPickView }) {
+  // The row scale the view was saved with. `density` has been on the view object since M1 and
+  // this is its first reader — see ViewBar.jsx.
+  const d = densityOf(view);
   const fieldsShown = (view.fields && view.fields.length ? view.fields : (collection.fields || []).slice(0, 6).map(f => f.key));
   const defs = fieldsShown.map(k => (collection.fields || []).find(f => f.key === k) || { key: k, type: 'text' });
   // The primary field is the title column and always leads, whatever the view says.
@@ -46,7 +50,9 @@ export default function TableView({ collection, view, views, rows, counts, selec
             {rows.map(r => {
               const on = selected === r.path;
               return (
-                <tr key={r.path}
+                // `rvH` arms the reveal-on-hover chrome in the title cell. The row still opens on
+                // double-click — OpenRecord makes that gesture discoverable rather than replacing it.
+                <tr key={r.path} className="rvH"
                   onClick={() => onSelect(r)}
                   onDoubleClick={() => onOpen(r)}
                   style={{
@@ -55,9 +61,14 @@ export default function TableView({ collection, view, views, rows, counts, selec
                     borderBottom: '1px solid var(--line)',
                   }}>
                   {defs.map(f => (
-                    <td key={f.key} style={sx('padding:9px 14px;vertical-align:middle')}>
+                    <td key={f.key} style={{ ...sx('vertical-align:middle'), padding: d.pad, lineHeight: d.line }}>
                       {f.key === primary?.key
-                        ? <span style={{ ...sx('font-size:12.5px;font-weight:600'), color: on ? 'var(--fg)' : 'var(--fg-soft)' }}>{r.title}</span>
+                        ? (
+                          <span style={{ ...sx('display:flex;align-items:center;min-width:0'), gap: d.gap }}>
+                            <span style={{ ...sx('min-width:0;overflow:hidden;text-overflow:ellipsis;font-weight:600'), fontSize: d.font, color: on ? 'var(--fg)' : 'var(--fg-soft)' }}>{r.title}</span>
+                            <OpenRecord onOpen={() => onOpen(r)} />
+                          </span>
+                        )
                         : <Cell field={f} value={r.fields[f.key]} onFollow={onFollow} />}
                     </td>
                   ))}

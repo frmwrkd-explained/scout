@@ -274,9 +274,26 @@ app.patch('/api/collections/:id', (req, res) => {
   catch (e) { res.status(e.status || 400).json({ error: e.message }); }
 });
 
+// `actor` is WHO IS ADDING the field, not part of the field. It has to be destructured off here:
+// `validateField` rejects any key outside the type's allowlist — deliberately, so a typo cannot
+// sit unnoticed in a schema for weeks — so passing the request body through whole made EVERY
+// manual `+ Add property` 400 with `"actor" is not an option of type text`. The agent path
+// (proposals.mjs → addField(card.collection, card.field)) always passed a clean field, so only
+// the human's door was broken. CLAUDE.md: a field a route does not destructure does not exist.
 app.post('/api/collections/:id/fields', (req, res) => {
-  try { res.json(addField(req.params.id, req.body || {})); }
-  catch (e) { res.status(e.status || 400).json({ error: e.message }); }
+  const { actor = 'crystal', ...field } = req.body || {};
+  try {
+    const collection = addField(req.params.id, field);
+    // A schema change is a mutation, and every mutation lands in the log — that is the only place
+    // the actor belongs. `schema` is already in log.mjs EVENT_TYPES; the agent's accepted field
+    // proposal logs the same type from proposals.mjs.
+    logEvent({
+      type: 'schema', actor,
+      target: '.scout/collections/' + req.params.id + '.md',
+      detail: { change: 'field', field: field.key, field_type: field.type },
+    });
+    res.json(collection);
+  } catch (e) { res.status(e.status || 400).json({ error: e.message }); }
 });
 
 // ?view=<id> applies a saved view; ?bind=<json> is the subtable case (a collection plus a bound

@@ -18,6 +18,7 @@
 import React from 'react';
 import { sx } from './sx';
 import { MONO } from './tokens';
+import ViewBar from './ViewBar';
 import TableView from './TableView';
 import BoardView from './BoardView';
 import ListView from './ListView';
@@ -26,40 +27,13 @@ import GalleryView from './GalleryView';
 const mono = (extra = '') => ({ ...sx(extra), fontFamily: MONO });
 
 // ── the view strip ─────────────────────────────────────────────────────────────────────────────
-// One pill per saved view, count on each. Selected is a raised neutral chip with a --border-3 edge
-// — never an accent fill (docs/05_UI_SPEC.md §6: the one solid accent per screen is the primary
-// action, and a tab is not an action).
+// The strip that was here — one pill per saved view and nothing else — is now `ViewBar.jsx`, which
+// draws the same pills plus the three controls the backend had always accepted and the UI had
+// never offered: the view's SHAPE (table · board · list · gallery — board is the Kanban one), its
+// row DENSITY, and a composer for a filtered sub-view. See that file for why they were missing.
 //
-// ViewTabs and QueryBar are exported because they are the ONE view strip. TableView used to carry
-// byte-equivalent private copies — it drew its own chrome before this dispatcher existed — so a
-// change to the query bar reached the table and not the board, the list or the gallery. Reconciled:
-// every renderer now takes `chrome: true` and this file draws it once.
-export function ViewTabs({ views, activeId, counts, onPick }) {
-  return (
-    <div style={sx('flex:none;display:flex;align-items:center;gap:6px;padding:10px 20px 0;flex-wrap:wrap')}>
-      {(views || []).map(v => {
-        const on = v.id === activeId;
-        return (
-          <button key={v.id} onClick={() => onPick(v.id)}
-            style={{
-              ...sx('display:flex;align-items:center;gap:8px;height:26px;padding:0 11px;border-radius:6px;font-size:11.5px;cursor:pointer;transition:background 130ms ease,color 130ms ease'),
-              background: on ? 'var(--raise)' : 'transparent',
-              border: '1px solid ' + (on ? 'var(--border-3)' : 'transparent'),
-              color: on ? 'var(--fg)' : 'var(--fg-muted)',
-              fontWeight: on ? 600 : 500,
-            }}>
-            <span>{v.label || v.id}</span>
-            {counts && counts[v.id] != null ? (
-              <span style={{ ...mono('font-size:10px;font-weight:600;font-variant-numeric:tabular-nums'), color: on ? 'var(--fg-soft)' : 'var(--fg-faint)' }}>
-                {counts[v.id]}
-              </span>
-            ) : null}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
+// QueryBar stays here: it is a read-out of what the view is doing, not a control, and it belongs
+// beside the renderers it explains.
 
 // The query bar states, in the app's own words, exactly what the view is doing. It is not
 // decoration: a collection IS a saved query, and a person who cannot see the query cannot tell why
@@ -113,7 +87,10 @@ export default function CollectionView(props) {
 
   return (
     <div style={sx('flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden')}>
-      <ViewTabs views={views} activeId={view.id} counts={counts} onPick={onPickView} />
+      <ViewBar
+        collection={collection} view={view} views={views} counts={counts}
+        onPickView={onPickView} onSaveView={props.onSaveView} onDeleteView={props.onDeleteView}
+      />
       <QueryBar collection={collection} view={view} total={(rows || []).length} path={collection.query?.path || '—'} />
       <Body {...props} />
     </div>

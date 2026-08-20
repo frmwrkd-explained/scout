@@ -326,3 +326,36 @@ export function InlineEdit({
     />
   );
 }
+
+
+// ── OpenRecord ───────────────────────────────────────────────────────────────────────────────
+// The affordance that says a row can be OPENED.
+//
+// Every row renderer (table, list, gallery) has always had `onClick → select` and
+// `onDoubleClick → open`. Both worked; neither was visible. A double-click is not an affordance,
+// it is a secret, and the first thing a person reported about this app was "I can't open
+// documents" — the surface offered no way to find out that it could. Law 8 says nothing is hidden
+// from the human who wants to look, and an invisible gesture hides the whole document surface.
+//
+// It lives here, not in the three renderers, for the reason CLAUDE.md gives: a second
+// implementation of one control is a bug. Three copies of a hover chip would drift within a week.
+//
+// Reveal-on-hover (`rvH`/`rv` from styles.css) keeps the table as dense as §6 requires — the
+// chrome only appears when someone reaches for the row. The parent row must carry `className="rvH"`.
+// `stopPropagation` matters: without it the click also runs the row's select handler, and the two
+// fight over the same event.
+export function OpenRecord({ onOpen, label = 'Open', title = 'Open this record — or double-click the row', className = '', style, ...rest }) {
+  if (!onOpen) return null;
+  return (
+    <button type="button" title={title} className={'rv hAccent ' + className}
+      onClick={e => { e.stopPropagation(); onOpen(); }}
+      onDoubleClick={e => e.stopPropagation()}
+      style={{
+        ...sx('flex:none;display:inline-flex;align-items:center;gap:4px;padding:1px 6px;border-radius:5px;cursor:pointer;background:var(--surface-2);font-size:9px;font-weight:700;letter-spacing:.1em'),
+        fontFamily: MONO, border: '1px solid var(--border-2)', color: 'var(--fg-muted)',
+        ...style,
+      }}
+      {...rest}
+    >{label.toUpperCase()}<span aria-hidden="true" style={sx('font-size:8.5px')}>↗</span></button>
+  );
+}

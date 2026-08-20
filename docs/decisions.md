@@ -682,3 +682,163 @@ is now probed against a live server.
 Three of these were invisible to 580 passing tests and visible within minutes of *calling the route
 and reading the answer*. The rule that would have caught all of them: **a fixture must be at least as
 hard as production, and an advertised capability must be exercised, not asserted.**
+
+---
+
+## What the first person to actually use the app found (2026-08-20)
+
+Reported as "I can't open documents, I can't add fields manually, I can't delete, etc." Four of the
+five were real, and none of them was in the parts the suite or `demonstrate.mjs` looks at. Every one
+was on the door only a **human** goes through.
+
+### The server was stale, and the app said so in a way that read as "unfinished"
+The running backend predated half the routes it was being asked for, so `/api/goals`,
+`/api/assistants`, `/api/proposals` and `/api/projects` all 404'd and Today rendered
+`THE GOALS ROUTE IS NOT UP YET` next to `THE ASSISTANTS ROUTE IS NOT UP YET`. Those strings are the
+frontend's honest fallback, and they are correct — but nothing distinguishes *"this route was never
+built"* from *"the process you are talking to is older than the code on disk"*, and the person
+reading them cannot tell. **Restarting the API fixed every one of them.** Worth remembering before
+diagnosing anything else: the backend has no reload, and `npm start` builds the UI but the process
+that serves it is whatever was launched.
+
+### `+ Add property` had never once worked
+`AddField.jsx` posts `{ ...field, actor }`. `validateField` rejects any key outside the type's
+allowlist — deliberately, so a typo cannot sit unnoticed in a schema for weeks — so **every** manual
+field add, of every type, 400'd with `"actor" is not an option of type text`. The agent's path
+(`proposals.mjs` → `addField(card.collection, card.field)`) always handed over a clean field, so the
+capability worked for agents and had never worked for a person.
+
+590 green tests said nothing because the only test of `addField` called the **function**, not the
+route. **The route is where the actor is separated from the field** — CLAUDE.md already says a field
+a route does not destructure does not exist. It now destructures, and logs a `schema` event with the
+actor, which a schema change had never produced.
+
+### Opening a record was a secret
+Table, list and gallery have always been `click → select`, `double-click → open`. Both worked.
+Nothing anywhere said so, the inspector's path was rendered as dead text while the identical line on
+the document surface was a button, and so the whole document surface was unreachable for someone who
+did not guess. **A double-click is not an affordance.** Law 8's "two clicks" was being counted from a
+gesture nobody could see.
+
+Fixed in one place, not three: `OpenRecord` in `ui.jsx`, reveal-on-hover (`rvH`/`rv`), used by all
+three row renderers — and the inspector's path is now the button it always claimed to be. The
+double-click still works; it is no longer the only way in.
+
+### There was no way to remove anything
+`api.archiveRecord` existed in `frontend/api.js` and **nothing called it**. `POST /api/records/archive`
+had been reachable by agents since M2 and by a person never. The document surface now carries
+`Archive`, which opens the five-reason strip (`REJECT_REASONS`, imported from `DecideCards.jsx` —
+the same list, not a sixth copy) and cannot write without one. It never says *delete*, because
+nothing is deleted: the file moves to `data/_archive/<collection>/` carrying `archive_reason`,
+`archived_by` and `archived_from`, and the event lands in the log.
+
+### `boot()` moved you to another collection while you were standing in a record
+`boot()` ended with `pickCollection(collections[0].id)` unconditionally. It also runs after a schema
+change — so adding a property on `#guest` silently switched the app to `#group`, and the document
+surface then rendered a guest **through the group schema**: the collapsed row on a person showed
+`members` and `swept`. It now keeps the active collection when that collection still exists.
+`reload()` already did this correctly, which is what made the difference visible.
+
+### And one more, still carrying the defect the handover says was fixed
+`GalleryView` passed `onOpen={onOpen}` into `Cell`, which takes `onFollow`. That is exactly the
+one-prop-two-signatures bug the handover records fixing for the table and the list — it was never
+fixed in the gallery, so every relation chip on a gallery tile looked clickable and did nothing.
+
+### The thing to carry forward
+`npm test` is green, `npm run demonstrate` passes 10 of 10, and four capabilities a person needs did
+not work. Both harnesses drive the app the way an **agent** does — through modules and HTTP. Nothing
+in either one clicks a button. **A capability that only a human reaches needs a test that goes
+through the human's door**, which for a route means the route, with the body the UI actually sends.
+
+---
+
+## The second round of feedback: the editor, the properties, the popup, the table (2026-08-20)
+
+> "I want a full working Markdown editor, so please check Obsidian… properties are super hard to
+> read, super cluttered, and not well-organized. Also, the pop-up is super bad, very horrible…
+> Make sure the table looks more like a table where I can make the rows smaller or bigger, where I
+> can change the view to Kanban, etc., and where I can create sub-views based on filters manually."
+
+Every one of these was already answered somewhere in this repo — in `docs/06_REUSE.md`, in
+`backend/views.mjs`, or in a field that had been written and never read. The theme of the whole
+round: **the backend was ahead of the UI, and nothing on screen said so.**
+
+### The references, and where they actually are
+`docs/06_REUSE.md` names them with URLs, licences and a take-this table. The one that matters here
+is **`geckse/tesseract-md-app` (MIT)** — named down to individual component files:
+`FrontmatterEditor.svelte`, `PropertyRow.svelte`, `AddPropertyRow.svelte`,
+`TypePickerDropdown.svelte`, `TableView`, `TableToolbar`, `SaveViewModal`. Clone it and read it
+before touching any of those surfaces. Obsidian is the other reference and it is on this machine:
+`/Applications/Obsidian.app/Contents/Resources/obsidian.asar` → `app.css` carries the real
+properties metrics (`--metadata-gap: 3px`, `--metadata-label-width: 9em`,
+`--metadata-input-height: calc(font-size * 1.75)`), extractable with
+`npx @electron/asar extract-file`.
+
+### The properties were fifteen shouted rows, six of them provenance
+40px rows, every label in 9px mono ALL CAPS at .16em tracking, a three-letter type word down the
+gutter (`TXT STA SEL REL NUM DTE Y/N TAG WHO`), and `created / updated / created_by / provenance /
+updated_by / verified_at` interleaved with the person's own nine, printing
+`2026-08-15T00:00:00.000Z` at full width.
+
+Fixed by taking all three answers from the references: the type gutter is an **icon** (Tesseract's
+`PropertyRow` / `TypePickerDropdown`), the rows are **Obsidian's height**, and the machine fields
+are their own collapsed **SYSTEM** group. Labels are sentence case — ALL CAPS is the one eyebrow
+above a section, not every row inside it. `cells.jsx dateFieldText` trims a stored ISO instant to
+the shape the editor writes, in the one place a field type becomes UI.
+
+### The popup was a dialog for adding one column
+520px over a dimmed page: a title, two paragraphs, thirteen full-sentence type buttons wrapped over
+four lines, then Add/Cancel. `docs/06_REUSE.md` already pointed at `AddPropertyRow.svelte` for this
+and the shape there is a **row in the property list**, with the type behind a small anchored
+popover. It is now that, it opens in the slot the property will occupy, and the whole interaction is
+type a name and press Enter.
+
+### The table controls existed in the backend and had no UI at all
+`views.mjs` has shipped `type` (table · board · list · gallery), `filter` with nine operators,
+`sort`, `group`, `fields` and **`density`** since M1, and `PUT /api/views/:collection` writes them
+into the vault. `density` had never had a single reader — it has been in `defaultView()` from the
+beginning. `api.deleteView` did not even exist on the client, though the route did.
+
+`ViewBar.jsx` is that missing UI, and it writes REAL saved views through the one route, so a view a
+person makes is the same object an agent writes and it lands in `.scout/views/<collection>.json`
+where the data carries it. Changing the shape or the density therefore SAVES — a collection turned
+into a board is a board tomorrow and on the other machine. Storing it as a session preference would
+have meant two people looking at one collection and describing different screens to each other.
+
+`saveView` also had to stop re-ordering: it filtered the old entry out and appended, so a view's tab
+jumped to the end of the strip every time you changed its shape. The control moved because you used
+it. It now replaces in place.
+
+### The editor: eleven dependencies now, and why
+CodeMirror 6, chosen by the owner. It is what Obsidian's editor is built on and what the reference
+uses for its source mode. Live preview is not a preview pane — the markup stays in the document and
+is hidden on every line the cursor is not on, so a heading reads as a heading until you put the
+caret in it. `MarkdownEditor.jsx livePreview` is a ViewPlugin doing exactly that over the syntax
+tree. The EDIT / DONE toggle is gone: it only existed because the two states were two different
+components.
+
+### The three defects the editor exposed on its first open
+1. **Opening a record rewrote it.** The editor adopts the text it is handed; that adoption looked
+   like a keystroke, the save path PATCHed the body back, and the server took it — `updated`,
+   `updated_by` and `verified_at` all rewritten, plus an `update` event with `changed: []`. Merely
+   scrolling past a record reassigned it from the assistant that found it to the human who looked
+   at it. `updated_by` is the field Law 4 reads to ignore an agent promotion and `decay.mjs` reads
+   to decide what is stale, so this is not noise — it tells the agent everything was re-verified
+   today. Fixed in **both** halves: the editor annotates an adopted value so it is not reported as
+   an edit, and **`patchRecord` now refuses a patch that changes nothing**, because a surface that
+   lies about an edit is exactly what the server should survive.
+   Guarded in `tests/phase-review-regressions.test.mjs` as D4.
+2. **The document surface rendered whatever collection the RAIL had selected.** Open a group while
+   `#guest` is active and a Facebook group grew `Score`, `On camera` and `Found in` as editable
+   rows — and writing one put a guest's field into a group's frontmatter, which is what happened
+   here. `readRecord` had returned the document's own collection all along; the surface ignored it.
+   A schema is a property of the record, not of the screen you arrived from.
+3. `GalleryView` was still passing `onOpen` where `Cell` takes `onFollow` — the one-prop-two-
+   signatures bug the handover records fixing for the table and the list, never fixed in the
+   gallery.
+
+### The thing to carry forward
+Four features in this round were *already built* and unreachable: archive, view shapes, density,
+saved-view filters. The build's failure mode is not missing capability, it is **capability with no
+affordance** — and the two look identical from the outside, except that the second one is worse,
+because the person concludes the app cannot do it and stops asking.

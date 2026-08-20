@@ -83,10 +83,17 @@ export default function Inspector({ collection, doc, referencedBy = [], open, on
     <aside style={{ ...sx('flex:none;background:var(--surface);border-left:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden'), width: INSPECTOR_W }}>
       <div style={sx('flex:none;height:40px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 16px;border-bottom:1px solid var(--line)')}>
         <Eyebrow style={sx('font-size:9px;font-weight:800;letter-spacing:.18em;color:var(--fg-muted)')}>INSPECTOR</Eyebrow>
-        {/* Law 8 — every record shows its path, and it is the same string the API takes. */}
-        <span style={{ ...mono('font-size:9.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'), color: 'var(--fg-faint)' }} title={doc.path}>
+        {/* Law 8 — every record shows its path, and it is the same string the API takes. It is
+            also CLICKABLE, the way the identical line on the document surface has always been:
+            rendered as dead text it printed the promise of two clicks without honouring it, and
+            with the row's open gesture hidden behind a double-click this was the last exit from a
+            selected record. Selecting a row and clicking its path is now the two clicks. */}
+        <button type="button" title={onOpenPath ? 'Open ' + doc.path : doc.path}
+          onClick={() => onOpenPath && onOpenPath(doc.path)}
+          className={onOpenPath ? 'hAccent' : ''}
+          style={{ ...mono('font-size:9.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:none;border:none;padding:0'), color: 'var(--fg-faint)', cursor: onOpenPath ? 'pointer' : 'default' }}>
           {doc.path}
-        </span>
+        </button>
       </div>
 
       <div style={sx('flex:1;min-height:0;overflow-y:auto')}>

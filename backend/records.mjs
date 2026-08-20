@@ -657,6 +657,25 @@ export function patchRecord(relPath, patch = {}, { actor = DEFAULT_ACTOR, rev = 
       { actor, target: doc.path, to: String(patch[gate.key]), max: AGENT_MAX_STAGE });
   }
   const body = patch.body !== undefined ? String(patch.body) : (patch.content !== undefined ? String(patch.content) : doc.content);
+
+  // A PATCH THAT CHANGES NOTHING IS NOT A WRITE.
+  //
+  // Without this, any surface that re-sent the value it was given — a controlled input echoing on
+  // mount, an editor adopting the text it was just handed — rewrote `updated`, `updated_by` and
+  // `verified_at` and logged an `update` with `changed: []`. Merely OPENING a record reassigned
+  // its provenance from the assistant that found it to the human who looked at it, which is the
+  // exact field Law 4 reads to ignore an agent-authored promotion, and the exact field decay reads
+  // to decide what is stale. One afternoon of that and the memory is telling the agent that
+  // everything was re-verified today by a person who only scrolled past it.
+  //
+  // A caller that genuinely means "I checked this and it still holds" has a verb for it —
+  // `verified_at` is settable in the patch, and setting it is then a real change.
+  const proposed = cleanInput(patch);
+  const same = Object.keys(proposed).every(k => JSON.stringify(doc.data[k]) === JSON.stringify(proposed[k]));
+  if (same && body === doc.content) {
+    return { path: doc.path, rev: current, data: doc.data, content: doc.content, unchanged: true };
+  }
+
   const now = new Date().toISOString().slice(0, 10);
   const data = orderFrontmatter(collection || { fields: [] }, {
     ...doc.data, ...cleanInput(patch),
@@ -664,7 +683,8 @@ export function patchRecord(relPath, patch = {}, { actor = DEFAULT_ACTOR, rev = 
     ...(agent ? {} : { proposed: false }),
   });
   writeMd(doc.abs, data, body);
-  const changed = Object.keys(cleanInput(patch));
+  const changed = Object.keys(proposed).filter(k => JSON.stringify(doc.data[k]) !== JSON.stringify(proposed[k]));
+  if (body !== doc.content) changed.push('body');
   emit({ type: 'update', actor, target: doc.path, detail: { changed, via: 'surface' } });
   touched();
   return { path: doc.path, rev: revOf(data, body), data, content: body };
