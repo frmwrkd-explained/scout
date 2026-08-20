@@ -33,8 +33,22 @@ import { registerUserToolRoutes } from './userTools.mjs';
 import { search as structuredSearch } from './search.mjs';
 import { registerFeedbackRoutes, installLogRing, recordApiCall, flushOutbox } from './feedback.mjs';
 import { listCollections, getCollection, saveCollection, addField, FIELD_TYPE_NAMES } from './collections.mjs';
-import { documentsFor, documentAt, collectionsOf, allDocuments, referencesTo } from './documents.mjs';
+import { documentsFor, documentAt, collectionsOf, allDocuments, referencesTo, viewFor } from './documents.mjs';
 import { listViews, getView, saveView, deleteView, applyView, defaultView } from './views.mjs';
+// ── Scout's own spine (M2–M5) ────────────────────────────────────────────────────────────────
+// Each of these owns its routes and mounts them through a registerXRoutes(app, deps) call below,
+// so this file stays a wiring diagram rather than becoming a second home for the logic.
+import { registerRecordRoutes, excludeQuarantined, sweepQuarantine } from './records.mjs';
+import { registerScoutMemoryRoutes, scheduleCacheRegen } from './memory.mjs';
+import { registerFileRoutes } from './files.mjs';
+import { registerIndexRoutes } from './agentIndex.mjs';
+import { registerScoutBoardRoutes } from './scoutBoard.mjs';
+import { registerIntakeRoutes, isFirstRun } from './intake.mjs';
+import { registerTerritoryRoutes } from './territory.mjs';
+import { registerTaskRoutes } from './tasks.mjs';
+import { registerProposalRoutes } from './proposals.mjs';
+import { registerInboxRoutes, startInboxWatch, ensureInbox, refreshAgentFiles } from './inbox.mjs';
+import { logEvent, readEvents } from './log.mjs';
 
 const APP_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.argv[2]) || Number(process.env.PORT) || 5177;
@@ -153,6 +167,43 @@ registerUserToolRoutes(app, { appendActivity });
 // beta feedback (backend/feedback.mjs) — the ONLY outbound call in this app to a server we own.
 registerFeedbackRoutes(app);
 
+// ── Scout: memory, orchestration and the doors ────────────────────────────────────────────────
+// `logEvent` is handed to every module as a dep rather than imported by each of them. One append
+// point means the Activity drawer shows the whole truth and there is nowhere for a mutation to
+// happen quietly — which is the only thing that makes Law 4's guarantee checkable.
+registerRecordRoutes(app, { logEvent, refreshAgentFiles });
+registerScoutMemoryRoutes(app, { logEvent });
+// `revealInOS` is declared in this file and is the ONE spawner — injecting it is what stops
+// files.mjs writing a second one. Without it the route answers 501 naming this exact fix.
+registerFileRoutes(app, { logEvent, revealInOS });
+registerIndexRoutes(app, { logEvent });
+registerScoutBoardRoutes(app, { logEvent });
+registerIntakeRoutes(app, { logEvent });
+
+// Scout's projects, which are folders under `projects/` with a `project.md` — not FrameForge's
+// `listProjects()`, which reads the same directory for a different object and would hand the rail
+// a shape it cannot render. Two things named "project" is a naming problem, not a reason to make
+// one of them serve both.
+app.get('/api/scout/projects', (_req, res) => {
+  const dir = path.join(getStorageRoot(), 'projects');
+  let ids = [];
+  try {
+    ids = fs.readdirSync(dir, { withFileTypes: true })
+      .filter(e => e.isDirectory() && !e.name.startsWith('.') && !e.name.startsWith('_'))
+      .map(e => e.name).sort();
+  } catch { /* no projects yet */ }
+  const projects = ids.map(id => {
+    let data = {};
+    try { ({ data } = readMd(path.join(dir, id, 'project.md'))); } catch { /* folder without a project.md */ }
+    return { id, label: data.label || data.name || id, ...data, path: 'projects/' + id + '/project.md' };
+  });
+  res.json({ projects });
+});
+registerTerritoryRoutes(app, { logEvent });
+registerTaskRoutes(app, { logEvent });
+registerProposalRoutes(app, { logEvent });
+registerInboxRoutes(app, { logEvent });
+
 // pid/scope route params become filesystem path segments — allow only slug charset
 // (project ids are kebab slugs; scope is 'library' or a project id). Blocks %2F traversal.
 const SLUG = /^[\w-]+$/;
@@ -230,14 +281,16 @@ app.post('/api/collections/:id/fields', (req, res) => {
 
 // ?view=<id> applies a saved view; ?bind=<json> is the subtable case (a collection plus a bound
 // parameter — one mechanism, no second storage).
-app.get('/api/collections/:id/documents', (req, res) => {
+app.get('/api/collections/:id/documents', async (req, res) => {
   let bind = null;
   if (req.query.bind) { try { bind = JSON.parse(String(req.query.bind)); } catch { return res.status(400).json({ error: 'bind must be JSON' }); } }
-  const found = documentsFor(req.params.id, { bind });
-  if (!found) return res.status(404).json({ error: 'no collection "' + req.params.id + '"' });
-  const view = getView(req.params.id, req.query.view ? String(req.query.view) : null) || defaultView(found.collection);
-  const { rows, groups } = applyView(view, found.documents);
-  res.json({ collection: found.collection, view, total: found.documents.length, rows, groups });
+  try {
+    // ONE composition, in documents.mjs, shared with door 3. See viewFor()'s note: the quarantine
+    // rule (Law 4) has to be applied where every view is assembled, not re-assembled per caller.
+    const out = await viewFor(req.params.id, { view: req.query.view ? String(req.query.view) : null, bind, all: !!req.query.all });
+    if (!out) return res.status(404).json({ error: 'no collection "' + req.params.id + '"' });
+    res.json(out);
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.get('/api/views/:collection', (req, res) => {
@@ -902,6 +955,28 @@ if (IS_MAIN) {
   // read only when a human presses Send in the feedback panel.
   installLogRing();
   startWatch(30000); // fs.watch + 30s reconcile → external agent edits bump the revision too
+
+  // Door 2, actually open (T07 step 1). `_inbox/` is where an agent with folder access and no
+  // network drops a finding — it is the door that works everywhere, so it must not need a button
+  // pressed. `ensureInbox` also writes the drop instructions into the folder they are needed in,
+  // and the two agent-facing files are refreshed once at boot so a folder-mode agent starting
+  // before the first write still has something to grep.
+  //
+  // Only under IS_MAIN: a test harness that imported this module would otherwise inherit a live
+  // fs.watch on somebody else's temp root.
+  try {
+    // Mark quarantined records ON DISK once at boot. The route computes the same answer on every
+    // read, but `territory.mjs` scores from the FILES — so without the flag written down, a record
+    // an agent wrote around the pipeline would be excluded from the view and still counted in its
+    // territory's hit rate. Law 1: the file is the truth, so the state has to be in the file.
+    const held = sweepQuarantine();
+    if (held.length) console.log('[scout] quarantined ' + held.length + ' record(s) written around the pipeline');
+    ensureInbox();
+    startInboxWatch();
+    refreshAgentFiles({ now: true });
+  } catch (e) {
+    console.error('[scout] the _inbox watcher did not start — ' + e.message);
+  }
   const HOST = process.env.HOST || '127.0.0.1';
   process.env.SCOUT_SELF_PORT = String(PORT); // ticket 10 — the agent home renders the Index's api base from this
   // Without an 'error' listener an occupied port kills the process with a raw unhandled

@@ -2,14 +2,24 @@
 // human-readable reason, and swallowing it made unrelated failures show the wrong toast.
 const j = async r => {
   if (!r.ok) {
-    let msg = 'api ' + r.status, code = null;
-    try { const b = await r.clone().json(); if (b && b.error) msg = b.error; if (b && b.code) code = b.code; } catch { /* non-JSON body */ }
+    let msg = 'api ' + r.status, code = null, body = null;
+    try {
+      const b = await r.clone().json();
+      body = b;
+      if (b && b.error) msg = b.error;
+      if (b && b.code) code = b.code;
+    } catch { /* non-JSON body */ }
     const err = new Error(msg);
     // Carry the server's discriminator ('not-configured' | 'no-entry' | …) so callers can render a
     // failure-specific empty state instead of one catch-all headline. Dropping it here is why every
     // Remotion failure used to read "No Remotion project connected", including the ones where it was.
     err.code = code;
     err.status = r.status;
+    // …and carry the whole body. A 409 from PATCH /api/records answers with the CURRENT rev and
+    // data — that is the entire input to the conflict UX, and dropping it here forced the document
+    // surface to issue a second GET and resolve against a different moment in time than the one
+    // that actually collided.
+    err.body = body;
     throw err;
   }
   return r.json();
@@ -27,6 +37,10 @@ export const api = {
   // bind is the subtable case — a collection plus a bound parameter, one mechanism
   documents: (id, view, bind) => fetch('/api/collections/' + encodeURIComponent(id) + '/documents'
     + '?view=' + encodeURIComponent(view || '') + (bind ? '&bind=' + encodeURIComponent(JSON.stringify(bind)) : '')).then(j),
+  // Every document in a collection, no view filter. This is the RELATION RESOLVER — `documents()`
+  // answers "what does this view show", which is a different question and the wrong one for
+  // following a link.
+  allDocuments: id => fetch('/api/collections/' + encodeURIComponent(id) + '/documents?all=1').then(j),
   views: collection => fetch('/api/views/' + encodeURIComponent(collection)).then(j),
   saveView: (collection, view) => fetch('/api/views/' + encodeURIComponent(collection), { method: 'PUT', ...opts(view) }).then(j),
   document: path => fetch('/api/document?path=' + encodeURIComponent(path)).then(j),
@@ -275,5 +289,104 @@ export const api = {
   // ticket 24 — promote a standalone chat to a project. Create the project first (createProject),
   // then bind: the session + transcript move into projects/<pid>/chat and the scope flips, keeping
   // the same session id. Returns the bound session (scope 'project', project set).
-  chatBindSession: (id, project) => fetch('/api/chat/sessions/' + encodeURIComponent(id) + '/bind', { method: 'POST', ...opts({ project }) }).then(j)
+  chatBindSession: (id, project) => fetch('/api/chat/sessions/' + encodeURIComponent(id) + '/bind', { method: 'POST', ...opts({ project }) }).then(j),
+
+  // ══ SCOUT ══════════════════════════════════════════════════════════════════════════════════
+  // Everything below is Scout's own surface. It mirrors backend/records.mjs, memory.mjs,
+  // territory.mjs, tasks.mjs, proposals.mjs and inbox.mjs one-for-one — and it mirrors the route
+  // list `skills/scout-router/` already calls, so the agent's doors and the UI's door are the
+  // same routes. If you add a route, add the method; if you delete one, check here first.
+
+  // ── the write pipeline (M2) ──────────────────────────────────────────────────────────────
+  // `actor` defaults to the human on every UI call. The agent doors always send their own, and
+  // that is the whole of Law 4: the gate reads the actor, not the caller's good intentions.
+  upsert: body => fetch('/api/records/upsert', { method: 'POST', ...opts(body) }).then(j),
+  batchUpsert: (items, actor) => fetch('/api/records/batch', { method: 'POST', ...opts({ items, actor }) }).then(j),
+  match: body => fetch('/api/records/match', { method: 'POST', ...opts(body) }).then(j),
+  moveRecord: (path, to, actor, reason) => fetch('/api/records/move', { method: 'POST', ...opts({ path, to, actor, reason }) }).then(j),
+  archiveRecord: (path, reason, actor) => fetch('/api/records/archive', { method: 'POST', ...opts({ path, reason, actor }) }).then(j),
+  acceptRecord: (path, actor) => fetch('/api/records/accept', { method: 'POST', ...opts({ path, actor }) }).then(j),
+  // `rev` is the revision this edit was built from. A stale rev 409s rather than clobbering the
+  // file someone (or something) else changed while the surface was open — that is T04's conflict UX.
+  // `body` is the note under the frontmatter. It travels INSIDE the patch, because that is where
+  // records.mjs `patchRecord()` reads it from — sending it as a sibling key looked right on both
+  // sides and silently dropped every body edit. It is sent as a sibling too, so a future route
+  // that does destructure it still works.
+  patchRecord: (path, patch, rev, body, actor) =>
+    fetch('/api/records', {
+      method: 'PATCH',
+      ...opts({ path, patch: body === undefined ? patch : { ...patch, body }, rev, body, actor }),
+    }).then(j),
+  record: path => fetch('/api/records?path=' + encodeURIComponent(path)).then(j),
+  history: path => fetch('/api/records/history?path=' + encodeURIComponent(path)).then(j),
+  activity: (limit = 200) => fetch('/api/activity?limit=' + limit).then(j),
+
+  // ── memory and the hot cache (M3) ────────────────────────────────────────────────────────
+  // context() is the same single read an agent performs on wake. WHAT THEY KNOW renders exactly
+  // this, so the human sees the assistant's actual context and not a UI paraphrase of it.
+  // `?format=json` is required: the route answers MARKDOWN by default, because that is what
+  // docs/04_AGENT_CONTRACT.md §2 promises an agent that curls it bare. This screen wants the
+  // envelope around it — the token count, what was dropped, the version.
+  context: (project = '') => fetch('/api/context?format=json' + (project ? '&project=' + encodeURIComponent(project) : '')).then(j),
+  cacheVersion: () => fetch('/api/cache/version').then(j),
+  regenerate: (project = '') => fetch('/api/cache/regenerate', { method: 'POST', ...opts({ project }) }).then(j),
+  me: () => fetch('/api/me').then(j),
+  saveMe: (body, data, actor) => fetch('/api/me', { method: 'PUT', ...opts({ body, data, actor }) }).then(j),
+  goals: () => fetch('/api/goals').then(j),
+  saveGoal: (id, patch, actor) => fetch('/api/goals/' + encodeURIComponent(id), { method: 'PATCH', ...opts({ patch, actor }) }).then(j),
+  territory: () => fetch('/api/territory').then(j),
+  territoryOne: id => fetch('/api/territory/' + encodeURIComponent(id)).then(j),
+  saveTerritory: (id, patch, actor) => fetch('/api/territory/' + encodeURIComponent(id), { method: 'PATCH', ...opts({ patch, actor }) }).then(j),
+  playbook: () => fetch('/api/playbook').then(j),
+  playbookOne: id => fetch('/api/playbook/' + encodeURIComponent(id)).then(j),
+  savePlaybook: (id, patch, actor) => fetch('/api/playbook/' + encodeURIComponent(id), { method: 'PATCH', ...opts({ patch, actor }) }).then(j),
+  learnings: () => fetch('/api/learnings').then(j),
+  saveLearning: (id, patch, actor) => fetch('/api/learnings/' + encodeURIComponent(id), { method: 'PATCH', ...opts({ patch, actor }) }).then(j),
+
+  // ── the decide queue (M4) ────────────────────────────────────────────────────────────────
+  // ONE queue. Every approval in the app lands here — a finding, a message to be sent, a request
+  // to join a group, a learning, a schema change, a question. Six kinds, one keyboard.
+  proposals: (status = 'open') => fetch('/api/proposals?status=' + encodeURIComponent(status)).then(j),
+  // `answer` is only used by the `question` card: accepting one means writing her answer into
+  // learnings/ or me.md, so the route refuses an accept without it. Every other kind ignores it.
+  acceptProposal: (id, actor, answer) => fetch('/api/proposals/' + encodeURIComponent(id) + '/accept',
+    { method: 'POST', ...opts({ actor, answer }) }).then(j),
+  rejectProposal: (id, reason, actor) => fetch('/api/proposals/' + encodeURIComponent(id) + '/reject', { method: 'POST', ...opts({ reason, actor }) }).then(j),
+
+  // ── orchestration (M4) ───────────────────────────────────────────────────────────────────
+  assistants: () => fetch('/api/assistants').then(j),
+  saveAssistant: (id, patch, actor) => fetch('/api/assistants/' + encodeURIComponent(id), { method: 'PATCH', ...opts({ patch, actor }) }).then(j),
+  tasks: (q = {}) => fetch('/api/tasks?' + new URLSearchParams(q)).then(j),
+  saveTask: body => fetch('/api/tasks', { method: 'POST', ...opts(body) }).then(j),
+  patchTask: (id, patch, project, actor) => fetch('/api/tasks/' + encodeURIComponent(id), { method: 'PATCH', ...opts({ patch, project, actor }) }).then(j),
+  claimTask: (id, actor, project) => fetch('/api/tasks/' + encodeURIComponent(id) + '/claim', { method: 'POST', ...opts({ actor, project }) }).then(j),
+  runs: (q = {}) => fetch('/api/runs?' + new URLSearchParams(q)).then(j),
+  findings: project => fetch('/api/findings?project=' + encodeURIComponent(project)).then(j),
+  scoutProjects: () => fetch('/api/scout/projects').then(j),
+  agentIndex: () => fetch('/api/index').then(j),
+
+  // ── files (M5) ───────────────────────────────────────────────────────────────────────────
+  // Law 8: we compress hard, so the way down must exist. Every record's path lands here, and
+  // Reveal opens the real folder in Finder.
+  files: (dir = '') => fetch('/api/files?dir=' + encodeURIComponent(dir)).then(j),
+  fileRead: p => fetch('/api/files/read?path=' + encodeURIComponent(p)).then(j),
+  revealPath: p => fetch('/api/files/reveal', { method: 'POST', ...opts({ path: p }) }).then(j),
+
+  // ── the whiteboard (M5) ──────────────────────────────────────────────────────────────────
+  // Edges are NOT stored: the board saves nodes, and the server derives the edges from the real
+  // relations between the documents on it. A hand-drawn edge that means nothing is the failure
+  // mode this avoids.
+  scoutBoard: id => fetch('/api/scout/board/' + encodeURIComponent(id)).then(j),
+  saveScoutBoard: (id, body) => fetch('/api/scout/board/' + encodeURIComponent(id), { method: 'PUT', ...opts(body) }).then(j),
+
+  // ── door 2 (M2) ──────────────────────────────────────────────────────────────────────────
+  // ── first run (M5) ───────────────────────────────────────────────────────────────────────
+  // Law 9. Each answer is persisted the moment it is given, so closing the window mid-interview
+  // costs nothing — `intake()` returns where they got to.
+  intake: () => fetch('/api/intake').then(j),
+  intakeAnswer: (key, value, actor) => fetch('/api/intake/answer', { method: 'POST', ...opts({ key, value, actor }) }).then(j),
+  intakeBuild: actor => fetch('/api/intake/build', { method: 'POST', ...opts({ actor }) }).then(j),
+
+  inboxSweep: () => fetch('/api/inbox/sweep', { method: 'POST', ...opts({}) }).then(j),
+  inboxStatus: () => fetch('/api/inbox').then(j)
 };

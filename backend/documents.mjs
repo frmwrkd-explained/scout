@@ -173,6 +173,44 @@ export function documentsFor(collectionId, { bind = null } = {}) {
   return { collection, documents: shaped };
 }
 
+
+// ── one collection, through one view, with the quarantine rule applied ────────────────────────
+//
+// THE one composition of documentsFor + the view + the quarantine split. It was assembled inline
+// in `backend/index.mjs`'s route and again in `backend/mcp.mjs`'s tool — the same six lines, in
+// two doors, where forgetting `excludeQuarantined` in either one would let a record an agent wrote
+// around the pipeline be counted as real (Law 4). A guarantee that has to be re-assembled per
+// caller is not a guarantee.
+//
+//   all: true   returns the whole collection with the view's FILTER dropped — for resolving a
+//               RELATION, which must not depend on what somebody last saved as the default view.
+//
+// Imports live inside the function: views.mjs and records.mjs both reach back into this module,
+// and a top-level import either way would be a load-order cycle.
+export async function viewFor(collectionId, { view = null, bind = null, all = false } = {}) {
+  const [{ getView, defaultView, applyView }, { excludeQuarantined }] = await Promise.all([
+    import('./views.mjs'), import('./records.mjs'),
+  ]);
+  const found = documentsFor(collectionId, { bind });
+  if (!found) return null;
+  const chosen = getView(collectionId, view || null) || defaultView(found.collection);
+  const clean = excludeQuarantined(found.documents);
+  const held = found.documents.filter(d => !clean.includes(d));
+  const applied = all
+    ? { rows: applyView({ ...chosen, filter: [], group: null }, clean).rows, groups: null }
+    : applyView(chosen, clean);
+  return {
+    collection: found.collection,
+    view: chosen,
+    total: clean.length,
+    rows: applied.rows,
+    groups: applied.groups,
+    // Returned, never hidden: concealing a quarantined record would leave the human no way to
+    // accept the ones that are fine (Law 8).
+    quarantined: held.map(d => ({ path: d.path, slug: d.slug, title: d.title })),
+  };
+}
+
 export function documentAt(relPath) {
   const root = R();
   const abs = path.resolve(root, relPath);

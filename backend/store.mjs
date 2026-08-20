@@ -75,6 +75,46 @@ export const paths = {
   // the tests' SCOUT_DATA temp dir isolates it without licence.mjs knowing about tests.
   licenceMd: () => path.join(R(), 'licence.md')
 };
+// ── frontmatter dates ────────────────────────────────────────────────────────────────────────
+// gray-matter parses a BARE YAML date (`created: 2026-08-17`) into a JavaScript `Date`, and a
+// quoted one (`created: '2026-08-17'`) into a string. The same key is therefore two different
+// types depending on how somebody happened to write the file, which has already produced two
+// live bugs in this codebase:
+//
+//   `String(created).localeCompare(...)`  sorted a queue by WEEKDAY NAME — "Mon Aug 17 2026…"
+//   `rejected ${access_changed}`          printed "Thu Jul 30 2026 02:00:00 GMT+0200 (Central
+//                                         European Summer Time)" into the agent's context file
+//
+// Both looked correct in review and both are invisible until you read real output. So: never
+// `String()` a frontmatter date and never `localeCompare` two of them. `day()` to show one,
+// `dayMs()` to compare two.
+export function dayMs(v) {
+  if (v == null || v === '') return null;
+  if (v instanceof Date) return Number.isNaN(v.getTime()) ? null : v.getTime();
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  const t = Date.parse(String(v));
+  return Number.isNaN(t) ? null : t;
+}
+
+// The calendar day, always `YYYY-MM-DD`. Uses UTC parts because a bare YAML date parses as UTC
+// midnight — reading it back in local time west of UTC would report the day before.
+export function day(v) {
+  const t = dayMs(v);
+  return t == null ? '' : new Date(t).toISOString().slice(0, 10);
+}
+
+// Oldest first. Missing dates sort last rather than first: an object with no date is not the
+// oldest thing in the queue, it is an object we know nothing about.
+export function byDate(key = 'created') {
+  return (a, b) => {
+    const x = dayMs(a && a[key]), y = dayMs(b && b[key]);
+    if (x == null && y == null) return 0;
+    if (x == null) return 1;
+    if (y == null) return -1;
+    return x - y;
+  };
+}
+
 export function safe(name) { return name.replace(/[^\w.\-]+/g, '_'); }
 // scope/pid become filesystem path segments (projects/<pid>/…). Route params are already
 // SLUG-guarded, but several endpoints take pid/scope from the request BODY where app.param

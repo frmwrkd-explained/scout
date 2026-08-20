@@ -17,3 +17,9 @@ release/
 workspace/
 .scout/index/
 .scout/cache/computed.json
+
+# The storage-root pointer. It is per-machine state, and it is the ONE file that lives outside the
+# storage root — so a stray copy in a checkout silently redirects the whole app, and every test
+# that sets only SCOUT_DATA reads the wrong folder. That is not theoretical: it turned five tests
+# red for an afternoon.
+config.md
