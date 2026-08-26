@@ -42,6 +42,25 @@ const TEXT_EXT = new Set([
   '.mjs', '.cjs', '.js', '.jsx', '.ts', '.tsx', '.css', '.html', '.svg', '.sh', '.env'
 ]);
 
+// Types we will hand to the browser AS THEMSELVES. Everything not on this list is served as an
+// attachment with `application/octet-stream`, which is the whole security argument for this route:
+// the app's UI and its API share an origin, so an `.html` an agent dropped into `_inbox/` and a
+// human moved into the vault would otherwise execute as first-party code with the API in reach.
+// An allowlist of inert media plus `nosniff` plus a `default-src 'none'` CSP makes that impossible
+// without hiding anything — the file still downloads, and Finder is still one click away.
+export const MEDIA_TYPES = {
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif',
+  '.webp': 'image/webp', '.avif': 'image/avif', '.bmp': 'image/bmp', '.ico': 'image/x-icon',
+  '.mp4': 'video/mp4', '.webm': 'video/webm', '.mov': 'video/quicktime', '.m4v': 'video/x-m4v',
+  '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.wav': 'audio/wav', '.ogg': 'audio/ogg',
+  '.flac': 'audio/flac', '.aac': 'audio/aac',
+  '.pdf': 'application/pdf',
+};
+// SVG is deliberately NOT in that table. It is an image everywhere else in this app and a script
+// host here: an inline <script> in an .svg served as image/svg+xml runs when the file is opened
+// directly. It downloads like any other unlisted type.
+export function mediaTypeFor(ext) { return MEDIA_TYPES[String(ext || '').toLowerCase()] || null; }
+
 // A preview is a preview. Past this we report the size and stop reading — the file is still one
 // click from Finder, which is the right tool for a 200MB log.
 export const MAX_PREVIEW_BYTES = 512 * 1024;
@@ -185,13 +204,57 @@ export function revealPath(rel, { revealInOS } = {}) {
   return { ok: true, path: target, absolute: abs, selected: select };
 }
 
+// ── rawFile ──────────────────────────────────────────────────────────────────────────────────
+// The bytes, for a browser. `readFile` answers TEXT for the preview pane; this answers the file
+// itself, which is what an <img> in a gallery tile and a picture in the file browser both need.
+//
+// It was the last of HANDOVER §5's gaps: `GalleryView.mediaSrc()` could only resolve a value that
+// was ALREADY a URL, so a person who put a photo in their workspace and pointed a field at it got
+// NO PREVIEW forever — the app could see the file, list it, and refuse to show it.
+//
+// Read-only, same resolver, same three refusals. Returns metadata; the route does the streaming,
+// because streaming needs `res` and this module keeps its logic testable without one.
+export function rawFile(rel) {
+  const { rel: fileRel, abs } = resolveRel(rel);
+  if (!fileRel) throw new FileError('a file path is required', 400);
+  let st;
+  try { st = fs.statSync(abs); } catch { throw new FileError('no such file', 404); }
+  if (st.isDirectory()) throw new FileError('that is a folder', 400);
+
+  const ext = path.extname(fileRel).toLowerCase();
+  const type = mediaTypeFor(ext);
+  return {
+    path: fileRel, name: path.basename(fileRel), ext, abs,
+    size: st.size, modified: st.mtime.toISOString(),
+    // No type we recognise → it is a download, never something the browser renders in place.
+    type: type || 'application/octet-stream',
+    inline: !!type,
+  };
+}
+
+// One byte range, the shape a <video> asks for when you drag its scrubber. Safari will not play a
+// video at all unless the server answers 206 to its first range request, so this is the difference
+// between "the gallery shows videos" and "the gallery shows a black rectangle on one browser".
+export function parseRange(header, size) {
+  const m = /^bytes=(\d*)-(\d*)$/.exec(String(header || '').trim());
+  if (!m || size <= 0) return null;
+  const [, a, b] = m;
+  if (a === '' && b === '') return null;
+  let start, end;
+  if (a === '') { end = size - 1; start = Math.max(0, size - Number(b)); }
+  else { start = Number(a); end = b === '' ? size - 1 : Math.min(Number(b), size - 1); }
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start > end || start >= size) return null;
+  return { start, end };
+}
+
 // ── routes ───────────────────────────────────────────────────────────────────────────────────
 // GET  /api/files?dir=          → listDir
-// GET  /api/files/read?path=    → readFile
+// GET  /api/files/read?path=    → readFile   (text, for the preview pane)
+// GET  /api/files/raw?path=     → rawFile    (the bytes, for an <img>/<video>)
 // POST /api/files/reveal {path} → revealPath
 //
 // Mounted by the integrator from `backend/index.mjs`. Nothing here is exposed by any other route,
-// and none of the three mutates anything.
+// and none of the four mutates anything.
 export function registerFileRoutes(app, deps = {}) {
   const send = (res, e) => res.status(e instanceof FileError ? e.status : 500).json({ error: e.message });
 
@@ -206,6 +269,41 @@ export function registerFileRoutes(app, deps = {}) {
   app.post('/api/files/reveal', (req, res) => {
     try { res.json(revealPath(req.body?.path, deps)); } catch (e) { send(res, e); }
   });
+
+  // The bytes. Every header here is load-bearing: `nosniff` stops the browser second-guessing the
+  // allowlisted type, the CSP makes the response inert even if it somehow renders, and anything
+  // off the allowlist is an attachment rather than a page on the app's own origin.
+  app.get('/api/files/raw', (req, res) => {
+    let f;
+    try { f = rawFile(req.query.path); } catch (e) { return send(res, e); }
+
+    res.set({
+      'Content-Type': f.type,
+      'X-Content-Type-Options': 'nosniff',
+      'Content-Security-Policy': "default-src 'none'; sandbox",
+      'Content-Disposition': (f.inline ? 'inline' : 'attachment') + '; filename="' + f.name.replace(/["\\]/g, '_') + '"',
+      'Cache-Control': 'no-cache',
+      'Accept-Ranges': 'bytes',
+      'Last-Modified': new Date(f.modified).toUTCString(),
+    });
+
+    const range = parseRange(req.headers.range, f.size);
+    if (range) {
+      res.status(206).set({
+        'Content-Range': 'bytes ' + range.start + '-' + range.end + '/' + f.size,
+        'Content-Length': String(range.end - range.start + 1),
+      });
+    } else {
+      res.set('Content-Length', String(f.size));
+    }
+
+    const stream = fs.createReadStream(f.abs, range ? { start: range.start, end: range.end } : undefined);
+    // A read that dies mid-stream cannot send a JSON error — the headers are already out. Destroy
+    // the response so the client sees a truncated body instead of hanging on a promise nobody kept.
+    stream.on('error', () => res.destroy());
+    req.on('close', () => stream.destroy());
+    stream.pipe(res);
+  });
 }
 
-export default { listDir, readFile, revealPath, resolveRel, registerFileRoutes, FileError, MAX_PREVIEW_BYTES };
+export default { listDir, readFile, rawFile, parseRange, revealPath, resolveRel, registerFileRoutes, FileError, MAX_PREVIEW_BYTES, MEDIA_TYPES };

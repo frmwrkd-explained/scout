@@ -203,7 +203,7 @@ export { cmdShimScript, cmdEscape, planLaunch } from './launch.mjs';
 // Spawn a CLI and pump its stdout. In `stream` mode, stdout is NDJSON split on newlines and each
 // object handed to parseLine; otherwise stdout is buffered whole. Resolves (never rejects) with
 // { text, cost, cliSessionId, cancelled, err } so the caller decides how to surface failure.
-function spawnAndStream({ bin, args, emit, signal, parseLine, stream, env }) {
+function spawnAndStream({ bin, args, emit, signal, parseLine, stream, env, timeoutMs = TURN_TIMEOUT_MS }) {
   return new Promise(resolve => {
     let child;
     try {
@@ -249,7 +249,7 @@ function spawnAndStream({ bin, args, emit, signal, parseLine, stream, env }) {
       resolve({ text, cost: state.cost, cliSessionId: state.cliSessionId, cancelled, err });
     };
 
-    const timer = setTimeout(() => { try { child.kill('SIGKILL'); } catch { /* gone */ } finish({ err: 'timeout after ' + TURN_TIMEOUT_MS / 1000 + 's' }); }, TURN_TIMEOUT_MS);
+    const timer = setTimeout(() => { try { child.kill('SIGKILL'); } catch { /* gone */ } finish({ err: 'timeout after ' + timeoutMs / 1000 + 's' }); }, timeoutMs);
     timer.unref?.();
 
     if (signal) {
@@ -290,7 +290,7 @@ function spawnAndStream({ bin, args, emit, signal, parseLine, stream, env }) {
   });
 }
 
-async function runClaude({ bin, session, userText, emit, signal, home, projectContext = '', model, effort }) {
+async function runClaude({ bin, session, userText, emit, signal, home, projectContext = '', model, effort, timeoutMs }) {
   // Isolated home + session Index: the CLI is pointed at CLAUDE_CONFIG_DIR=<home> (global skills never
   // load) and the Index is injected as a system-prompt appendix (the router SKILL.md is never edited).
   const systemPrompt = indexInjection(home.indexText) + (projectContext ? '\n\n' + projectContext : '');
@@ -298,7 +298,7 @@ async function runClaude({ bin, session, userText, emit, signal, home, projectCo
     bin,
     args: [...(home.extraArgs || []), '--append-system-prompt', systemPrompt,
       ...buildClaudeArgs({ prompt: String(userText || ''), resume, allowedTools: allowedToolsValue(session), model, effort })],
-    emit, signal, parseLine: handleClaudeEvent, stream: true, env: { ...agentEnv(), ...(home.env || {}) }
+    emit, signal, parseLine: handleClaudeEvent, stream: true, env: { ...agentEnv(), ...(home.env || {}) }, timeoutMs
   });
 
   const resume = session?.cliSessionId || null;
@@ -332,7 +332,7 @@ async function runClaude({ bin, session, userText, emit, signal, home, projectCo
   return { text, directives, cost: res.cost || 0, cliSessionId: res.cliSessionId, cancelled: res.cancelled };
 }
 
-async function runOneShot({ bin, kind, session, history, userText, emit, signal, home, projectContext = '', model, effort }) {
+async function runOneShot({ bin, kind, session, history, userText, emit, signal, home, projectContext = '', model, effort, timeoutMs }) {
   const tail = transcriptTail(history);
   // A generic CLI has no --append-system-prompt; the Index rides at the head of the prompt instead,
   // and the isolation env still relocates its config dir (a no-op for non-claude profiles).
@@ -344,7 +344,7 @@ async function runOneShot({ bin, kind, session, history, userText, emit, signal,
   const p = providerById(kind);
   const args = [...(home.extraArgs || []), ...(p ? p.sessionArgs({ model, effort }) : []),
     ...buildOneShotArgs({ prompt, kind, allowedTools: allowedToolsValue(session) })];
-  const res = await spawnAndStream({ bin, args, emit, signal, stream: false, env: { ...agentEnv(), ...(home.env || {}) } });
+  const res = await spawnAndStream({ bin, args, emit, signal, stream: false, env: { ...agentEnv(), ...(home.env || {}) }, timeoutMs });
   const raw = String(res.text || '').trim();
   // same contract as runClaude: a failure is reported whether or not text arrived (DEV-135)
   if (res.err && !res.cancelled) {
@@ -364,7 +364,10 @@ async function runOneShot({ bin, kind, session, history, userText, emit, signal,
 //   async ({ session, loc, history, userText, attachments, emit, signal }) =>
 //     ({ text, directives, cost, cliSessionId?, cancelled?, setup? })
 export async function cliExecutor(ctx = {}) {
-  const { session, history = [], userText, emit, signal, projectContext = '' } = ctx;
+  // `timeoutMs` is how an assistant RUN differs from a chat turn: dispatch.mjs sends a sweep that
+  // may take twenty minutes down the same pipe a five-minute chat turn uses. Undefined keeps the
+  // chat default, so nothing that does not ask for it changes.
+  const { session, history = [], userText, emit, signal, projectContext = '', timeoutMs } = ctx;
   const command = session?.agentCommand || getSettings().agentCommand || 'claude';
   const bin = resolveBin(command);
 
@@ -390,8 +393,8 @@ export async function cliExecutor(ctx = {}) {
 
   const kind = runnerKind(command);
   return kind === 'claude'
-    ? runClaude({ bin, session, userText, emit, signal, home, projectContext, model, effort })
-    : runOneShot({ bin, kind, session, history, userText, emit, signal, home, projectContext, model, effort });
+    ? runClaude({ bin, session, userText, emit, signal, home, projectContext, model, effort, timeoutMs })
+    : runOneShot({ bin, kind, session, history, userText, emit, signal, home, projectContext, model, effort, timeoutMs });
 }
 
 // ── the honest connection test (DEV-135, acceptance 3) ──

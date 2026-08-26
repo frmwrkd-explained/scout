@@ -1,4 +1,5 @@
 import { tempRoots } from './_env.mjs'; // first — sets storage-root env before the store loads
+import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -78,3 +79,34 @@ export function patchGenFile(pid, id, patch) {
   writeMd(file, { ...data, ...patch }, content);
 }
 export { paths, getStorageRoot, writeMd, readMd, fs, path };
+
+// ── testing a .jsx module ──────────────────────────────────────────────────────────────────────
+// Several screens keep their real logic in exported pure functions — `Today.overnightLines`,
+// `Assistants.costToday`, `GalleryView.mediaSrc` — and none of it was reachable from `node --test`,
+// because node cannot import JSX. So none of it was tested, and the defects that reached people
+// lived exactly there: a formatter handed epoch milliseconds it could not read printed the word
+// "null" into the panel header on the 9am screen.
+//
+// This compiles ONE module (not its React imports — `external: ['react', …]` keeps it a leaf) to a
+// temp .mjs and imports it. It is deliberately narrow: it is for pure exported logic, not for
+// rendering. A component that needs a DOM to be tested is telling you its logic wants to be a
+// function.
+export async function loadJsx(relPath) {
+  const esbuild = await import('esbuild');
+  // fileURLToPath, never `url.pathname` — a repo path with a space in it (this one has two) comes
+  // back percent-encoded and esbuild reports it as "could not resolve", which reads like a
+  // missing file rather than a mangled path.
+  const src = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', relPath);
+  // Output INSIDE the repo: the compiled module still imports `react` (it is external, so the
+  // component code is left alone), and a file in os.tmpdir() cannot resolve it. node_modules/
+  // is the one directory that is always present, always ignored, and always resolvable.
+  const cache = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'node_modules', '.cache', 'scout-jsx');
+  fs.mkdirSync(cache, { recursive: true });
+  const out = path.join(cache, relPath.replace(/[\\/]/g, '_') + '.mjs');
+  await esbuild.build({
+    entryPoints: [src], outfile: out, bundle: true, format: 'esm', platform: 'neutral',
+    jsx: 'automatic', logLevel: 'silent',
+    external: ['react', 'react-dom', 'react/jsx-runtime', '@codemirror/*', '@lezer/*', 'codemirror'],
+  });
+  return import(out);
+}

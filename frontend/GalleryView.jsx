@@ -24,15 +24,22 @@ export function mediaField(collection) {
   return fields.find(f => f.type === 'file' && f.primary_media) || fields.find(f => f.type === 'file') || null;
 }
 
-// A `file` value is content-addressed under `<workspace>/files/` (docs/02_DATA_MODEL.md §5), and
-// NOTHING SERVES THAT FOLDER YET — there is no `/api/file` route in backend/index.mjs. So: a value
-// that is already a resolvable URL renders, and anything else renders as a named plate rather than
-// a broken image. When the route lands, this function is the only thing that changes.
+// A `file` value names a file in the workspace (docs/02_DATA_MODEL.md §5). `GET /api/files/raw`
+// serves those bytes — read-only, containment-checked, and inert for anything that is not media —
+// so a photo the person dropped in their own folder finally renders.
+//
+// This function was the one the old comment said would change when that route landed, and it is.
+// Everything is handed to the route EXCEPT what the browser can already fetch itself; a path that
+// escapes the workspace is refused there with a 400 rather than being guessed at here, and the tile
+// falls back to its named plate on the error. The frontend does not know where the vault is, and
+// should not: containment is one rule, in one place (backend/files.mjs `resolveRel`).
 export function mediaSrc(value) {
   const first = Array.isArray(value) ? value[0] : value;
   if (!first) return null;
-  const s = typeof first === 'object' ? (first.src || first.url || first.path || first.name || '') : String(first);
-  return /^(https?:|data:|blob:|file:|\/)/.test(s) ? s : null;
+  const s = String(typeof first === 'object' ? (first.src || first.url || first.path || first.name || '') : first).trim();
+  if (!s) return null;
+  if (/^(https?:|data:|blob:)/.test(s)) return s;
+  return '/api/files/raw?path=' + encodeURIComponent(s.replace(/^file:\/\//, ''));
 }
 
 export function mediaName(value) {

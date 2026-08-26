@@ -842,3 +842,144 @@ Four features in this round were *already built* and unreachable: archive, view 
 saved-view filters. The build's failure mode is not missing capability, it is **capability with no
 affordance** — and the two look identical from the outside, except that the second one is worse,
 because the person concludes the app cannot do it and stops asking.
+
+---
+
+## Wiring the runner: the one button, and what it exposed (2026-08-26)
+
+The open item was the one visible on the app's first screen. TODAY has carried a `Send them out`
+button since M5 with the caption **NO RUNNER WIRED YET**, because `onSendOut` had nobody to call.
+`agentHome.mjs`, `agentRunner.mjs` and `agentProviders.mjs` were all ported and tested (T14 step 1)
+and wired only to CHAT. An assistant could be hired, scoped, scheduled and given tasks — and then
+nothing could send it anywhere. GOAL.md §3 is *"She presses one button. The assistants go back
+out."*
+
+### `dispatch.mjs` composes; it does not reimplement
+
+The module is deliberately thin, because everything it needs already existed and a second copy of
+any of it would be the bug `CLAUDE.md`'s source-of-truth table exists to prevent:
+
+| It needs | It calls | It does NOT |
+|---|---|---|
+| an OS process, with the right argv per CLI | `agentRunner.cliExecutor` | spawn anything itself |
+| an isolated home with the router skill mounted fresh | `agentHome.prepareAgentHome` | copy a skill |
+| a run record | `tasks.appendRun` | own a second run store |
+| what the agent may do | `GET /api/index`, via the brief | restate a capability |
+| to write a finding | **nothing** — the assistant curls door 1 | write a document |
+
+That last row is the one that matters. **Spawning a process ourselves buys it no privilege.** A
+local CLI is a door we happen to open, not a trusted one: it signs its writes as an assistant, so
+`records.mjs` gates it, `sweepQuarantine` catches it if it goes round the side, and the log names
+it. `tests/phase-dispatch.test.mjs` demonstrates the gate refusing a promotion from a process Scout
+started itself, and the refusal landing in Activity.
+
+### Three properties, and the reason for each
+
+- **It answers before the work finishes.** `sendOut` returns the RUNNING record and hands back
+  `done` for a caller that wants to wait. A sweep is minutes long; an HTTP request that waits it out
+  dies to a proxy timeout with an assistant marked `running` for ever.
+- **A run reports what was COUNTED, never what was claimed.** `countWork()` reads the event log,
+  filtered to that actor and that run's window. The test stub deliberately says *"Found 40 guests"*
+  and stores one; the run says `1 stored`. This is the same rule `territory.mjs` already lives by —
+  a number typed into a file is a claim, a number summed from events is a fact — and the counted
+  line renders LAST in the summary, so a run with a beautiful paragraph and nothing stored cannot
+  read as a good night.
+- **No CLI is not a failure.** `sendOut` pre-checks `resolveBin` and throws 503 `{ setup: true }`
+  **without recording a run**: a run that never started is not a run, and a workspace with no CLI
+  would otherwise accumulate blocked records that put a fake bad night on TODAY every time somebody
+  pressed the button. Doors 2 and 3 need no local CLI at all, and the message says so.
+
+### The Index does not advertise it
+
+`POST /api/assistants/:id/run` is the HUMAN's door. `docs/04_AGENT_CONTRACT.md` §5 does not give an
+agent the power to dispatch another agent, and the Index may omit what exists but must never
+advertise what does not. If sub-agent dispatch is ever wanted, it is an Index line and a scope rule,
+not an accident.
+
+---
+
+## What wiring the runner exposed
+
+Four defects, none of which any test could have caught, because all four needed a run to exist.
+
+### The interview hired an assistant scoped to NOTHING
+
+`startFirstWork()` read `readIntake().data.collection`, which is stamped only when she ACCEPTS the
+collection card (`settleWorkspace`). The interview proposes the card and hires the assistant in the
+same breath — so at that moment the id lives in `pending_view.collection` and `data.collection` is
+null. The assistant's brief therefore read:
+
+```
+WHERE YOU MAY WORK
+  collections   none named — ask before you write into one
+```
+
+The very first assistant, on the very first run, had nowhere to put what it found. `interviewState()`
+had always read both fields (§state); `startFirstWork` now does too. Found by demonstrating gate 1 —
+every part passed and the finding could not arrive. Guarded in `tests/phase-intake.test.mjs`.
+
+It also wrote `schedule: 'every morning'` — the LABEL — where the app's vocabulary is
+`continuous · daily · weekly · manual`. HIRE rendered a blank selection over it and nothing could
+act on it. It writes the value now.
+
+### TODAY printed the word "null" into its panel header
+
+`normRun()` converts every timestamp to epoch milliseconds the moment it arrives. `clock()`, ten
+lines away in the same file, did `Date.parse(String(ts))` — which is `NaN` for a number. So the
+OVERNIGHT header rendered `null → NOW / 4 RUNS` and the overnight sentence silently dropped its
+window. Both functions were correct alone and wrong together, and had been since M5 — invisible for
+as long as `runs` was always empty.
+
+**A formatter that only speaks one of the two shapes its own module produces will fail on the day
+the data arrives.** This is also why `tests/phase-today.test.mjs` and `helpers.loadJsx()` exist: this
+repo had ~20 `.jsx` files exporting pure logic and no way to test any of it, and the defects that
+reached people lived exactly there.
+
+### The card said WORKING and never changed
+
+A run answers before it finishes, so the screen has to find out when it stops. It did not: press
+`Send out`, watch an assistant sit at WORKING until you navigate away and back. That is the same
+failure as a capability with no affordance, one step later in the story — the person concludes the
+button did nothing. `App.watchRuns()` polls while anybody is out and stops on the pass that finds
+nobody, bumping **both** `nonce` (the rail, ASSISTANTS) and `refreshKey` (TODAY) — bumping only the
+first left the 9am screen showing four assistants RUNNING beside a rail that had already noticed.
+
+### The schedule was a sentence nobody acted on
+
+`assistants/<id>.md` has carried `schedule:` since M4 and HIRE has offered four values for it since
+M5, and **nothing read it**. The seeded workspace ships four assistants saying "every 6 hours",
+"Sundays at 7am", "after every scout-fb run" — printed on the card as though they were promises.
+An affordance with no capability behind it is worse than a missing capability: the person believes
+the sentence.
+
+Both halves are now true:
+
+- `dispatch.mjs` has a scheduler. It is **off by default** (`autoRun`), because sending an assistant
+  out spawns a CLI that costs her money, and nothing in this app spends money without a press.
+- `normalizeSchedule()` lives in `tasks.mjs` with the assistant it describes, and `getAssistant()`
+  returns a derived `schedule_kind` — so no screen normalises anything and `GET /api/schedule`
+  reports `scheduled` (how many the app will actually act on) beside `auto` (whether it will). Four
+  assistants carrying unreadable schedules is `scheduled: 0`, and the card says
+  `EVERY 6 HOURS · YOU SEND IT` rather than repeating her sentence back at her as a promise.
+- Anything we cannot plainly read is **manual**. Guessing at a schedule spends her money.
+
+---
+
+## `GET /api/files/raw` — the last of HANDOVER §5's gaps
+
+`GalleryView.mediaSrc()` could only resolve a value that was ALREADY a URL, and its own comment said
+*"when the route lands, this function is the only thing that changes."* It landed, and it is.
+
+The one real decision is the allowlist. The UI and the API share an origin, so an `.html` an agent
+dropped into `_inbox/` and a human filed away must never execute as first-party code with the API in
+reach. So: recognised media types are served inline as themselves; **everything else is an
+attachment with `application/octet-stream`**, plus `nosniff` and `default-src 'none'; sandbox`.
+Nothing is hidden — the file still downloads and Finder is still one click away.
+
+**SVG is deliberately absent from that table.** It is an image everywhere else in this app and a
+script host here.
+
+Range requests are answered with 206 because Safari will not play a video at all otherwise, and
+`RenderTile` now falls back to its named plate on a media error — a path that escapes the workspace
+is refused server-side, and a NAMED PLATE says *"this file is not here"* where a broken-image glyph
+says *"this app is broken"*.

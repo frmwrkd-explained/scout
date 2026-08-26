@@ -364,6 +364,18 @@ export const api = {
   patchTask: (id, patch, project, actor) => fetch('/api/tasks/' + encodeURIComponent(id), { method: 'PATCH', ...opts({ patch, project, actor }) }).then(j),
   claimTask: (id, actor, project) => fetch('/api/tasks/' + encodeURIComponent(id) + '/claim', { method: 'POST', ...opts({ actor, project }) }).then(j),
   runs: (q = {}) => fetch('/api/runs?' + new URLSearchParams(q)).then(j),
+  run: id => fetch('/api/runs/' + encodeURIComponent(id)).then(j),
+  // The one button (GOAL §3). `sendOut` puts ONE assistant out; `sendOutAll` is what TODAY's
+  // primary button calls. Both answer the moment the run RECORD exists, not when the work is
+  // finished — a sweep takes minutes, and the screens already poll api.runs() for the rest.
+  // A 503 carries { setup: true }: no agent CLI is connected, which is a Settings trip, not a bug.
+  sendOut: (id, actor) => fetch('/api/assistants/' + encodeURIComponent(id) + '/run', { method: 'POST', ...opts({ actor }) }).then(j),
+  sendOutAll: actor => fetch('/api/assistants/run', { method: 'POST', ...opts({ actor }) }).then(j),
+  stopRun: id => fetch('/api/runs/' + encodeURIComponent(id) + '/stop', { method: 'POST', ...opts({}) }).then(j),
+  // What an assistant's `schedule:` actually means right now → { auto, running, due[], out[] }.
+  // `due` is what the SCHEDULE says; `auto` is whether anything acts on it. A screen must show
+  // both or it is telling somebody their assistants go out overnight when they do not.
+  schedule: () => fetch('/api/schedule').then(j),
   findings: project => fetch('/api/findings?project=' + encodeURIComponent(project)).then(j),
   scoutProjects: () => fetch('/api/scout/projects').then(j),
   agentIndex: () => fetch('/api/index').then(j),

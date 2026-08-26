@@ -233,6 +233,14 @@ export default class SettingsPage extends React.Component {
               </div>
             </>)}
             {this.card(<>
+              {label('ASSISTANT SCHEDULES')}
+              <div style={sx('display:flex;align-items:center;gap:10px')}>
+                {this.toggle(!!st.autoRun, () => app.saveSettings({ autoRun: !st.autoRun }))}
+                <span style={sx('font-size:12px')}>Send assistants out on their own schedule</span>
+              </div>
+              {hint(<>Off by default. Every assistant carries a schedule — <b>all day</b>, <b>every morning</b>, <b>once a week</b> — and with this off it is a note on the card rather than something that happens: they go out when you press <b>Send them out</b>. Turning it on spawns your agent CLI unattended, which costs money.</>)}
+            </>)}
+            {this.card(<>
               {label('REVIEW MODE')}
               <div style={sx('display:flex;align-items:center;gap:10px')}>
                 {this.toggle(!!st.showHints, () => app.saveSettings({ showHints: !st.showHints }))}

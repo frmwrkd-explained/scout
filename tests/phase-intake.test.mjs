@@ -21,7 +21,7 @@ import { freshRoot, getStorageRoot } from './helpers.mjs';
 import {
   QUESTIONS, QUESTION_KEYS, PLAIN_TYPE,
   isFirstRun, identityWritten, interviewState, saveAnswer, proposeWorkspace, buildWorkspace,
-  settleWorkspace, collectionIdFrom, territoriesFrom, meFrom, registerIntakeRoutes, intakePath,
+  settleWorkspace, startFirstWork, collectionIdFrom, territoriesFrom, meFrom, registerIntakeRoutes, intakePath,
 } from '../backend/intake.mjs';
 import { validateSchema, saveCollection, getCollection, listCollectionIds } from '../backend/collections.mjs';
 import { listViews, inferViewType } from '../backend/views.mjs';
@@ -414,6 +414,26 @@ test('build refuses while a required answer is still missing', async () => {
   const r = await req('POST', '/api/intake/build', {});
   assert.equal(r.status, 400);
   assert.match(r.body.error, /I still need one answer/);
+});
+
+test('the first assistant is scoped to the collection the interview just proposed', () => {
+  freshRoot();
+  answerAll();
+  const built = buildWorkspace({ actor: 'crystal' });
+  const started = startFirstWork({}, { actor: 'crystal' });
+
+  // The collection is a CARD at this point — `collection` on the interview file is stamped only
+  // when she accepts it. Reading only the accepted one hired an assistant scoped to NOTHING, whose
+  // brief said "collections: none named" and which therefore had nowhere to put its first finding.
+  // Found while demonstrating gate 1: every part passed and the finding could not arrive.
+  assert.equal(getCollection(built.schema.id), null, 'the collection really is not on disk yet');
+  assert.deepEqual(started.assistant.scope.collections, [built.schema.id]);
+  assert.ok(started.assistant.scope.territory.length > 0, 'and to the ground she named');
+
+  // …and it stays right once she approves it.
+  saveCollection({ ...built.card.schema || built.schema });
+  settleWorkspace();
+  assert.deepEqual(startFirstWork({}, { actor: 'crystal' }).assistant.scope.collections, [built.schema.id]);
 });
 
 test.after(() => cancelCacheRegen());

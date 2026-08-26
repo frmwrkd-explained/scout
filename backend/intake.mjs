@@ -718,7 +718,15 @@ export function startFirstWork(answers = {}, { actor = 'crystal' } = {}) {
   const thing = String(a.thing || 'people worth your time').trim();
   const work = String(a.work || '').trim();
   const territories = territoriesFrom(a.where);
-  const collection = readIntake().data.collection || null;
+  // `collection` is stamped only when she ACCEPTS the card (settleWorkspace); the id exists from the
+  // moment build() proposed it, in `pending_view`. Reading only the accepted one hired her first
+  // assistant scoped to NOTHING — its brief read "collections: none named — ask before you write
+  // into one", so the very first run of the very first assistant had nowhere to put what it found,
+  // and the finding gate 1 asks for could not arrive. interviewState() has always read both (§state);
+  // this now does too. If she rejects the card, the scope names a collection that does not exist —
+  // which is exactly the case the brief already tells the assistant to ask about.
+  const intakeData = readIntake().data;
+  const collection = intakeData.collection || (intakeData.pending_view && intakeData.pending_view.collection) || null;
 
   // One assistant, named for the job rather than the technology — "creating one must feel like
   // hiring, not configuring" (T12 step 6).
@@ -726,7 +734,10 @@ export function startFirstWork(answers = {}, { actor = 'crystal' } = {}) {
     name: 'Scout',
     job: 'Looks for ' + thing.toLowerCase() + ' in the places you named, and writes down why each one is worth your time.',
     scope: { collections: collection ? [collection] : [], territory: territories.map(t => t.id) },
-    schedule: 'every morning',
+    // The VALUE, not the label. frontend/Assistants.jsx SCHEDULE_OPTIONS is the vocabulary
+    // (continuous · daily · weekly · manual) and dispatch.mjs reads it; writing the label here made
+    // HIRE render a blank selection over this assistant and left the schedule un-actionable.
+    schedule: 'daily',
     status: 'idle',
   }, { actor });
 

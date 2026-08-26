@@ -23,6 +23,8 @@ FrameForge's own `CLAUDE.md`, `README.md` and `ISSUES.md` are preserved as `docs
 | Decay | `backend/decay.mjs` | One function decides staleness for every object type. Never inline a second rule. |
 | Territory scoring | `backend/territory.mjs` | Sole writer of `yield` / `hit_rate` — never set by hand |
 | The agent's view of the app | `backend/agentIndex.mjs` | Adding a capability is a new Index line, never a router-skill edit |
+| Sending an assistant out (the local-CLI door) | `backend/dispatch.mjs` | `sendOut` / `sendOutAll` / `stopRun`. Composes `agentRunner` + `agentHome` + `tasks`; it spawns nothing itself and writes no document. A run's figures are **counted from the log**, never taken from the agent's reply. |
+| Serving a file's bytes | `backend/files.mjs` `rawFile` | `GET /api/files/raw`. Media types are an allowlist served inline; everything else is an attachment, because the UI and the API share an origin. |
 | HTTP contract | `backend/index.mjs` route handlers | A field a route does not destructure does not exist |
 | The router skill | `skills/scout-router/` | **Canonical source.** The app copies it fresh into every agent session home on each run, so a tamper never persists. Edit it here, never in a mounted copy. |
 | Event log | `backend/log.mjs` | Append-only, one file per day. Every mutation lands here. |

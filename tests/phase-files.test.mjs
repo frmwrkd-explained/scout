@@ -12,7 +12,7 @@ import path from 'node:path';
 import express from 'express';
 import { tempRoots } from './_env.mjs';
 import { setStorageRoot, getStorageRoot } from '../backend/store.mjs';
-import { listDir, readFile, revealPath, resolveRel, registerFileRoutes, FileError, MAX_PREVIEW_BYTES } from '../backend/files.mjs';
+import { listDir, readFile, rawFile, parseRange, mediaTypeFor, revealPath, resolveRel, registerFileRoutes, FileError, MAX_PREVIEW_BYTES } from '../backend/files.mjs';
 
 // A workspace of our own, shaped like the seeded one. Deliberately NOT helpers.freshRoot(): that
 // imports backend/index.mjs and boots the whole app, and none of this needs the app.
@@ -30,9 +30,19 @@ function freshWorkspace() {
   fs.writeFileSync(path.join(root, 'data', 'guests', '._maria-santos.md'), 'apple double');
   fs.writeFileSync(path.join(root, '.DS_Store'), 'finder');
   fs.writeFileSync(path.join(root, 'data', 'guests', 'maria-santos.md.4711.tmp'), 'half written');
+  // A real 1x1 PNG and the two files the raw route must refuse to render: an .html (a script host
+  // on the app's own origin) and an .svg (the same, wearing an image's clothes).
+  fs.mkdirSync(path.join(root, 'files'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'files', 'maria.png'), Buffer.from(PNG_1x1, 'base64'));
+  fs.writeFileSync(path.join(root, 'files', 'note.html'), '<script>fetch("/api/records")</script>');
+  fs.writeFileSync(path.join(root, 'files', 'logo.svg'), '<svg xmlns="http://www.w3.org/2000/svg"><script>1</script></svg>');
   setStorageRoot(root);
   return root;
 }
+
+// The smallest valid PNG there is — 67 bytes, one transparent pixel.
+const PNG_1x1 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+const PNG_BYTES = Buffer.from(PNG_1x1, 'base64').length;
 
 // One express app for the HTTP cases, with a revealer stub standing in for index.mjs's revealInOS.
 const revealed = [];
@@ -117,7 +127,7 @@ test('the root itself resolves, and only inside it', () => {
 test('listDir shows the real folder tree, one level at a time', () => {
   freshWorkspace();
   const top = listDir('');
-  assert.deepEqual(top.dirs.map(d => d.name), ['data', 'goals']);
+  assert.deepEqual(top.dirs.map(d => d.name), ['data', 'files', 'goals']);
   assert.deepEqual(top.files.map(f => f.name), ['me.md']);
   assert.equal(top.path, '');
   assert.equal(top.parent, null);
@@ -230,7 +240,7 @@ test('GET /api/files lists, GET /api/files/read reads, POST /api/files/reveal re
 
   const top = await get('/api/files');
   assert.equal(top.status, 200);
-  assert.deepEqual(top.body.dirs.map(d => d.name), ['data', 'goals']);
+  assert.deepEqual(top.body.dirs.map(d => d.name), ['data', 'files', 'goals']);
 
   const sub = await get('/api/files?dir=' + encodeURIComponent('data/guests'));
   assert.equal(sub.status, 200);
@@ -278,4 +288,89 @@ test('the browser writes nothing', () => {
   revealPath('data/guests/maria-santos.md', { revealInOS: () => {} });
   assert.deepEqual(fs.readdirSync(path.join(root, 'data', 'guests')).sort(), before);
   assert.equal(getStorageRoot(), root);
+});
+
+// ── the bytes (HANDOVER §5 gap 4) ────────────────────────────────────────────────────────────
+// `readFile` answers text; this answers the file. Until it existed a photo in the workspace was
+// listed, described, and could not be shown — which is Law 8 broken by omission.
+
+test('rawFile describes a media file and marks it renderable', () => {
+  freshWorkspace();
+  const f = rawFile('files/maria.png');
+  assert.equal(f.type, 'image/png');
+  assert.equal(f.inline, true);
+  assert.equal(f.size, PNG_BYTES);
+  assert.equal(f.name, 'maria.png');
+});
+
+test('anything off the media allowlist is a download, never a page on our own origin', () => {
+  freshWorkspace();
+  // The whole security argument for this route: the UI and the API share an origin, so an .html
+  // that an agent dropped in and a human filed away must never execute as first-party code.
+  for (const p of ['files/note.html', 'files/logo.svg', 'me.md']) {
+    const f = rawFile(p);
+    assert.equal(f.type, 'application/octet-stream', p + ' must not be served as itself');
+    assert.equal(f.inline, false);
+  }
+  // …and SVG is absent from the table on purpose, not by accident.
+  assert.equal(mediaTypeFor('.svg'), null);
+  assert.equal(mediaTypeFor('.PNG'), 'image/png', 'the extension match is case-insensitive');
+});
+
+test('rawFile refuses a traversal, a folder and a file that is not there', () => {
+  freshWorkspace();
+  assert.throws(() => rawFile('../../etc/passwd'), e => e instanceof FileError && e.status === 400);
+  assert.throws(() => rawFile('/etc/passwd'), e => e instanceof FileError && e.status === 400);
+  assert.throws(() => rawFile('data'), e => e instanceof FileError && e.status === 400);
+  assert.throws(() => rawFile('files/nope.png'), e => e instanceof FileError && e.status === 404);
+  assert.throws(() => rawFile(''), e => e instanceof FileError && e.status === 400);
+});
+
+test('parseRange reads exactly the shape a <video> sends, and refuses nonsense', () => {
+  assert.deepEqual(parseRange('bytes=0-9', 100), { start: 0, end: 9 });
+  assert.deepEqual(parseRange('bytes=10-', 100), { start: 10, end: 99 });
+  assert.deepEqual(parseRange('bytes=-20', 100), { start: 80, end: 99 });
+  assert.deepEqual(parseRange('bytes=0-999', 100), { start: 0, end: 99 }, 'clamped to the file');
+  for (const bad of ['', 'bytes=', 'items=0-1', 'bytes=50-10', 'bytes=200-300', 'bytes=abc-def']) {
+    assert.equal(parseRange(bad, 100), null, JSON.stringify(bad) + ' should not parse');
+  }
+});
+
+test('GET /api/files/raw serves the bytes with headers that keep them inert', async () => {
+  freshWorkspace();
+  const r = await fetch((await url()) + '/api/files/raw?path=files/maria.png');
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get('content-type'), 'image/png');
+  assert.equal(r.headers.get('x-content-type-options'), 'nosniff');
+  assert.match(r.headers.get('content-security-policy'), /default-src 'none'/);
+  assert.match(r.headers.get('content-disposition'), /^inline/);
+  assert.equal(r.headers.get('accept-ranges'), 'bytes');
+  const buf = Buffer.from(await r.arrayBuffer());
+  assert.equal(buf.length, PNG_BYTES);
+  assert.equal(buf.subarray(1, 4).toString(), 'PNG');
+});
+
+test('GET /api/files/raw hands an unlisted type over as an attachment', async () => {
+  freshWorkspace();
+  const r = await fetch((await url()) + '/api/files/raw?path=files/note.html');
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get('content-type'), 'application/octet-stream');
+  assert.match(r.headers.get('content-disposition'), /^attachment/);
+});
+
+test('GET /api/files/raw answers a range with 206, so video seeks', async () => {
+  freshWorkspace();
+  const r = await fetch((await url()) + '/api/files/raw?path=files/maria.png', { headers: { Range: 'bytes=0-9' } });
+  assert.equal(r.status, 206);
+  assert.equal(r.headers.get('content-range'), 'bytes 0-9/' + PNG_BYTES);
+  assert.equal(r.headers.get('content-length'), '10');
+  assert.equal((await r.arrayBuffer()).byteLength, 10);
+});
+
+test('GET /api/files/raw refuses a traversal with a readable 400, like every other file route', async () => {
+  freshWorkspace();
+  const r = await get('/api/files/raw?path=../../etc/passwd');
+  assert.equal(r.status, 400);
+  assert.match(r.body.error, /escapes the workspace/);
+  assert.equal((await get('/api/files/raw?path=files/nope.png')).status, 404);
 });

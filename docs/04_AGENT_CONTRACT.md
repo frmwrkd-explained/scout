@@ -14,6 +14,8 @@ The agent layer is **separate and swappable**. Scout does not own the agent proc
 
 All three call the same `upsertRecord`. `_inbox/` is untrusted input, `data/` is the store, **the watcher is the border.** Write folder mode first — it works everywhere.
 
+Scout can *open* door 1 for you — `backend/dispatch.mjs` spawns whichever agent CLI is connected in Settings, hands it the brief below, and records the run (`POST /api/assistants/:id/run`, or the one button on TODAY). That is convenience, not ownership: **it is optional, the app is fully usable without it, and a process Scout spawned has exactly the same standing as one it did not.** The gate refuses it, quarantine catches it, and the log names it. Nothing in this contract changes because of who started the process.
+
 ## 2. Wake-up
 
 ```bash

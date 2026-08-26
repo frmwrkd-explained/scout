@@ -40,6 +40,16 @@ import Interview from './Interview';
 
 const HUMAN = 'crystal';   // the UI is never an agent. Law 4 reads the actor, so this is load-bearing.
 
+// How often to look, while an assistant is out. Long enough that a machine with four agents
+// sweeping is not also re-reading its own rail ten times a second; short enough that "it came
+// home" arrives while she is still looking at the card.
+const RUN_POLL_MS = 3000;
+
+// A 503 from the dispatcher means no agent CLI is connected. That is a setup step, not a defect,
+// and saying so is the difference between "this app is broken" and "connect one and press again".
+const setupToast = e =>
+  (e && e.body && e.body.setup) ? e.message + ' You can also work through _inbox/ or MCP.' : (e && e.message) || 'Something went wrong.';
+
 export default class App extends React.Component {
   state = {
     screen: 'today',          // she opens at 9am and three lines tell her where she is (GOAL §3)
@@ -62,7 +72,31 @@ export default class App extends React.Component {
     // toggled twice and changed nothing.
     initTheme();
     this.boot();
+    this.watchRuns();
   }
+
+  componentWillUnmount() { clearInterval(this.runWatch); }
+
+  // ── while anybody is out ───────────────────────────────────────────────────────────────────
+  // A run answers before it finishes — that is the design (backend/dispatch.mjs) — so the card that
+  // says WORKING has to find out when it stops. Without this it says WORKING until you navigate
+  // away and back: the person presses Send out, watches a state that never resolves, and concludes
+  // the button did nothing. That is the same failure as a capability with no affordance, one step
+  // later in the story.
+  //
+  // Cheap by construction: it only ticks while an assistant is actually out, and it stops on the
+  // pass that finds nobody. `loadSidebar()` is one batch of six reads the rail is already doing.
+  watchRuns = () => {
+    clearInterval(this.runWatch);
+    this.runWatch = setInterval(() => {
+      if (!(this.state.assistants || []).some(a => String(a.status) === 'running')) return;
+      this.loadSidebar();
+      // BOTH keys. `nonce` is what the rail and ASSISTANTS re-read on; `refreshKey` is what TODAY
+      // re-reads on. Bumping only the first left the 9am screen — the one with the button on it —
+      // showing four assistants RUNNING beside a rail that had already noticed they were home.
+      this.setState(s => ({ nonce: s.nonce + 1, refreshKey: s.refreshKey + 1 }));
+    }, RUN_POLL_MS);
+  };
 
   async boot() {
     // Law 9 — the workspace is built WITH the person. A brand-new install has no `me.md` and no
@@ -252,6 +286,39 @@ export default class App extends React.Component {
     this.setState(s => ({ nonce: s.nonce + 1, refreshKey: s.refreshKey + 1 }));
   };
 
+  // ── the one button (GOAL §3) ───────────────────────────────────────────────────────────────
+  // Both of these ANSWER before the work is finished — the route returns the running record, the
+  // screens poll api.runs() for the rest. They never rethrow: TODAY's button awaits this handler,
+  // and a rejection there is an unhandled promise, not an error message.
+  //
+  // A 503 is not a failure, it is a missing connection: doors 2 and 3 need no local CLI, so the
+  // toast says where to fix it rather than reading like the feature is broken.
+  sendOutAll = async () => {
+    try {
+      const r = await api.sendOutAll(HUMAN);
+      const out = (r.started || []).length;
+      const held = (r.skipped || []).length;
+      this.setState({
+        toast: out
+          ? out + (out === 1 ? ' assistant is out.' : ' assistants are out.') + ' What they find lands in the queue.'
+          : held ? 'They are already out.' : 'Nobody is hired yet — hire an assistant first.',
+      });
+      this.reload();
+    } catch (e) { this.setState({ toast: setupToast(e) }); }
+  };
+
+  sendOutOne = async id => {
+    // Her name for it, not its id. `run.assistant` is the slug, and "scout-fb is out" is the app
+    // talking about a file where she is talking about a colleague she hired.
+    const who = (this.state.assistants || []).find(a => String(a.id) === String(id));
+    const name = (who && who.name) || id;
+    try {
+      await api.sendOut(id, HUMAN);
+      this.setState({ toast: name + ' is out. What it finds lands in the queue.' });
+      this.reload();
+    } catch (e) { this.setState({ toast: setupToast(e) }); }
+  };
+
   // Dragging a card between board columns is a promotion, and a promotion goes through the gate
   // like every other one. The board does not re-bucket optimistically: if the route refuses, the
   // card must not have appeared to move.
@@ -315,7 +382,7 @@ export default class App extends React.Component {
 
     switch (screen) {
       case 'today':
-        return <Today onGo={this.go} onOpenPath={this.openPath} refreshKey={refreshKey} actor={HUMAN} />;
+        return <Today onGo={this.go} onOpenPath={this.openPath} refreshKey={refreshKey} actor={HUMAN} onSendOut={this.sendOutAll} />;
 
       case 'decide':
         return (
@@ -355,6 +422,8 @@ export default class App extends React.Component {
             onSelect={id => this.setState({ activeAssistant: id })}
             onDecide={() => this.go('decide')}
             onOpenPath={this.openPath}
+            onSendOut={this.sendOutOne}
+            onSendOutAll={this.sendOutAll}
           />
         );
 

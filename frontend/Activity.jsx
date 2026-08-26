@@ -40,6 +40,7 @@ const TONE = {
   cache: 'var(--fg-faint)',
   skip: 'var(--fg-faint)',
   accept: 'var(--ok)',
+  run: 'var(--marked)',
 };
 
 // "6 minutes ago" beats a timestamp for a person scanning a log, and the exact time is one hover

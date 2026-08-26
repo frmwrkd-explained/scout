@@ -36,6 +36,10 @@ const { app } = await import('../backend/index.mjs');
 const server = app.listen(0, '127.0.0.1');
 await new Promise(r => server.once('listening', r));
 const BASE = 'http://127.0.0.1:' + server.address().port;
+// The brief an assistant is handed renders its api base from this. index.mjs stamps it when it
+// binds for real; here the harness picked an ephemeral port, so stamp it ourselves or every
+// spawned assistant would be told to curl a port nothing is listening on.
+process.env.SCOUT_SELF_PORT = String(server.address().port);
 
 // ── plumbing ────────────────────────────────────────────────────────────────────────────────
 const C = { dim: '\x1b[2m', red: '\x1b[31m', green: '\x1b[32m', yellow: '\x1b[33m', bold: '\x1b[1m', off: '\x1b[0m' };
@@ -76,6 +80,18 @@ function walk(dir, out = []) {
   return out;
 }
 const read = rel => { try { return fs.readFileSync(path.join(ws, rel), 'utf8'); } catch { return ''; } };
+
+// A run answers before it finishes — deliberately, because a sweep is minutes long. Wait for the
+// record to carry an `ended` before asserting anything about the outcome.
+async function settleRun(id, timeoutMs = 20000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const r = await get('/api/runs/' + encodeURIComponent(id));
+    if (r.body?.run?.ended) return r.body.run;
+    await new Promise(res => setTimeout(res, 60));
+  }
+  return null;
+}
 const fmOf = (rel, key) => (read(rel).match(new RegExp('^' + key + ':\\s*(.+)$', 'm')) || [])[1] || '';
 
 // ════════════════════════════════════════════════════════════════════════════════════════════
@@ -141,7 +157,40 @@ gate(1, 'A fresh person is productive in 15 minutes');
       started.assistant && (started.assistant.job || '').slice(0, 60));
     check((started.tasks || []).length > 0, 'and real work queued against the ground she named',
       (started.tasks || []).map(t => t.label).join(' · ').slice(0, 76));
-    note('the finding itself arrives from an agent run — Scout does not own the agent process (04 §1)');
+
+    // "…and produces a first real finding before the session ends."
+    //
+    // Scout does not own the agent process (04 §1) — it owns the DOOR. So the last clause is
+    // demonstrated the way she would meet it: approve the collection card, connect a CLI, press
+    // Send them out, and watch the finding arrive through the pipeline. The stand-in CLI is
+    // `tests/fixtures/stub-sortie.mjs`, and it is named here rather than hidden: what is being
+    // demonstrated is the WIRING — that a process Scout spawned reads its brief, finds the API,
+    // signs as itself and lands a gated record. The judgement is whatever CLI she connects.
+    // The interview HANDS BACK the card; it does not create the collection and it does not accept
+    // on her behalf (backend/intake.mjs §build). The screen posts it, and so does this.
+    const proposed = await post('/api/collections/propose', { ...built.card, actor: 'ana' });
+    const cardId = proposed.body?.id || proposed.body?.proposal?.id;
+    const accepted = cardId ? await post('/api/proposals/' + encodeURIComponent(cardId) + '/accept', { actor: 'ana' }) : null;
+    const exists = (await get('/api/collections')).body?.collections?.some(c => c.id === built.schema?.id);
+    check(accepted?.status === 200 && exists, 'she approves her collection on one card and the table exists',
+      '#' + (built.schema?.id || '?'));
+
+    const { saveSettings } = await import('../backend/store.mjs');
+    saveSettings({ agentCommand: path.join(ROOT, 'tests', 'fixtures', 'stub-sortie.mjs') });
+    const before = (await get('/api/collections/' + encodeURIComponent(built.schema.id) + '/documents')).body?.rows?.length || 0;
+    const sent = await post('/api/assistants/' + encodeURIComponent(started.assistant.id) + '/run', { actor: 'ana' });
+    check(sent.status === 200 && sent.body?.run?.status === 'running',
+      'she presses one button and the assistant goes out', 'run ' + (sent.body?.run?.id || '—'));
+
+    const finished = await settleRun(sent.body?.run?.id);
+    const after = (await get('/api/collections/' + encodeURIComponent(built.schema.id) + '/documents')).body?.rows?.length || 0;
+    check(finished?.status === 'done' && after > before,
+      'and a first real finding is in her table before the session ends',
+      before + ' → ' + after + ' in #' + built.schema.id + ' · ' + (finished?.status || 'no run') + ' · '
+        + String(finished?.summary || '').split('\n').filter(Boolean)[0]?.slice(0, 70));
+    check(Number(finished?.found) === after - before,
+      'what the run reports is COUNTED from the log, never taken from the agent’s word',
+      'it claimed 40; the log says ' + finished?.found);
   } finally {
     process.env.SCOUT_DATA = saveData; process.env.SCOUT_CONFIG = saveCfg;
     setStorageRoot(ws);

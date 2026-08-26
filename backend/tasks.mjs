@@ -32,6 +32,25 @@ const taskFile = (pid, id) => path.join(tasksDir(pid), safe(id) + '.md');
 const runFile = id => path.join(runsDir(), safe(id) + '.md');
 
 export const TASK_STATUS = ['open', 'claimed', 'done', 'blocked'];
+
+// The four schedules HIRE offers (frontend/Assistants.jsx SCHEDULE_OPTIONS) and the only ones
+// `dispatch.mjs` will act on. It lives here because a schedule is a property of an ASSISTANT, and
+// because `getAssistant` hands the derived kind to the UI — a screen that normalised this itself
+// would be a second rule, and the one on screen is the one the person believes.
+//
+// The labels are accepted too: intake.mjs wrote one for a while, and a person editing the .md by
+// hand will write one. Everything else — "every 6 hours", "after every scout-fb run" — is MANUAL.
+// Guessing at a schedule spawns a CLI and spends their money, so an unreadable schedule is one
+// nobody acts on, and every screen says so rather than implying a cron.
+export const SCHEDULE_KINDS = ['continuous', 'daily', 'weekly', 'manual'];
+export function normalizeSchedule(v) {
+  const s = String(v || '').trim().toLowerCase();
+  if (!s) return 'manual';
+  if (s.startsWith('continuous') || s === 'all day') return 'continuous';
+  if (s.startsWith('daily') || s === 'every morning' || s === 'every day') return 'daily';
+  if (s.startsWith('weekly') || s === 'once a week' || s === 'every week') return 'weekly';
+  return 'manual';
+}
 // Written by claimTask and by nothing else. saveTask() refuses a patch that names either of them,
 // because a queue where any writer can stamp `assigned` has no claim protocol, only a convention.
 export const CLAIM_FIELDS = ['assigned', 'claimed_at'];
@@ -96,6 +115,9 @@ export function getAssistant(id) {
     model: data.model || null,
     parent: data.parent || null,
     status: data.status || 'idle',  // idle | running | blocked
+    // Derived, never stored: what her schedule text means to the part of the app that acts on it.
+    // `schedule` stays exactly as she wrote it — this says whether anything will happen.
+    schedule_kind: normalizeSchedule(data.schedule),
     path: path.join('assistants', safe(id) + '.md'),
     body: content.trim(),
   };

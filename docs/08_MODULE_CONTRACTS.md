@@ -232,6 +232,44 @@ Routes: `GET /api/assistants`, `PATCH /api/assistants/:id`, `GET /api/tasks`,
 `POST /api/tasks`, `PATCH /api/tasks/:id`, `POST /api/tasks/:id/claim`,
 `GET /api/runs`, `POST /api/runs`.
 
+## 7b · `backend/dispatch.mjs` — the one button (M4 / T14 step 1)
+
+*"She presses one button. The assistants go back out."* — GOAL.md §3.
+
+The local-CLI door, and nothing else. It composes what already exists rather than reimplementing
+any of it: `agentRunner.cliExecutor` owns the OS process and the provider argv, `agentHome`
+owns the isolated home and the mounted router skill, `tasks.mjs` owns the run store,
+`agentIndex.mjs` owns what an agent may do, and `records.mjs` remains the only writer of
+documents. A spawned assistant writes over HTTP like any other agent — **spawning it ourselves
+buys it no privilege**, and `tests/phase-dispatch.test.mjs` demonstrates the gate refusing one.
+
+```js
+export function buildBrief(assistant, { tasks, apiBase, project })   // pure
+export function sendOut(id, { project, actor, agentCommand, deps })  // → { run, done, brief }
+export function sendOutAll({ project, actor, deps })                 // → { started[], skipped[] }
+export function countWork(actorId, since, until)                     // → { found, merged, … }
+export function stopRun(runId); export function stopAll()
+export function registerDispatchRoutes(app, deps)
+```
+Routes: `POST /api/assistants/:id/run`, `POST /api/assistants/run`, `GET /api/runs/:id`,
+`POST /api/runs/:id/stop`.
+
+Three properties are load-bearing:
+
+- **It answers before the work is finished.** `sendOut` returns as soon as the run RECORD exists
+  and hands back `done` for a caller that wants to wait. A sweep is minutes long; a request that
+  waits it out dies to a proxy timeout and leaves an assistant marked `running` for ever.
+- **What a run reports is COUNTED, never claimed.** `countWork` reads the event log, filtered to
+  that actor and that run's window. An agent saying "found 40" is a claim; forty `store` events
+  carrying its signature are a fact. Same rule `territory.mjs` already lives by.
+- **No CLI is not a failure.** `sendOut` pre-checks `resolveBin` and throws 503 `{ setup: true }`
+  **without recording a run** — a run that never started is not a run, and doors 2 and 3 need no
+  local CLI at all. Every screen states this rather than looking broken.
+
+`GET /api/index` deliberately does **not** advertise these. They are the human's door; the agent
+contract (04 §5) does not give an agent the power to dispatch another agent, and the Index may
+omit what exists but must never advertise what does not.
+
 ## 8 · `backend/proposals.mjs` — the DECIDE queue (M4)
 
 Every approval in the app flows through one queue. Cards live at `proposals/<id>.md`.

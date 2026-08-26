@@ -21,12 +21,24 @@ import { MONO } from './tokens';
 import { api } from './api';
 import { Btn, Chip, Empty, Eyebrow } from './ui';
 import Markdown from './Markdown';
+import { RenderMedia } from './RenderMedia';
 
 const mono = (extra = '') => ({ ...sx(extra), fontFamily: MONO });
 
 // Rendered markdown is the preview; the raw file is the evidence. Anything not on this list is
 // shown verbatim, because "prettifying" a .json or a .mjs would be inventing a second renderer.
 const RENDERABLE = new Set(['.md', '.markdown']);
+
+// What `GET /api/files/raw` will hand back as itself rather than as a download. Kept in step with
+// backend/files.mjs MEDIA_TYPES — the server is the authority; this list only decides whether to
+// ASK. SVG is absent from both, deliberately: it is a script host, not an image, when served raw.
+const MEDIA_EXT = new Set([
+  '.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif', '.bmp', '.ico',
+  '.mp4', '.webm', '.mov', '.m4v',
+  '.mp3', '.m4a', '.wav', '.ogg', '.flac', '.aac',
+  '.pdf',
+]);
+const rawUrl = p => '/api/files/raw?path=' + encodeURIComponent(p);
 
 // Frontmatter is split off by delimiter, NOT parsed. This screen must never disagree with the
 // file — a parser here would be a second source of truth for what a record says, and the whole
@@ -138,6 +150,32 @@ function Preview({ file, mode, onMode, error }) {
     );
   }
   if (file.binary) {
+    // A picture is not "nothing honest to show" — it is the file, and Law 8 is about being able to
+    // SEE what is on disk. `GET /api/files/raw` serves the recognised media types as themselves
+    // (and everything else as a download it will never render), so a photo, a clip or a PDF in the
+    // workspace previews here. Anything else still says what it is and how big it is.
+    const media = MEDIA_EXT.has(file.ext);
+    if (media) {
+      return (
+        <div style={sx('flex:1;min-height:0;overflow:auto;padding:16px 22px 40px;display:flex;flex-direction:column;gap:12px')}>
+          <div style={sx('display:flex;align-items:center;gap:10px')}>
+            <span style={{ ...mono('font-size:9.5px;letter-spacing:.12em'), color: 'var(--fg-faint)' }}>
+              {file.ext.replace('.', '').toUpperCase() + ' · ' + bytes(file.size)}
+            </span>
+          </div>
+          {file.ext === '.pdf' ? (
+            <object data={rawUrl(file.path)} type="application/pdf"
+              style={{ ...sx('width:100%;flex:1;min-height:480px;border-radius:10px'), border: '1px solid var(--border)', background: 'var(--sunk)' }}>
+              <Empty size="page" style={sx('max-width:420px;margin:40px auto')} title="PDF"
+                body="This machine has no inline PDF viewer. Reveal in Finder opens it." />
+            </object>
+          ) : (
+            <RenderMedia src={rawUrl(file.path)} controls hoverPlay={false} fit="contain"
+              style={{ ...sx('max-width:100%;max-height:70vh;border-radius:10px'), background: 'var(--sunk)' }} />
+          )}
+        </div>
+      );
+    }
     return (
       <Empty
         size="page"

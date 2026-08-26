@@ -140,6 +140,12 @@ const DEFAULT_SETTINGS = {
   // readable error instead of silently fabricating a "practice" version that looks like real output.
   // Opt back in from Settings only for offline development.
   agentSimulateFallback: false,
+  // Whether an assistant's `schedule:` actually sends it out (backend/dispatch.mjs). OFF by
+  // default and deliberately so: sending an assistant out spawns a CLI that costs the person
+  // money, and nothing in this app spends money without a press. With it off, `schedule` is a
+  // statement of intent she reads on the card, and every screen says so rather than implying a
+  // cron nobody wired.
+  autoRun: false,
   // Groq — the cheap-LLM accelerator. Scout's only remaining use is backend/distill.mjs, which
   // turns a closed session transcript into durable learnings. See docs/03_MEMORY.md.
   groqApiKey: '',

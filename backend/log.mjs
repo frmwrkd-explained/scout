@@ -29,6 +29,9 @@ import { getStorageRoot, readMd, writeMd } from './store.mjs';
 export const EVENT_TYPES = [
   'store', 'update', 'merge', 'skip', 'move', 'archive', 'refused',
   'quarantine', 'accept', 'propose', 'decide', 'cache', 'claim', 'inbox', 'schema',
+  // `run` is the local-CLI door opening and closing: one event when an assistant is sent out and
+  // one when it comes back, with what it actually wrote counted from the events in between.
+  'run',
 ];
 
 // One separator, three spaces of it, used nowhere inside a path. The JSON tail is re-joined on the

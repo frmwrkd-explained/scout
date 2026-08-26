@@ -48,6 +48,7 @@ import { registerTerritoryRoutes } from './territory.mjs';
 import { registerTaskRoutes } from './tasks.mjs';
 import { registerProposalRoutes } from './proposals.mjs';
 import { registerInboxRoutes, startInboxWatch, ensureInbox, refreshAgentFiles } from './inbox.mjs';
+import { registerDispatchRoutes, startScheduler, stopScheduler, stopAll as stopAllRuns } from './dispatch.mjs';
 import { logEvent, readEvents } from './log.mjs';
 
 const APP_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -203,6 +204,9 @@ registerTerritoryRoutes(app, { logEvent });
 registerTaskRoutes(app, { logEvent });
 registerProposalRoutes(app, { logEvent });
 registerInboxRoutes(app, { logEvent });
+// The one button (GOAL §3). Mounted AFTER tasks.mjs so `POST /api/assistants/:id/run` sits beside
+// the routes that own assistants, and so the Index reads both in one pass.
+registerDispatchRoutes(app, { logEvent });
 
 // pid/scope route params become filesystem path segments — allow only slug charset
 // (project ids are kebab slugs; scope is 'library' or a project id). Blocks %2F traversal.
@@ -991,6 +995,10 @@ if (IS_MAIN) {
     ensureInbox();
     startInboxWatch();
     refreshAgentFiles({ now: true });
+    // An assistant's `schedule:` only means something while this is ticking. It is a no-op unless
+    // `autoRun` is on in Settings — nothing in this app spawns a CLI, and therefore spends money,
+    // without the person having said so once.
+    startScheduler({ deps: { logEvent } });
   } catch (e) {
     console.error('[scout] the _inbox watcher did not start — ' + e.message);
   }
@@ -1013,4 +1021,11 @@ if (IS_MAIN) {
   // deliberately unawaited: a feedback service having a bad day must never delay the app starting,
   // and the ordinary case (nothing queued) is silent.
   server.on('listening', () => { flushOutbox().catch(() => { /* still queued; try again next launch */ }); });
+
+  // An assistant sent out holds a child process for as long as its sweep takes. Quitting Scout must
+  // take them with it: jobs.mjs's cleanup only tracks the children IT spawned, and a run spawned
+  // through agentRunner would otherwise outlive the app that can no longer record what it did.
+  for (const sig of ['SIGINT', 'SIGTERM']) {
+    process.on(sig, () => { try { stopScheduler(); stopAllRuns(); } catch { /* nothing out */ } });
+  }
 }

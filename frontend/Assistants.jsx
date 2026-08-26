@@ -22,6 +22,11 @@
 //   onDecide(subject)         send her to DECIDE. subject is always
 //                             { kind:'task'|'assistant', id, path, question, task, assistant }.
 //   onOpenPath(path)          Law 8 — open the raw `.md`. Every object on this screen offers it.
+//   onSendOut(id)             put ONE assistant out now (POST /api/assistants/:id/run). Optional:
+//                             without it the button is disabled and says why, never hidden.
+//   onSendOutAll()            put them all out. Both are SECONDARY here — the one solid accent
+//                             fill on this screen is Hire, and TODAY owns "Send them out" in
+//                             accent. Two accent fills on one screen is two primary actions.
 //
 // EXPORTS the assistant/task vocabulary (states, lanes, dots, paths, figures) because Hire.jsx and
 // Project.jsx speak it too, and a second copy of "what colour is blocked" is exactly the bug
@@ -67,6 +72,39 @@ export const SCHEDULE_OPTIONS = [
   { value: 'weekly', label: 'Once a week', hint: 'A slower ground that does not change much.' },
   { value: 'manual', label: 'Only when I ask', hint: 'It sits still until you send it out.' },
 ];
+// What the schedule STATE is, in one line, for the team header. Every branch is a fact:
+//   · schedules on   → how many are due right now
+//   · schedules off  → they go when you send them, and nothing else will
+//   · no answer yet  → say nothing rather than guess
+// The alternative — printing "EVERY MORNING" on a card and leaving it there — is the sentence a
+// person believes, and it was untrue for the whole of M4 and M5.
+export function scheduleWord(sched) {
+  // useRemote resolves a FAILED load to `[]`, not null — so "did the route answer" is a question
+  // about the shape, not about truthiness. A screen that cannot reach the route says nothing;
+  // guessing "off" would be a claim, and this line's whole job is to stop claims like that.
+  if (!sched || typeof sched !== 'object' || Array.isArray(sched) || typeof sched.auto !== 'boolean') return null;
+  // `scheduled` comes from the SERVER, already normalised (backend/tasks.mjs normalizeSchedule).
+  // Counting the raw strings here would report four sweeps a night over four assistants carrying
+  // "every 6 hours" and "when you shortlist someone", none of which anything acts on.
+  const scheduled = Number(sched.scheduled) || 0;
+  if (!sched.auto) return scheduled ? 'SCHEDULES OFF — YOU SEND THEM OUT' : null;
+  if (!scheduled) return 'NO ASSISTANT HAS A SCHEDULE SCOUT CAN ACT ON';
+  const due = (sched.due || []).length;
+  return due ? due + ' DUE NOW' : 'ON SCHEDULE';
+}
+
+// What the card says about this assistant's schedule. `schedule_kind` is the server's reading of
+// her words (backend/tasks.mjs); when it comes back `manual` over a schedule she plainly meant as
+// one — "every 6 hours" — the card SAYS the app will not act on it, rather than printing her
+// sentence back at her as though it were a promise.
+export function scheduleStat(a) {
+  const raw = a && a.schedule ? String(a.schedule) : '';
+  const label = scheduleLabel(a && a.schedule).toUpperCase();
+  const known = SCHEDULE_OPTIONS.some(o => o.value === (a && a.schedule));
+  if (!raw || known) return label;
+  return a && a.schedule_kind && a.schedule_kind !== 'manual' ? label : label + ' · YOU SEND IT';
+}
+
 export const scheduleLabel = v => {
   const hit = SCHEDULE_OPTIONS.find(o => o.value === v);
   return hit ? hit.label : (v ? String(v) : 'Only when you ask');
@@ -279,7 +317,7 @@ function teamSentence(list) {
 }
 
 // ── one assistant ────────────────────────────────────────────────────────────────────────────
-function AssistantCard({ a, depth, children, tasks, runs, currency, onOpenPath, onDecide, onSelect, kidStates }) {
+function AssistantCard({ a, depth, children, tasks, runs, currency, onOpenPath, onDecide, onSelect, kidStates, onSendOut, sending }) {
   const state = stateOf(a);
   const meta = ASSISTANT_STATES[state];
   const doing = doingOf(a, tasks);
@@ -294,8 +332,9 @@ function AssistantCard({ a, depth, children, tasks, runs, currency, onOpenPath, 
   const found = num(r && (r.found ?? r.finds)) ?? num(a.found);
 
   const stats = depth
-    ? ['SUB-AGENT OF ' + String(a.parent || '').toUpperCase(), scheduleLabel(a.schedule).toUpperCase(), spend ? spend + ' TODAY' : null]
-    : [r && r.started ? 'LAST RUN ' + String(r.started).slice(11, 16) : null,
+    ? ['SUB-AGENT OF ' + String(a.parent || '').toUpperCase(), scheduleStat(a), spend ? spend + ' TODAY' : null]
+    : [scheduleStat(a),
+       r && r.started ? 'LAST RUN ' + String(r.started).slice(11, 16) : null,
        found != null ? found + ' FOUND' : null,
        spend ? spend + ' TODAY' : null,
        kidStates && kidStates.length ? kidStates.length + (kidStates.length === 1 ? ' SUB-AGENT' : ' SUB-AGENTS') : null];
@@ -319,7 +358,19 @@ function AssistantCard({ a, depth, children, tasks, runs, currency, onOpenPath, 
                 ...monoStyle('font-size:12px;font-weight:600;padding:0;background:none;border:none;text-align:left'),
                 color: depth ? 'var(--fg-soft)' : 'var(--fg)', cursor: onSelect ? 'pointer' : 'default',
               }}>{a.name || a.id}</button>
-            <StateWord state={state} />
+            <div style={sx('display:flex;align-items:center;gap:10px;flex:none')}>
+              <StateWord state={state} />
+              {/* An assistant you cannot send anywhere is a setting, not an assistant. Disabled
+                  while it is out, because a second run would spawn a second process against the
+                  same task queue — the claim protocol survives that, but the cost does not. */}
+              <Btn size="sm" variant="secondary"
+                busy={!!sending}
+                disabled={!onSendOut || state === 'running'}
+                title={state === 'running' ? 'Already out' : 'Send it out now'}
+                onClick={() => onSendOut && onSendOut(a.id)}>
+                {sending ? 'Sending' : state === 'running' ? 'Out' : 'Send out'}
+              </Btn>
+            </div>
           </div>
 
           {/* what it is — the job, in the one sentence she wrote when she hired it */}
@@ -372,11 +423,36 @@ function AssistantCard({ a, depth, children, tasks, runs, currency, onOpenPath, 
 // ── the screen ───────────────────────────────────────────────────────────────────────────────
 export default function Assistants({
   assistants, tasks, runs, nonce, currency = '$',
-  onHire, onSelect, onDecide, onOpenPath,
+  onHire, onSelect, onDecide, onOpenPath, onSendOut, onSendOutAll,
 }) {
+  // Which cards are mid-request. The RUN is not tracked here — `status: running` on the assistant
+  // is, and it comes back from the server. This is only the second between the click and the
+  // answer, so that a double-click cannot send the same assistant twice.
+  const [sending, setSending] = React.useState(() => new Set());
+  const mark = (id, on) => setSending(prev => {
+    const next = new Set(prev);
+    if (on) next.add(id); else next.delete(id);
+    return next;
+  });
+  const [sendingAll, setSendingAll] = React.useState(false);
+
+  const sendOne = async id => {
+    if (!onSendOut) return;
+    mark(id, true);
+    try { await onSendOut(id); } finally { mark(id, false); }
+  };
+  const sendAll = async () => {
+    if (!onSendOutAll) return;
+    setSendingAll(true);
+    try { await onSendOutAll(); } finally { setSendingAll(false); }
+  };
   const list = useRemote(assistants, () => api.assistants().then(r => listOf(r, 'assistants')), nonce);
   const taskList = useRemote(tasks, () => api.tasks().then(r => listOf(r, 'tasks')), nonce);
   const runList = useRemote(runs, () => api.runs({ limit: 60 }).then(r => listOf(r, 'runs')), nonce);
+  // Whether a schedule ACTS. `due` is what the schedule says; `auto` is whether anything will do
+  // it. Showing the first without the second is how a person comes to believe their assistants
+  // went out overnight when nothing did.
+  const sched = useRemote(null, () => api.schedule().catch(() => null), nonce);
 
   const all = arr(list);
   const T = arr(taskList);
@@ -394,7 +470,8 @@ export default function Assistants({
     return (
       <AssistantCard key={a.id} a={a} depth={depth} tasks={T} runs={R} currency={currency}
         kidStates={depth ? null : kids}
-        onOpenPath={onOpenPath} onDecide={onDecide} onSelect={onSelect}>
+        onOpenPath={onOpenPath} onDecide={onDecide} onSelect={onSelect}
+        onSendOut={onSendOut ? sendOne : null} sending={sending.has(a.id)}>
         {kids.length ? (
           <div style={sx('display:flex;flex-direction:column;gap:8px')}>{kids.map(k => render(k, depth + 1))}</div>
         ) : null}
@@ -414,12 +491,21 @@ export default function Assistants({
             all.length ? all.length + (all.length === 1 ? ' ASSISTANT' : ' ASSISTANTS') : null,
             subCount ? subCount + (subCount === 1 ? ' SUB-AGENT' : ' SUB-AGENTS') : null,
             spend ? spend + ' SPENT TODAY' : null,
+            scheduleWord(sched),
           ]} />
         </div>
-        {/* the ONE solid accent fill on this screen */}
-        <Btn variant="primary" disabled={!onHire} onClick={() => onHire && onHire()} style={{ flex: 'none', height: 40 }}>
-          Hire an assistant
-        </Btn>
+        <div style={sx('flex:none;display:flex;align-items:center;gap:10px')}>
+          {/* Secondary on purpose — see the props note. It is the same act as TODAY's big button
+              and it calls the same route; it is just not this screen's primary one. */}
+          <Btn variant="secondary" busy={sendingAll} disabled={!onSendOutAll || !all.length}
+            onClick={sendAll} style={{ flex: 'none', height: 40 }}>
+            {sendingAll ? 'Sending them out' : 'Send them all out'}
+          </Btn>
+          {/* the ONE solid accent fill on this screen */}
+          <Btn variant="primary" disabled={!onHire} onClick={() => onHire && onHire()} style={{ flex: 'none', height: 40 }}>
+            Hire an assistant
+          </Btn>
+        </div>
       </header>
 
       <div style={sx('flex:1;min-height:0;overflow-y:auto;padding:16px 24px 24px;display:flex;flex-direction:column;gap:10px')}>

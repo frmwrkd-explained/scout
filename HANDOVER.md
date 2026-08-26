@@ -1,8 +1,9 @@
-# HANDOVER — Scout, as of 2026-08-20
+# HANDOVER — Scout, as of 2026-08-26
 
-**M0–M5 are built. `npm test` is green (593 tests, 591 pass, 2 skipped, 0 fail) and
+**M0–M5 are built. `npm test` is green (625 tests, 623 pass, 2 skipped, 0 fail) and
 `npm run demonstrate` walks GOAL.md's ten gates against a real running app and prints the
-evidence for each one — currently 10 of 10.**
+evidence for each one — currently 10 of 10, including gate 1's last clause: a first real
+finding arrives before the session ends.**
 
 This file tells you where things stand, what was decided, and what will bite you. It does not
 replace the spec — it tells you how the spec has actually been applied.
@@ -31,7 +32,7 @@ Then `docs/02_DATA_MODEL.md`, `03_MEMORY.md`, `04_AGENT_CONTRACT.md`, `05_UI_SPE
 ```bash
 npm ci
 find . -name "._*" -not -path "./node_modules/*" -delete   # ALWAYS, see §3
-npm test                     # 593 tests
+npm test                     # 625 tests
 npm run demonstrate          # the ten gates, against a throwaway copy of workspace/
 npm run server               # express on 5177
 npm run dev                  # vite on 5178, proxies /api → 127.0.0.1:5177
@@ -39,6 +40,17 @@ npm run dev                  # vite on 5178, proxies /api → 127.0.0.1:5177
 
 `npm start` builds and serves the whole app (UI + API) from one process — that is the fastest way
 to look at it. `npm run demonstrate --keep` leaves the copied workspace on disk to poke at.
+
+**To watch an assistant actually go out without spending anything**, point `agentCommand` at the
+test stub and press the button:
+
+```yaml
+# <storage root>/settings.md
+agentCommand: <repo>/tests/fixtures/stub-sortie.mjs
+```
+
+It reads its brief, finds the API base and its own actor id in it, and writes a finding through
+door 1 — the same gated, deduped, logged pipeline `_inbox/` and MCP go through.
 
 ---
 
@@ -55,13 +67,14 @@ to look at it. `npm run demonstrate --keep` leaves the copied workspace on disk 
 | **`records.mjs`** | **the only writer of files under `data/`** — the four verbs, near-match, the gate, quarantine, archive |
 | `log.mjs` | the append-only event log, one file per day. Every mutation lands here |
 | `inbox.mjs` | door 2 — the `_inbox/` watcher, `_known.md`, `_index.md` |
+| **`dispatch.mjs`** | **the one button** — sends an assistant out through the connected CLI, records the run. Composes `agentRunner`/`agentHome`/`tasks`; spawns nothing itself |
 | `decay.mjs` | one `staleness()` for every object type. **Never inline a second rule** |
 | `territory.mjs` | the sole writer of `finds` / `wins` / `hit_rate` — all computed, never typed |
 | `memory.mjs` | identity, goals, playbook, learnings, and **`renderCache()`**, the only producer of the agent's wake-up context |
 | `tasks.mjs` | assistants, tasks, atomic claiming, runs, findings |
 | `proposals.mjs` | the one DECIDE queue — six card kinds, one accept path each |
 | `agentIndex.mjs` | `renderIndex()` — one line per capability, and it drops any route not actually registered |
-| `files.mjs` | the read-only file browser, with real path-traversal refusal |
+| `files.mjs` | the read-only file browser, with real path-traversal refusal — and `rawFile`, the bytes an `<img>` needs |
 | `scoutBoard.mjs` | the whiteboard's store; **edges are derived from real relations, never stored** |
 | `intake.mjs` | the first-run interview — seven questions, and the workspace they build |
 | `mcp.mjs` | door 3, the MCP tool surface — **generated from `agentIndex.mjs`**, so a new capability becomes a tool with no edit here |
@@ -183,6 +196,28 @@ Two defences, both wanted: the editor marks an adopted value so it is not report
 D4). If you add a third door onto a record, assume it will echo, and let the server be the one that
 does not care.
 
+### A formatter that speaks one of the two shapes its own file produces
+`normRun()` in `Today.jsx` converts every timestamp to epoch milliseconds the moment it arrives.
+`clock()`, ten lines away in the same file, did `Date.parse(String(ts))` — `NaN` for a number. The
+OVERNIGHT panel header rendered the literal string `null → NOW / 4 RUNS`, and the overnight sentence
+silently dropped its window. Both were correct alone, wrong together, and had been since M5 —
+invisible for exactly as long as `runs` was always empty, which was until `dispatch.mjs` landed.
+
+Wiring a producer is when every consumer that has never seen real data gets tested for the first
+time. Expect a defect per consumer, and look at the screen rather than the suite.
+
+### Frontend logic had no door until now
+This repo has ~20 `.jsx` files exporting pure functions — `Today.overnightLines`,
+`Assistants.costToday`, `GalleryView.mediaSrc` — and `node --test` could not import any of them. So
+none of it was tested, and the defects that reached people lived exactly there. `helpers.loadJsx()`
+compiles ONE module (React stays external) into `node_modules/.cache/` and imports it;
+`tests/phase-today.test.mjs` is the first user. Use it for pure exported logic, not for rendering —
+a component that needs a DOM to be tested is telling you its logic wants to be a function.
+
+Two traps it already cost: `new URL(import.meta.url).pathname` percent-encodes the spaces in this
+repo's path and esbuild reports it as "could not resolve" (use `fileURLToPath`); and the output must
+live INSIDE the repo or the compiled module cannot resolve `react`.
+
 ### A green suite proves nothing about the doors only a human uses
 Both harnesses drive the app the way an AGENT does — `npm test` calls modules and routes,
 `npm run demonstrate` calls routes. Neither clicks anything. On 2026-08-20 the first person to use
@@ -247,22 +282,23 @@ pick its proxy target. Pass the port as argv. The proxy target stays `127.0.0.1`
 
 ## 5 · Known gaps, stated plainly
 
-1. **Gate 1's last clause is the honest limit.** GOAL.md says the interview should end "…and
-   produces a first real finding". Scout does not run agents — that is the design
-   (`docs/04_AGENT_CONTRACT.md` §1) — so the app cannot conjure one, and a seeded fake finding would
-   make the first thing she ever judged a lie. What the interview does instead: proposes her first
-   collection as a card, records the ground she named, hires one assistant in her own language, and
-   queues a task per territory. **The finding arrives on the first agent run through any of the
-   three doors.** Closing the remaining half means wiring an agent runtime, not more UI.
-2. **Nothing runs the agents.** Scout does not own the agent process — that is the design
-   (`docs/04_AGENT_CONTRACT.md` §1) — but it means `runs/` is empty on a fresh workspace and
-   "what it cost" has no source yet. The three doors (HTTP, `_inbox/`, MCP tool surface) are built;
-   the local-CLI spawner from FrameForge is present but not wired to Scout's assistants.
-3. **`documentsFor()` still counts quarantined rows**; the route filters them, and `sweepQuarantine()`
-   runs at boot so the flag is on disk and `territory.mjs` scores agree. If you add a third consumer,
-   call `isQuarantined` from `records.mjs` — do not write a second predicate.
-4. **The gallery view resolves media only for values that are already URLs.** `mediaSrc()` in
-   `GalleryView.jsx` is the single function to change when a file-serving route lands.
+1. **Nothing schedules the assistants.** `dispatch.mjs` sends them out when a person presses the
+   button (TODAY's primary action, or `Send out` on a card) and `assistants/<id>.md` carries a
+   `schedule:` string that **nothing reads**. "Every morning" is her words on a card, not a cron.
+   The next honest step is a scheduler that calls `sendOut` — one small module, not a redesign;
+   until it exists, do not let any screen imply an assistant will go out on its own.
+2. **A run is one shot, not a session.** `sendOut` hands the assistant one brief and reads one
+   reply. It cannot answer a mid-run question, so an assistant that gets stuck marks its task
+   `blocked` (which does reach DECIDE) and comes home. Multi-turn runs would go through
+   `chat.mjs`'s session machinery, which already exists and is not wired to assistants.
+3. **`codex` is in the provider table and its sandbox is not tested against door 1.**
+   `promptArgs` runs `codex exec --sandbox read-only`, and a read-only sandbox may refuse the
+   localhost HTTP the brief tells the assistant to use. `claude` is the path with a demonstration
+   behind it. Before promising a person a second provider, run one and read the run record —
+   an advertised capability that does not work is worse than a gap (see §3).
+4. **`documentsFor()` still counts quarantined rows**; the route filters them, and
+   `sweepQuarantine()` runs at boot so the flag is on disk and `territory.mjs` scores agree. If you
+   add a third consumer, call `isQuarantined` from `records.mjs` — do not write a second predicate.
 5. **Light mode deviates from `docs/05_UI_SPEC.md` §4 in three tokens** — `--fg-muted`, `--fg-faint`
    and `--warn`, because §4's printed values fail §4's own 4.5:1 rule (`--fg-faint` measured 2.78:1).
    Hue and saturation kept, lightness only. `tests/phase-theme-contrast.test.mjs` asserts every pair
@@ -271,7 +307,19 @@ pick its proxy target. Pass the port as argv. The proxy target stays `127.0.0.1`
    `Accept: application/json` header, because `docs/04_AGENT_CONTRACT.md` §2 writes the route and
    `read .scout/cache/context.md` as the same act. The UI asks for the envelope explicitly.
 
----
+### Closed since the last handover
+
+- **Gate 1's last clause.** "…and produces a first real finding before the session ends" is now
+  demonstrated end to end: she approves her collection on one card, presses one button, and a
+  record lands in her table through the pipeline. `npm run demonstrate` shows `0 → 1 in #carer`.
+  The stand-in CLI is `tests/fixtures/stub-sortie.mjs` and the demonstration names it — what is
+  proven is the WIRING; the judgement is whatever CLI she connects.
+- **"Nothing runs the agents."** `dispatch.mjs` is the local-CLI door. It is optional by
+  construction: with no CLI connected the route answers 503 `{ setup: true }`, records no run, and
+  every screen says where to fix it.
+- **Gallery media.** `GET /api/files/raw` serves the bytes, and `GalleryView.mediaSrc()` — the one
+  function the old comment said would change when the route landed — now routes every `file` value
+  through it. The file browser previews images, video, audio and PDFs for the same reason.
 
 ## 6 · What "demonstrated" looks like
 
@@ -291,6 +339,21 @@ GATE 4  The gate holds
 `workspace/data/guests/ana-villaflor.md` is **deliberately** left without `provenance: pipeline` so
 the quarantine state is visible in the UI and provable in the demonstration. It is not a mistake.
 
+Gate 1 ends with the clause this project could not demonstrate until the runner was wired:
+
+```
+GATE 1  A fresh person is productive in 15 minutes
+   ✓ she approves her collection on one card and the table exists   #carer
+   ✓ she presses one button and the assistant goes out              run scout-2026-…
+   ✓ and a first real finding is in her table before the session ends   0 → 1 in #carer · done
+   ✓ what the run reports is COUNTED from the log, never taken from the agent's word
+                                                       it claimed 40; the log says 1
+```
+
+The stand-in CLI is `tests/fixtures/stub-sortie.mjs`, and the demonstration NAMES it. What is being
+proven is the wiring — that a process Scout spawned reads its brief, finds the API, signs as itself
+and lands a gated record. The judgement is whatever CLI she connects.
+
 **Demonstrate, don't describe.** A task is done when its Demonstrate section can be performed.
 
 ---
@@ -303,4 +366,5 @@ more about this codebase than this document can tell you — and if something is
 the gate rather than the stack frame.
 
 Then open the app (`npm start`), press `D`, and work the queue with the keyboard. That is the
-product.
+product. Then press **Send them out** and watch what comes back — point `agentCommand` at the stub
+first (§1) if you would rather not spend anything to see it.

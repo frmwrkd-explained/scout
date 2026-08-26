@@ -117,14 +117,20 @@ export function RenderTile({
   className = 'hBd rvH', style, mediaStyle
 }) {
   const border = marked ? markedColor : selected ? selectedColor : idleColor;
+  // A src that will not load falls back to the placeholder rather than the browser's broken-image
+  // glyph. This matters now that a `file` value resolves to a real route: a path that escapes the
+  // workspace, or names a file that has been moved, is refused server-side — and a NAMED PLATE says
+  // "this file is not here", where a broken icon says "this app is broken".
+  const [failed, setFailed] = React.useState(false);
+  React.useEffect(() => { setFailed(false); }, [src]);
   return (
     <div onClick={onClick} onDoubleClick={onDoubleClick} draggable={draggable}
       onDragStart={onDragStart} title={title} className={className}
       style={{ ...sx('border-radius:10px;overflow:hidden;background:var(--surface);cursor:pointer'), border: '1.5px solid ' + border, ...(style || {}) }}>
       <div style={{ ...sx('position:relative;background:var(--sunk);display:flex;align-items:center;justify-content:center'), aspectRatio: aspect }}>
-        {src
+        {src && !failed
           ? <RenderMedia src={src} kind={kind} poster={poster} fit={fit} hoverPlay={hoverPlay}
-              onLoad={onMediaLoad} style={{ ...sx('width:100%;height:100%'), ...(mediaStyle || {}) }} />
+              onLoad={onMediaLoad} onError={() => setFailed(true)} style={{ ...sx('width:100%;height:100%'), ...(mediaStyle || {}) }} />
           : placeholder}
         {overlay}
       </div>

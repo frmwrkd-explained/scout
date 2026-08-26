@@ -58,9 +58,15 @@ function overnightStart(now = new Date()) {
   return d.getTime() - 6 * 3600 * 1000;
 }
 
-const clock = ts => {
-  const t = Date.parse(String(ts));
-  if (Number.isNaN(t)) return null;
+// HH:MM from anything that is a moment. It takes a NUMBER as readily as a string, because every
+// caller on this screen hands it one: `normRun` converts `started`/`ended` to epoch ms the moment
+// they arrive, and `Date.parse(String(1756215600000))` is NaN. The panel header therefore printed
+// the literal string "null → NOW", and the overnight sentence silently dropped its window — for as
+// long as there were no runs to render, which was until dispatch.mjs landed. A formatter that only
+// speaks one of the two shapes its own file produces will always fail on the day data arrives.
+export const clock = ts => {
+  const t = ts instanceof Date ? ts.getTime() : (typeof ts === 'number' ? ts : Date.parse(String(ts)));
+  if (!Number.isFinite(t)) return null;
   const d = new Date(t);
   return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
 };
@@ -80,7 +86,7 @@ function normEvent(r) {
   };
 }
 
-function normRun(r) {
+export function normRun(r) {
   const d = body(r);
   const started = Date.parse(String(first(d.started, d.started_at, d.start, d.at, d.created) || '')) || null;
   return {
@@ -133,7 +139,7 @@ function normGoal(r) {
 // ── the three lines ───────────────────────────────────────────────────────────────────────────
 // Each returns { text, honest } — `honest: true` means "there was nothing to report", and it
 // renders as a short mono uppercase status line rather than as prose with a fabricated number.
-function overnightLines({ runs, events, cards, goals, sources }) {
+export function overnightLines({ runs, events, cards, goals, sources }) {
   const since = overnightStart();
   const nightRuns = runs.filter(r => r.started && r.started >= since);
   const nightEvents = events.filter(e => e.at && e.at >= since);
@@ -362,8 +368,11 @@ export default class Today extends React.Component {
     const behind = goals.filter(g => g.behind);
     const since = overnightStart();
     const nightRuns = runs.filter(r => r.started && r.started >= since);
+    // Neither end is allowed to render as the word "null": a run still out has no `ended`, and a
+    // clock that cannot read its input is a bug, not a time. Both fall back to something true.
     const runWindow = nightRuns.length
-      ? (clock(Math.min(...nightRuns.map(r => r.started))) + ' → ' + (clock(Math.max(...nightRuns.map(r => r.ended || r.started))) || 'NOW') + ' / ' + nightRuns.length + ' RUNS')
+      ? ((clock(Math.min(...nightRuns.map(r => r.started))) || '—') + ' → '
+         + (clock(Math.max(...nightRuns.map(r => r.ended || r.started))) || 'NOW') + ' / ' + nightRuns.length + ' RUNS')
       : (sources.runs ? 'NO RUNS RECORDED' : 'NO RUN LOG');
 
     // Breakdown of the queue by kind — the same six kinds, the same table, no second vocabulary.
