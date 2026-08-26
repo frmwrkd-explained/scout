@@ -282,20 +282,29 @@ pick its proxy target. Pass the port as argv. The proxy target stays `127.0.0.1`
 
 ## 5 · Known gaps, stated plainly
 
-1. **Nothing schedules the assistants.** `dispatch.mjs` sends them out when a person presses the
-   button (TODAY's primary action, or `Send out` on a card) and `assistants/<id>.md` carries a
-   `schedule:` string that **nothing reads**. "Every morning" is her words on a card, not a cron.
-   The next honest step is a scheduler that calls `sendOut` — one small module, not a redesign;
-   until it exists, do not let any screen imply an assistant will go out on its own.
+1. **The scheduler only understands four schedules, and it is off by default.**
+   `continuous · daily · weekly · manual` (`tasks.normalizeSchedule`) — anything else is `manual`,
+   because guessing at a schedule spawns a CLI and spends her money. The seeded workspace ships four
+   assistants saying "every 6 hours" and "Sundays at 7am", and every one of them reads
+   `· YOU SEND IT` on the card. `autoRun` is off until she turns it on in Settings, for the same
+   reason. If you widen the vocabulary, widen `SCHEDULE_OPTIONS` with it — HIRE offers exactly those
+   four, and a value the app cannot offer is a value nobody typed on purpose.
+   It also only runs while Scout is running: `daily` in practice means "the first time she opens it
+   after 6am", which is as close to overnight as an app that is not a daemon can get.
 2. **A run is one shot, not a session.** `sendOut` hands the assistant one brief and reads one
    reply. It cannot answer a mid-run question, so an assistant that gets stuck marks its task
    `blocked` (which does reach DECIDE) and comes home. Multi-turn runs would go through
    `chat.mjs`'s session machinery, which already exists and is not wired to assistants.
-3. **`codex` is in the provider table and its sandbox is not tested against door 1.**
-   `promptArgs` runs `codex exec --sandbox read-only`, and a read-only sandbox may refuse the
-   localhost HTTP the brief tells the assistant to use. `claude` is the path with a demonstration
-   behind it. Before promising a person a second provider, run one and read the run record —
-   an advertised capability that does not work is worse than a gap (see §3).
+3. **The provider table has two entries, and T14 step 5 names four.**
+   `agentProviders.mjs` carries `claude` and `codex` plus a generic `-p <prompt>` fallback; T14 also
+   names Devin CLI and goose. They are absent on purpose: an entry is an argv shape, and an argv
+   shape nobody has run is a capability advertised and not delivered — the failure this repo has
+   already paid for twice (see §3, and `CORE_API_ROUTES advertised 17 dead routes`). Adding one is
+   a table entry plus a run you watched finish.
+   And **`codex`'s sandbox is not tested against door 1**: `promptArgs` runs
+   `codex exec --sandbox read-only`, and a read-only sandbox may refuse the localhost HTTP the brief
+   tells the assistant to use. `claude` is the path with a demonstration behind it. Before promising
+   somebody a second provider, send one out and read the run record.
 4. **`documentsFor()` still counts quarantined rows**; the route filters them, and
    `sweepQuarantine()` runs at boot so the flag is on disk and `territory.mjs` scores agree. If you
    add a third consumer, call `isQuarantined` from `records.mjs` — do not write a second predicate.
@@ -320,6 +329,8 @@ pick its proxy target. Pass the port as argv. The proxy target stays `127.0.0.1`
 - **Gallery media.** `GET /api/files/raw` serves the bytes, and `GalleryView.mediaSrc()` — the one
   function the old comment said would change when the route landed — now routes every `file` value
   through it. The file browser previews images, video, audio and PDFs for the same reason.
+- **`schedule:` means something.** It had been written, offered on HIRE and printed on the card
+  since M4 with nothing acting on it. See gap 1 for what it now does and does not promise.
 
 ## 6 · What "demonstrated" looks like
 
