@@ -203,7 +203,11 @@ export default function Document({
   const nextStage = React.useMemo(() => {
     if (!onPromote) return null;
     const { gate } = collapsedFields(schema, data);
-    if (!gate) return null;
+    // Only a STATUS field is a stage (docs/02 §2 — the gate guards the one `gate: true` status
+    // field). collapsedFields falls back to a `select` for the collapsed ROW, which is right for
+    // display and wrong for promotion: on #group it offered "instagram" as the next stage, and
+    // pressing it would have written `platform: instagram` through the move route.
+    if (!gate || gate.type !== 'status') return null;
     const opts = (gate.options || []).map(o => (typeof o === 'string' ? o : o.value));
     const i = opts.indexOf(data[gate.key]);
     return opts[i + 1] || null;

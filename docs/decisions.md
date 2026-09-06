@@ -991,6 +991,9 @@ decisions each of them took where the docs were silent:
 - **One "open in the whiteboard" control, not two.** The inspector's path-less "OPEN THE WHITEBOARD"
   link and the GRAPH preview's button did the same job with different results; the button now
   carries the path and places the document and its relations on the board (Law 10).
+- **Only a `status` field is a stage.** The collapsed row falls back to a `select` for display, and
+  the promote button borrowed that fallback — on `#group` it offered "instagram" as the next stage.
+  `nextStage` now requires `type: status`; a collection without one has no promote button.
 - **The territory node's HIT RATE is `hit_rate` as computed** (`territory.mjs` gives a percentage);
   the node multiplied it by 100 and printed 2500%.
 
