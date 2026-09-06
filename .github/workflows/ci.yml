@@ -1,0 +1,23 @@
+# The three checks a contributor runs locally, on a machine nobody's exFAT sidecars or exec bits
+# have touched. This is what would have caught the two defects a fresh clone hit on 2026-09-06:
+# fixtures committed without their exec bit (seven tests died with spawn EACCES) and the seeded
+# workspace being gitignored (npm run demonstrate could not run at all).
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run demonstrate
+      - run: npm run build
