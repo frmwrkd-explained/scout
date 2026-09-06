@@ -11,6 +11,7 @@
     "test": "node --test",
     "bench": "node scripts/bench-store.mjs",
     "demonstrate": "node scripts/demonstrate.mjs",
+    "demo": "node scripts/demo.mjs",
     "start": "npm run build && node backend/index.mjs",
     "app": "npm run build && electron .",
     "dist:mac": "npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --publish never",

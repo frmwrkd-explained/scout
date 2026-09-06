@@ -32,13 +32,32 @@ Then `docs/02_DATA_MODEL.md`, `03_MEMORY.md`, `04_AGENT_CONTRACT.md`, `05_UI_SPE
 npm ci
 find . -name "._*" -not -path "./node_modules/*" -delete   # ALWAYS, see §3
 npm test                     # 593 tests
-npm run demonstrate          # the ten gates, against a throwaway copy of workspace/
+npm run demonstrate          # the ten gates, against a throwaway copy of the workspace
+npm run demo                 # workspace-demo/ → workspace/, so `npm start` has something in it
 npm run server               # express on 5177
 npm run dev                  # vite on 5178, proxies /api → 127.0.0.1:5177
 ```
 
 `npm start` builds and serves the whole app (UI + API) from one process — that is the fastest way
 to look at it. `npm run demonstrate --keep` leaves the copied workspace on disk to poke at.
+
+### There are two workspaces, and only one of them is yours
+
+`workspace/` is **a user's data** and is gitignored, so a fresh clone does not have one.
+`workspace-demo/` is a **checked-in fixture** — Crystal, 22 guests, 8 groups, 7 pieces of ground, a
+DECIDE queue and a memory that already decays — with nobody's real names in it.
+
+- **`npm run demonstrate`** copies `workspace/` when it exists and `workspace-demo/` when it does
+  not, and **prints which one it used**. Both are copied to a temp dir first: a demonstration that
+  mutates the workspace it is demonstrating can only be run once.
+- **`npm run demo`** copies `workspace-demo/` → `workspace/` and sweeps `._*` on the way in. It
+  **refuses to overwrite an existing `workspace/`** — one line, exit 1. Law 5 is not a rule about
+  the app only, and a convenience script that clobbers somebody's vault to save them one `rm` is
+  the same failure with a friendlier name.
+- Edit the fixture the way you would edit any vault: it is plain markdown, and every file in it is
+  in the exact shape the pipeline writes (`docs/decisions.md`, "A checked-in demonstration
+  workspace"). `workspace-demo/data/guests/ana-villaflor.md` is deliberately left without
+  `provenance: pipeline` — see §6.
 
 ---
 
@@ -255,7 +274,7 @@ pick its proxy target. Pass the port as argv. The proxy target stays `127.0.0.1`
    queues a task per territory. **The finding arrives on the first agent run through any of the
    three doors.** Closing the remaining half means wiring an agent runtime, not more UI.
 2. **Nothing runs the agents.** Scout does not own the agent process — that is the design
-   (`docs/04_AGENT_CONTRACT.md` §1) — but it means `runs/` is empty on a fresh workspace and
+   (`docs/04_AGENT_CONTRACT.md` §1) — but it means `runs/` is empty on a workspace nobody has seeded and
    "what it cost" has no source yet. The three doors (HTTP, `_inbox/`, MCP tool surface) are built;
    the local-CLI spawner from FrameForge is present but not wired to Scout's assistants.
 3. **`documentsFor()` still counts quarantined rows**; the route filters them, and `sweepQuarantine()`
@@ -288,7 +307,7 @@ GATE 4  The gate holds
    ✓ so is the quarantine
 ```
 
-`workspace/data/guests/ana-villaflor.md` is **deliberately** left without `provenance: pipeline` so
+`workspace-demo/data/guests/ana-villaflor.md` is **deliberately** left without `provenance: pipeline` so
 the quarantine state is visible in the UI and provable in the demonstration. It is not a mistake.
 
 **Demonstrate, don't describe.** A task is done when its Demonstrate section can be performed.
@@ -297,10 +316,19 @@ the quarantine state is visible in the UI and provable in the demonstration. It 
 
 ## 7 · If you are picking this up cold
 
-Run `npm run demonstrate` first. It boots the real app against a copy of the workspace, walks the
-ten gates in the order a person meets them, and prints what it saw. In four minutes you will know
-more about this codebase than this document can tell you — and if something is broken, it will name
-the gate rather than the stack frame.
+Run `npm run demonstrate` first. It boots the real app against a copy of the workspace — yours if
+you have one, the checked-in `workspace-demo/` fixture otherwise — walks the ten gates in the order
+a person meets them, and prints what it saw. In four minutes you will know more about this codebase
+than this document can tell you, and if something is broken it will name the gate rather than the
+stack frame.
 
-Then open the app (`npm start`), press `D`, and work the queue with the keyboard. That is the
-product.
+Then give yourself a workspace and open the app:
+
+```bash
+npm run demo     # workspace-demo/ → workspace/ ; refuses if you already have one
+npm start        # build + serve on 5177
+```
+
+Press `D` and work the queue with the keyboard. That is the product. From that point `workspace/`
+is yours — it is gitignored, nothing in this repo will overwrite it, and `npm run demo` will refuse
+to run again rather than take it from you.

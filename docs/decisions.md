@@ -842,3 +842,66 @@ Four features in this round were *already built* and unreachable: archive, view 
 saved-view filters. The build's failure mode is not missing capability, it is **capability with no
 affordance** — and the two look identical from the outside, except that the second one is worse,
 because the person concludes the app cannot do it and stops asking.
+
+---
+
+## 2026-09-06 · A checked-in demonstration workspace, and why `npm run demo` refuses
+
+### The gap
+`workspace/` is gitignored — a workspace is a user's data and never belongs in this repo — but
+`scripts/demonstrate.mjs` copied `workspace/` unconditionally and `HANDOVER.md` told a new person
+to run `npm run demonstrate` first and then `npm start` and press `D`. **On a fresh clone both were
+impossible:** demonstrate died on the missing folder before printing a single gate, and `npm start`
+landed on the first-run interview with nothing in it. GOAL.md gate 10 — *"a second person can run
+and extend the app from these docs alone"* — therefore failed on the one thing the docs open with,
+and no test could see it, because every test builds its own root in `/tmp`.
+
+### The decision: a fixture in the repo, not a generator
+`workspace-demo/` is checked in as plain markdown — Crystal, 22 guests, 8 groups, 7 pieces of
+ground, five playbook claims, four learnings, four assistants, a project with tasks, a DECIDE queue
+of six kinds, three runs and two days of event log. `demonstrate.mjs` copies `workspace/` when it
+exists and `workspace-demo/` when it does not, and **prints which one it used** — "10 of 10" over an
+unnamed workspace is a claim nobody can check.
+
+**Why a fixture and not a seed script.** Law 1 says the files are the truth. A generator would make
+the truth a program, and the first question anybody asks of demo data — *"what does a real record
+look like on disk?"* — would then be answered by reading code instead of by opening a file. It also
+makes the fixture editable by the person it is for: `workspace-demo/` opens in Obsidian like any
+other vault. The build script that produced it wrote every file through `store.mjs writeMd`, so the
+frontmatter is byte-for-byte the shape the pipeline writes, and then it was thrown away.
+
+### `npm run demo` refuses to overwrite `workspace/`
+It copies `workspace-demo/` → `workspace/`, sweeps `._*` on the way in, and **stops with one line
+and exit 1 if `workspace/` already exists.** Law 5 is not a rule about the app only. A convenience
+script that clobbers somebody's real vault to save them one `rm` is the same failure with a
+friendlier name, and it is worse than the app doing it, because nobody expects a setup command to
+destroy anything. Moving the existing workspace out of the way stays the person's decision.
+
+### Dates are frozen against 2026-09-06, so decay is visible rather than described
+The fixture is not "recent data": every date in it was chosen so the intended things read stale on
+the day it was written and the rest read fresh. `playbook/two-message-rule` and
+`playbook/screenshot-the-post` are past their 30-day window, so they are excluded from the hot cache
+and named in `excluded[]` while their files stay untouched. `territory/ofw-stories` is twelve days
+unswept against a seven-day interval, so it renders `← STALE`. `territory/manila-nurses` is
+`rejected 2026-07-30 · do not re-request`, `territory/health-workers` is `pending since 8d`, and
+`territory/frat-alumni-ph` is untried and attributed to the vetter. Both goals have deadlines in the
+future so "days left" is positive, and exactly one of them is behind. That is gate 7 demonstrated by
+data rather than asserted by a comment — and it is the reason the fixture should be re-dated, not
+"refreshed", if it ever stops reading the way it is meant to.
+
+### Two ids, two objects, on purpose
+A piece of ground is **both** a `#group` record under `data/groups/` and a memory object at
+`territory/<id>.md`, under the same id. The group carries the catalogue — members, platform, and the
+hand-counted `finds` / `booked` that `my-best` sorts on (seeding ambiguity 5, above). The territory
+carries the live scoreboard, whose `finds` / `wins` / `hit_rate` are rollups `backend/territory.mjs`
+computes and nobody types. `guest.found_in` points at the id, so it resolves as a relation chip to
+the group **and** scores the territory, with one value and no second source of truth.
+`manila-foodies` is deliberately a group with no territory file: 62 finds, 0 booked, dropped as
+working ground — it is why `my-best` sorts on `booked` and never on `finds`.
+
+### `guest.found_in` targets `#group`, not `#territory`
+`backend/collections.mjs` validates a relation's `target` against the collections that actually
+exist on disk, and `addField` re-validates the whole schema. A `found_in` pointing at `territory`
+would therefore need a third collection file whose only purpose is to satisfy the validator — and
+gate 8, which adds a field to `#guest` through the real route, would 400 without it. Pointing at
+`#group` is both true (that is where the person was found) and self-contained.
