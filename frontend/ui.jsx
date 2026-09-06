@@ -244,19 +244,39 @@ export function Field({ label, hint, className, style, children, ...rest }) {
 // exported from neither — which docs/COMPONENTS.md §1.1 names as the root cause of the worst
 // duplication in the app, because a surface that wanted this chip had no way to import it and
 // retyped it instead. One declaration now, here with the other primitives. Import it.
+//
+// A chip with `onClick` (TODAY's queue-kind pills, a tag's remove ×, a filter pill) used to be a
+// `<span onClick>` with no `role` or `tabIndex` — invisible to a keyboard and to a screen reader,
+// the same gap Btn's own header comment names for the divs it replaced. Present `onClick` ⇒ render
+// a real `<button type="button">`, which gets focus and Enter/Space activation for free; absent
+// `onClick` ⇒ stay a `<span>`, because a label-only chip is not a control and should not claim to
+// be one (an inert element with a button role is its own accessibility bug).
+const CHIP_BTN_RESET = sx('background:none;border:none;font:inherit;color:inherit;padding:0;margin:0;display:inline-flex;align-items:center;white-space:nowrap');
+
 export function Chip({ label, on, onClick, title, style, ...rest }) {
+  const look = {
+    ...sx('font-size:10px;border-radius:6px;padding:4px 10px;cursor:pointer'),
+    fontFamily: MONO, fontVariantNumeric: 'tabular-nums',
+    color: on ? 'var(--fg)' : 'var(--fg-muted)',
+    background: on ? 'var(--raise)' : 'transparent',
+    border: '1px solid ' + (on ? 'var(--border-3)' : 'var(--border-2)'),
+    fontWeight: on ? 700 : 400,
+    ...style,
+  };
+  const className = on ? '' : 'hBd';
+  if (onClick) {
+    // CHIP_BTN_RESET deliberately omits BTN_RESET's `gap:7px` — a chip's label is sometimes a
+    // fragment (MultiSelectEditor's token + a "×"), and that gap would shove the × away from its
+    // own token on every tag in the app. Reusing BTN_RESET wholesale would be the second reset,
+    // and it would shift a call site nobody asked to move.
+    return (
+      <button type="button" onClick={onClick} title={title || ''} className={className}
+        style={{ ...CHIP_BTN_RESET, ...look }}
+        {...rest}>{label}</button>
+    );
+  }
   return (
-    <span onClick={onClick} title={title || ''} className={on ? '' : 'hBd'}
-      style={{
-        ...sx('font-size:10px;border-radius:6px;padding:4px 10px;cursor:pointer'),
-        fontFamily: MONO, fontVariantNumeric: 'tabular-nums',
-        color: on ? 'var(--fg)' : 'var(--fg-muted)',
-        background: on ? 'var(--raise)' : 'transparent',
-        border: '1px solid ' + (on ? 'var(--border-3)' : 'var(--border-2)'),
-        fontWeight: on ? 700 : 400,
-        ...style,
-      }}
-      {...rest}>{label}</span>
+    <span title={title || ''} className={className} style={look} {...rest}>{label}</span>
   );
 }
 

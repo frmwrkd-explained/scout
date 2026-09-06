@@ -95,6 +95,19 @@ function refPath(s) {
 }
 const looksLikeRef = s => WIKI.test(String(s).trim()) || /^[\w.\-/]+\/[\w.\-/]+$/.test(String(s).trim());
 
+// `[[data/guests/maria-santos]]`, `[[data/guests/maria-santos|Maria Santos]]`, or a bare
+// `data/guests/maria-santos` → `data/guests/maria-santos.md`; anything that does not look like a
+// reference at all → `null`. This is `refPath` + `looksLikeRef` above as ONE public answer, so a
+// second surface that needs to turn wikilink-shaped text into an openable path (Inspector's LINKS
+// section — docs/05_UI_SPEC.md §1, design/EXTRACT.md §2 — renders prose mentions RefList never
+// sees) calls this instead of writing its own predicate and its own `|label` stripping, which is
+// exactly how two resolvers start disagreeing about what counts as a link (item 7).
+export function resolveWikilink(text) {
+  const s = String(text ?? '').trim();
+  if (!s || !looksLikeRef(s)) return null;
+  return refPath(s);
+}
+
 // Evidence arrives as counted rows ({ k, v } / { label, value }), as document references
 // (wikilinks), or as both. They render differently, so they are separated once, here.
 function normalizeEvidence(ev) {

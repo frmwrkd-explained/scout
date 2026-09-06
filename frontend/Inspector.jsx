@@ -17,6 +17,7 @@ import { GraphPreview } from './Whiteboard';
 import { sx } from './sx';
 import { MONO } from './tokens';
 import { Eyebrow } from './ui';
+import { resolveWikilink } from './DecideCards';
 import PropertyRows, { rowsFor } from './PropertyRows';
 
 export const INSPECTOR_W = 302;
@@ -169,7 +170,18 @@ export default function Inspector({ collection, doc, referencedBy = [], open, on
           {linksOut.length ? (
             <>
               <span style={{ ...mono('font-size:8.5px;font-weight:700;letter-spacing:.12em;display:block;padding:4px 0'), color: 'var(--fg-faint)' }}>OUT / WRITTEN HERE</span>
-              {linksOut.map((l, i) => <div key={i} style={sx('font-size:12px;color:var(--fg-soft);padding:3px 0')}>{l}</div>)}
+              {linksOut.map((l, i) => {
+                // The one resolver (DecideCards.resolveWikilink) — never a second `|label` stripper.
+                const p = resolveWikilink('[[' + l + ']]');
+                return p && onOpenPath ? (
+                  <button key={i} type="button" onClick={() => onOpenPath(p)} className="hAccent"
+                    style={sx('font-size:12px;padding:3px 0;background:none;border:none;text-align:left;cursor:pointer;color:var(--accent)')}>
+                    {l}
+                  </button>
+                ) : (
+                  <div key={i} style={sx('font-size:12px;color:var(--fg-soft);padding:3px 0')}>{l}</div>
+                );
+              })}
             </>
           ) : <Nothing>NO WIKILINKS IN THE BODY</Nothing>}
         </Section>

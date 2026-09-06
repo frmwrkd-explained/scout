@@ -8,6 +8,11 @@
 //   onDecided   fn({ id, kind, verdict, reason })  fires AFTER the server confirms, so the rail's
 //                         "Needs you" count and TODAY can refresh. Optional.
 //   onCount     fn(n)     open-card count, on load and after every decision. Optional.
+//   focus       string    a card id to open on, rather than the first open card — how "Answer it"
+//                         on a blocked assistant's question lands on THAT card (App.go passes the
+//                         subject through as `arg`). Absent, or naming a card no longer in the
+//                         queue (already decided elsewhere), falls back to the first card — never
+//                         a blank queue over a typo in an id.
 //
 // THE SCREEN IS ALTITUDE 1 AND STAYS THERE
 //   card                      the kind, one headline, one line, the yes/no      (default)
@@ -104,6 +109,15 @@ export default class Decide extends React.Component {
     answer: '', answerFor: null,   // the typed answer, and the card it belongs to
   };
 
+  // The scrollable altitude-1/2 pane, and the wrapper around its ALWAYS-rendered content (CardBody
+  // + the WHY toggle row) inside it — the two `maybeAutoWhy` (below, item 4) compares. Two refs on
+  // purpose: `scrollHeight` on an `overflow:auto` box can never read BELOW its own `clientHeight`
+  // — a short-content box still reports `scrollHeight === clientHeight`, because the box itself
+  // defines the scrollable canvas once content doesn't overflow it. `contentRef` sits on a plain
+  // (non-flex) wrapper, so its `offsetHeight` is the content's actual, unstretched height.
+  paneRef = React.createRef();
+  contentRef = React.createRef();
+
   componentDidMount() {
     this.mounted = true;
     window.addEventListener('keydown', this.onKey);
@@ -117,6 +131,33 @@ export default class Decide extends React.Component {
     window.removeEventListener('keydown', this.onKey);
   }
 
+  // Item 4 — the card fills the pane on purpose (this file's header comment: a target that moves
+  // between cards is worse than one that doesn't), so a short card with WHY collapsed left a
+  // ~300px empty box between the summary and the pinned action bar. Resizing the card to its
+  // content would fix the box by reintroducing exactly the moving target the pinning was built to
+  // avoid, so instead: when a freshly-shown card has room to spare, open WHY BY DEFAULT so the
+  // space holds real reasoning. The person's [W] key still closes it; a card with a full EVIDENCE
+  // table never triggers this because it already fills the box on its own.
+  componentDidUpdate(prevProps, prevState) {
+    if (prevState.idx !== this.state.idx || prevState.loading !== this.state.loading) this.maybeAutoWhy();
+  }
+
+  maybeAutoWhy() {
+    const card = this.card();
+    if (!card || !card.why || this.state.why || this.state.mode !== 'decide') return;
+    // One frame so the just-applied layout has settled — reading heights synchronously here risks
+    // measuring the PREVIOUS card's box on some browsers.
+    requestAnimationFrame(() => {
+      if (!this.mounted || this.state.why || this.card() !== card) return;
+      const pane = this.paneRef.current, content = this.contentRef.current;
+      if (!pane || !content) return;
+      // `content.offsetHeight` is the collapsed card's own, unstretched height; `pane.clientHeight`
+      // is the box `flex:1` forces it to fill. Meaningfully less of the latter than the former ⇒
+      // the empty box this item fixes.
+      if (content.offsetHeight <= pane.clientHeight - 80) this.setState({ why: true });
+    });
+  }
+
   async load() {
     this.setState({ loading: true, error: null });
     try {
@@ -125,7 +166,10 @@ export default class Decide extends React.Component {
         .map(normalizeCard)
         .filter(c => c && c.id);
       if (!this.mounted) return;
-      this.setState({ queue, idx: 0, loading: false, why: false, ev: false, mode: 'decide' });
+      // `findIndex` misses → -1, and `Math.max(0, -1)` is 0 — the same "first card" fallback as
+      // no `focus` at all, so a stale or unknown id never renders an empty queue.
+      const idx = this.props.focus ? Math.max(0, queue.findIndex(c => c.id === this.props.focus)) : 0;
+      this.setState({ queue, idx, loading: false, why: false, ev: false, mode: 'decide' });
       if (this.props.onCount) this.props.onCount(queue.length);
     } catch (e) {
       if (!this.mounted) return;
@@ -369,21 +413,23 @@ export default class Decide extends React.Component {
                 <article style={sx('flex:1;min-height:0;display:flex;flex-direction:column;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;overflow:hidden')}>
 
                   {/* altitude 1 + altitude 2 scroll; the action bar below never moves. */}
-                  <div style={sx('flex:1;min-height:0;overflow-y:auto')}>
-                    <CardBody
-                      card={card}
-                      onOpenPath={this.props.onOpenPath}
-                      answer={this.currentAnswer()}
-                      onAnswer={v => this.setState({ answer: v, answerFor: card.id })}
-                      onSubmit={() => this.commit('accept')}
-                    />
+                  <div ref={this.paneRef} style={sx('flex:1;min-height:0;overflow-y:auto')}>
+                    <div ref={this.contentRef}>
+                      <CardBody
+                        card={card}
+                        onOpenPath={this.props.onOpenPath}
+                        answer={this.currentAnswer()}
+                        onAnswer={v => this.setState({ answer: v, answerFor: card.id })}
+                        onSubmit={() => this.commit('accept')}
+                      />
 
-                    {/* ── altitude 2 ── */}
-                    <div style={sx('border-top:1px solid var(--line);padding:14px 40px;display:flex;align-items:center;gap:18px')}>
-                      <TextToggle open={why} label="WHY" k={KEYS.why} onClick={() => this.setState(s => ({ why: !s.why, ev: false }))} />
-                      {why ? (
-                        <span style={{ ...mono('font-size:10px;font-weight:500;letter-spacing:.1em;color:var(--fg-faint)') }}>EVIDENCE IS ONE MORE CLICK, INSIDE</span>
-                      ) : null}
+                      {/* ── altitude 2 ── */}
+                      <div style={sx('border-top:1px solid var(--line);padding:14px 40px;display:flex;align-items:center;gap:18px')}>
+                        <TextToggle open={why} label="WHY" k={KEYS.why} onClick={() => this.setState(s => ({ why: !s.why, ev: false }))} />
+                        {why ? (
+                          <span style={{ ...mono('font-size:10px;font-weight:500;letter-spacing:.1em;color:var(--fg-faint)') }}>EVIDENCE IS ONE MORE CLICK, INSIDE</span>
+                        ) : null}
+                      </div>
                     </div>
 
                     {why ? (

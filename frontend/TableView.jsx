@@ -24,7 +24,7 @@ const mono = (extra = '') => ({ ...sx(extra), fontFamily: MONO });
 // it for all four view types, so a change to the query bar lands on the board, the list and the
 // gallery at the same time instead of on the table alone.
 
-export default function TableView({ collection, view, views, rows, counts, selected, onSelect, onOpen, onFollow, onPickView }) {
+export default function TableView({ collection, view, views, rows, counts, selected, onSelect, onOpen, onFollow, onPickView, onSaveView }) {
   // The row scale the view was saved with. `density` has been on the view object since M1 and
   // this is its first reader — see ViewBar.jsx.
   const d = densityOf(view);
@@ -33,17 +33,48 @@ export default function TableView({ collection, view, views, rows, counts, selec
   // The primary field is the title column and always leads, whatever the view says.
   const primary = (collection.fields || []).find(f => f.primary);
 
+  // Sorting existed only through ViewBar's Filters composer (design/EXTRACT.md §2 wants a header
+  // click too, item 9). One writer: this calls the SAME `onSaveView` the composer calls, into the
+  // SAME saved-view path (`.scout/views/<collection>.json`) — a session-only sort would disagree
+  // with what an agent or another machine sees of "this view", and Law 1 says the file is the
+  // truth. none → asc → desc → none, one field at a time (ViewComposer's own sort picker manages
+  // only one field too — a second, independent multi-sort model here would be the second
+  // implementation Law 10 warns about).
+  const sortField = view.sort?.[0]?.field || null;
+  const sortDir = view.sort?.[0]?.dir || null;
+  const cycleSort = key => {
+    if (!onSaveView) return;
+    const sort = sortField !== key ? [{ field: key, dir: 'asc' }]
+      : sortDir === 'asc' ? [{ field: key, dir: 'desc' }]
+      : [];
+    onSaveView({ ...view, sort });
+  };
+
   return (
     <div style={sx('flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden')}>
       <div style={sx('flex:1;min-height:0;overflow:auto')}>
         <table style={sx('width:100%;border-collapse:collapse')}>
           <thead>
             <tr>
-              {defs.map(f => (
-                <th key={f.key} style={{ ...mono('text-align:left;padding:0 14px 8px;font-size:9px;font-weight:700;letter-spacing:.16em;position:sticky;top:0;background:var(--ink)'), color: 'var(--fg-muted)', borderBottom: '1px solid var(--line)' }}>
-                  {(f.label || f.key).replace(/_/g, ' ').toUpperCase()}
-                </th>
-              ))}
+              {defs.map(f => {
+                const on = sortField === f.key;
+                return (
+                  <th key={f.key} style={{ ...sx('text-align:left;padding:0;position:sticky;top:0;background:var(--ink)'), borderBottom: '1px solid var(--line)' }}>
+                    {onSaveView ? (
+                      <button type="button" onClick={() => cycleSort(f.key)} className="hFg"
+                        title={!on ? 'Sort by ' + (f.label || f.key) : sortDir === 'asc' ? 'Sorting ascending — click for descending' : 'Sorting descending — click to clear'}
+                        style={{ ...mono('display:flex;align-items:center;gap:5px;width:100%;padding:0 14px 8px;font-size:9px;font-weight:700;letter-spacing:.16em;background:none;border:none;cursor:pointer;text-align:left'), color: on ? 'var(--fg-soft)' : 'var(--fg-muted)' }}>
+                        <span>{(f.label || f.key).replace(/_/g, ' ').toUpperCase()}</span>
+                        <span style={{ ...sx('font-size:8px;line-height:1'), opacity: on ? 1 : 0, color: 'var(--fg-faint)' }}>{sortDir === 'asc' ? '▲' : '▼'}</span>
+                      </button>
+                    ) : (
+                      <span style={{ ...mono('display:block;padding:0 14px 8px;font-size:9px;font-weight:700;letter-spacing:.16em'), color: 'var(--fg-muted)' }}>
+                        {(f.label || f.key).replace(/_/g, ' ').toUpperCase()}
+                      </span>
+                    )}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>

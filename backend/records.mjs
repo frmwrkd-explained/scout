@@ -26,7 +26,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { getStorageRoot, readMd, writeMd, revOf } from './store.mjs';
 import { getCollection, listCollections, gateField, primaryField, AUTO_FIELDS } from './collections.mjs';
-import { allDocuments, documentsFor, matchesQuery } from './documents.mjs';
+import { allDocuments, documentsFor, matchesQuery, kindOf } from './documents.mjs';
 import { logEvent, readEvents, eventsFor, EVENT_TYPES } from './log.mjs';
 // proposals.mjs imports store.mjs and nothing else; it reaches back into this file only through a
 // runtime `await import()`, so this is not a load-time cycle. It is imported statically on purpose:
@@ -952,6 +952,9 @@ export function readRecord(relPath) {
   return {
     path: doc.path, data, content: doc.content, rev: revOf(doc.data, doc.content), flags,
     collection: collection ? collection.id : null,
+    // What KIND of file this is when it is not a record — identity, goal, territory… — so the
+    // document surface can label it instead of borrowing the rail's collection (docs/05 §2.1).
+    kind: kindOf(doc.path),
     raw: flags.agentPromotion ? doc.data : undefined,
   };
 }

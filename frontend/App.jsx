@@ -315,6 +315,14 @@ export default class App extends React.Component {
   // Dragging a card between board columns is a promotion, and a promotion goes through the gate
   // like every other one. The board does not re-bucket optimistically: if the route refuses, the
   // card must not have appeared to move.
+  // Accept a quarantined record — the one thing a human can do about a file an agent wrote around
+  // the pipeline (Law 4). No try/catch on purpose: a refusal propagates to the strip in
+  // CollectionView, which shows the server's own reason beside the specific record (Law 8).
+  onAccept = async path => {
+    await api.acceptRecord(path, HUMAN);
+    this.reload();
+  };
+
   onMove = async (row, to) => {
     try {
       await api.moveRecord(row.path, to, HUMAN);
@@ -535,6 +543,7 @@ export default class App extends React.Component {
           <CollectionView
             collection={activeCollection} view={view} views={views} rows={rows} counts={viewCounts}
             quarantined={quarantined}
+            onAccept={this.onAccept}
             selected={selected}
             onSelect={r => this.select(r.path)}
             // Two different actions, two different names. `onOpen(row)` opens a record; `onFollow`
