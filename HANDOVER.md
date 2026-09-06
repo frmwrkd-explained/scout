@@ -1,8 +1,16 @@
-# HANDOVER — Scout, as of 2026-08-20
+# HANDOVER — Scout, as of 2026-09-06
 
-**M0–M5 are built. `npm test` is green (593 tests, 591 pass, 2 skipped, 0 fail) and
-`npm run demonstrate` walks GOAL.md's ten gates against a real running app and prints the
-evidence for each one — currently 10 of 10.**
+**M0–M5 are built. `npm test` is green (636 tests, 634 pass, 2 skipped, 0 fail) and
+`npm run demonstrate` walks GOAL.md's ten gates against a real running app — from a fresh clone,
+against the checked-in `workspace-demo/` — and prints the evidence for each one: 10 of 10.**
+
+The 2026-09-06 finishing pass: three auditors walked the app the way a person and an agent do and
+reproduced 45 findings; the fixes and the calls taken are in `docs/decisions.md` under that date.
+The short version — the DECIDE queue's `question` card could not be accepted, an agent's overnight
+finds never reached the queue, `PATCH /api/records` let an agent rewrite `me.md`, memory edits made
+on the document surface never reached the hot cache, the MCP door never invalidated it, goals could
+not be created, TODAY's one accent fill was dead, there was no search, no settings, no theme
+control, and ~4,450 lines of FrameForge frontend nothing imported. All closed.
 
 This file tells you where things stand, what was decided, and what will bite you. It does not
 replace the spec — it tells you how the spec has actually been applied.
@@ -276,7 +284,23 @@ pick its proxy target. Pass the port as argv. The proxy target stays `127.0.0.1`
 2. **Nothing runs the agents.** Scout does not own the agent process — that is the design
    (`docs/04_AGENT_CONTRACT.md` §1) — but it means `runs/` is empty on a workspace nobody has seeded and
    "what it cost" has no source yet. The three doors (HTTP, `_inbox/`, MCP tool surface) are built;
-   the local-CLI spawner from FrameForge is present but not wired to Scout's assistants.
+   the local-CLI spawner from FrameForge (`agentRunner.mjs`, `agentHome.mjs`, `agentProviders.mjs`)
+   is present but not wired to Scout's assistants. TODAY's and PROJECT's "Put the team back to work"
+   reopens blocked tasks and says so honestly; it does not spawn anything. **This is the single
+   largest remaining piece of GOAL §3** ("she presses one button; the assistants go back out") and
+   it is a runtime, not a UI: an `assistants/<id>.md` needs a command (Settings has the field),
+   `agentHome` mounts the router skill and injects `GET /api/context`, the run lands in `runs/` and
+   the findings arrive through door 1. The orchestration audit lens that would have designed this
+   was cut for cost; start from `backend/agentRunner.mjs` and `docs/04_AGENT_CONTRACT.md` §1.
+2b. **`moveRecord` and `upsertRecord` on a collection whose home is outside `data/`** (the template's
+   `#territory` over `territory/**`) write through the generic writer rather than `saveTerritory`,
+   so a board drag on a territory skips the `access_changed` stamp. `patchRecord` DOES delegate
+   (`docs/08` §3). Not a gate hole — the gate still refuses agents and the cache now bumps — but the
+   same shape one level up. Delegating means making `moveRecord` async.
+2c. **`frontend/api.js` still carries ~120 FrameForge-only methods** (`/api/board`, `/api/assets`,
+   `/api/generations`, `/api/manual`, …) beside the SCOUT block. Their callers are deleted; the
+   methods were left because pruning them needs a grep per method against the surviving surfaces.
+   A method for a route that 404s is a lie about what the app can do — prune them.
 3. **`documentsFor()` still counts quarantined rows**; the route filters them, and `sweepQuarantine()`
    runs at boot so the flag is on disk and `territory.mjs` scores agree. If you add a third consumer,
    call `isQuarantined` from `records.mjs` — do not write a second predicate.

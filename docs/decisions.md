@@ -974,3 +974,29 @@ decisions each of them took where the docs were silent:
   counted over the new collection's gate. A goal with a label and no number beats no goal.
 - **The Index names the port that is bound.** `selfPort()` fell back to FrameForge's 5176;
   `setSelfPort(server.address().port)` is called from the listen callback and from `demonstrate`.
+
+### The frontend half
+- **`frontend/ScoutSettings.jsx`, not `Settings.jsx`.** FrameForge's settings screen was 433 lines
+  nothing mounted; the theme radio and the key field were lifted into a Scout-native screen with a
+  name that cannot be confused with the deleted one. It also carries the storage root with Reveal
+  and the keyboard cheat sheet — the only place the app's keys are written where a person can read them.
+- **A toast clears itself unless it is a refusal.** Danger-toned toasts (a gate refusal is the one
+  that matters) wait for a click; everything else clears after 8s and on any navigation, so a stale
+  confirmation never sits over the next screen.
+- **`location.js` and `slashCommands.js` stay** although nothing in the running app imports them:
+  a test guards each, and the M0 decision recorded keeping `slashCommands` trimmed. Deleting a
+  guarded module is a decision for whoever removes the guard.
+- **A blocked task's card id is computed client-side** as `task-<project>-<id>`, mirroring
+  `tasks.mjs pullIntoDecide`, rather than adding a lookup route for one click.
+- **One "open in the whiteboard" control, not two.** The inspector's path-less "OPEN THE WHITEBOARD"
+  link and the GRAPH preview's button did the same job with different results; the button now
+  carries the path and places the document and its relations on the board (Law 10).
+- **The territory node's HIT RATE is `hit_rate` as computed** (`territory.mjs` gives a percentage);
+  the node multiplied it by 100 and printed 2500%.
+
+### The fixture exec bits (a trap, now guarded)
+Four stub CLIs under `tests/fixtures/` were committed as `100644`. On a checkout that honours
+modes — every Linux clone, most macOS clones off exFAT — seven tests died with `spawn … EACCES`,
+which reads like a runner bug. They are `100755` now and `tests/_env.mjs` re-asserts the bit, so a
+zip download or a mode-stripping filesystem cannot bring the failure back. The CI workflow runs on
+ubuntu for exactly this class of defect.
