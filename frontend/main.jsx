@@ -1,22 +1,19 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
-import { install as installCapture, recordBoundaryError, stashForReport } from './feedbackCapture.js';
 import './styles.css';
-
-// Before anything else, including App's own imports having run their side effects: the rings must
-// already be listening when the first boot error happens, or the one crash a user is guaranteed
-// to notice is the one we have no record of. Nothing is transmitted — see feedbackCapture.js.
-installCapture();
 
 // Last-resort guard: a render crash anywhere in the tree shows a reload card
 // instead of a blank window (the backend keeps running either way).
+//
+// This used to also capture console/network rings and offer "Reload & report this", writing a
+// stash only FrameForge's Feedback.jsx ever read. Feedback.jsx is deleted (item D, dead frontend)
+// and nothing in Scout reads that stash, so the capture and the button went with it — a control
+// that writes something nobody reads is not a lighter version of the feature, it is the same bug
+// "capability with no affordance" runs in reverse.
 class ErrorBoundary extends React.Component {
   state = { error: null };
   static getDerivedStateFromError(error) { return { error }; }
-  // The card below is all the user ever saw of this crash, and the stack died with it. Hand it to
-  // the capture ring so "Report this" has the component stack rather than the user's paraphrase.
-  componentDidCatch(error, info) { recordBoundaryError(error, info); }
   render() {
     if (!this.state.error) return this.props.children;
     return (
@@ -32,12 +29,6 @@ class ErrorBoundary extends React.Component {
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
             <div onClick={() => window.location.reload()} style={{ flex: 1, textAlign: 'center', padding: '9px 16px', borderRadius: 8, background: 'var(--accent)', color: 'var(--on-accent)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
               Reload Scout
-            </div>
-            {/* React is gone, so the panel cannot open here. Stash the rings, reload, and let the
-                app open the report on the way back with the crash already attached. */}
-            <div onClick={() => { stashForReport({ openReport: true }); window.location.reload(); }}
-              style={{ flex: 1, textAlign: 'center', padding: '9px 16px', borderRadius: 8, background: 'transparent', color: 'var(--fg-soft)', border: '1px solid var(--border-3)', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>
-              Reload &amp; report this
             </div>
           </div>
         </div>

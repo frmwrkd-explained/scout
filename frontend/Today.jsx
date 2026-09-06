@@ -5,8 +5,10 @@
 //   onGo        fn(key)   navigate. Called with a screen key from 08_MODULE_CONTRACTS.md §10 —
 //                         'decide' from NEEDS YOU and from the D key, 'goals' from the goals panel.
 //   onOpenPath  fn(path)  open a raw .md (Law 8). Optional; links hide without it.
-//   onSendOut   fn()      put the assistants back out. Optional — with no runner wired the button
-//                         says so instead of pretending. Returns a promise if it does work.
+//   onSendOut   fn()      reopen every blocked task and let whichever door the assistants come
+//                         through pick them up (App.putTeamToWork — the same control PROJECT's
+//                         "Put the team to work" calls). Optional; disabled with an honest label
+//                         when absent, never a button that looks live and does nothing.
 //   refreshKey  any       change it to force a reload (after a decision, after a run).
 //
 // WHAT IS ON IT, AND NOTHING ELSE
@@ -58,9 +60,15 @@ function overnightStart(now = new Date()) {
   return d.getTime() - 6 * 3600 * 1000;
 }
 
+// `ts` arrives two ways here: a raw ISO string straight off a run's frontmatter, and an already-
+// parsed ms timestamp (every `normRun`/`normEvent` field below is `Date.parse(...)`d once on the
+// way in). `Date.parse(String(msNumber))` cannot read a bare millisecond count back as a date —
+// V8 returns NaN for it — so a run whose header used the parsed number printed the literal string
+// "null" where a time belonged. Accept either; never print null.
 const clock = ts => {
-  const t = Date.parse(String(ts));
-  if (Number.isNaN(t)) return null;
+  if (ts === null || ts === undefined || ts === '') return null;
+  const t = typeof ts === 'number' ? ts : Date.parse(String(ts));
+  if (!Number.isFinite(t)) return null;
   const d = new Date(t);
   return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
 };
@@ -362,8 +370,12 @@ export default class Today extends React.Component {
     const behind = goals.filter(g => g.behind);
     const since = overnightStart();
     const nightRuns = runs.filter(r => r.started && r.started >= since);
+    // A defensive `|| '—'` on BOTH ends, not just the second — `clock()` now handles the type
+    // mismatch that caused the literal-"null" bug, but a run whose `started` genuinely has no
+    // parseable time (a hand-edited file, a future field name this screen does not know yet)
+    // must never print anything but the placeholder that says so.
     const runWindow = nightRuns.length
-      ? (clock(Math.min(...nightRuns.map(r => r.started))) + ' → ' + (clock(Math.max(...nightRuns.map(r => r.ended || r.started))) || 'NOW') + ' / ' + nightRuns.length + ' RUNS')
+      ? ((clock(Math.min(...nightRuns.map(r => r.started))) || '—') + ' → ' + (clock(Math.max(...nightRuns.map(r => r.ended || r.started))) || 'NOW') + ' / ' + nightRuns.length + ' RUNS')
       : (sources.runs ? 'NO RUNS RECORDED' : 'NO RUN LOG');
 
     // Breakdown of the queue by kind — the same six kinds, the same table, no second vocabulary.
@@ -396,7 +408,7 @@ export default class Today extends React.Component {
                     {cards.length === 1 ? 'decision waiting' : 'decisions waiting'}
                   </span>
                 </div>
-                {/* Outlined, not filled: the one solid accent on TODAY is "Send them out". */}
+                {/* Outlined, not filled: the one solid accent on TODAY is "Put the team back to work". */}
                 <Btn variant="secondary" disabled={!cards.length || !onGo} onClick={() => onGo && onGo('decide')}
                   style={sx('flex:none;height:40px;padding:0 18px;border-radius:6px;font-size:13px;gap:10px')}>
                   <span>Start deciding</span>
@@ -459,8 +471,10 @@ export default class Today extends React.Component {
         {/* ── 4 · what is running (388px, EXTRACT.md §3.2) ─────────────────────────────────── */}
         <aside style={sx('width:388px;flex:none;display:flex;flex-direction:column;gap:16px;overflow:hidden')}>
 
-          {/* The one solid accent fill on this screen. With no runner wired it says so rather
-              than looking like a button that works. */}
+          {/* The one solid accent fill on this screen. Scout does not own the agent process
+              (04_AGENT_CONTRACT §1) — there is no runner to dispatch — so the label says what
+              this actually does: reopen blocked tasks and let whichever door the assistants come
+              through pick them up. Same control, same honest label, as PROJECT's. */}
           <Btn
             variant="primary"
             busy={sending}
@@ -469,9 +483,9 @@ export default class Today extends React.Component {
             style={sx('flex:none;display:flex;align-items:center;justify-content:space-between;gap:14px;height:64px;padding:0 22px;border-radius:8px')}
           >
             <span style={sx('display:flex;flex-direction:column;gap:4px;align-items:flex-start')}>
-              <span style={sx('font-size:16px;font-weight:600')}>{sending ? 'They’re out' : 'Send them out'}</span>
+              <span style={sx('font-size:16px;font-weight:600')}>{sending ? 'Putting them back to work' : 'Put the team back to work'}</span>
               <span style={{ ...mono('font-size:10px;font-weight:600;letter-spacing:.1em;opacity:.72') }}>
-                {!onSendOut ? 'NO RUNNER WIRED YET'
+                {!onSendOut ? 'NOT AVAILABLE YET'
                   : sending ? plural(assistants.length, 'ASSISTANT', 'ASSISTANTS') + ' STARTING'
                   : runningNow ? plural(runningNow, 'ASSISTANT', 'ASSISTANTS') + ' ALREADY RUNNING'
                   : plural(assistants.length, 'ASSISTANT', 'ASSISTANTS') + ' IDLE'}

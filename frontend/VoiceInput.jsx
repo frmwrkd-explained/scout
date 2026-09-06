@@ -181,7 +181,7 @@ export class VoiceInput extends React.Component {
   }
 
   render() {
-    const { size = 30, disabled } = this.props;
+    const { size = 30, disabled, disabledReason } = this.props;
     const S = this.state;
     const mm = String(Math.floor(S.elapsed / 60000)).padStart(2, '0');
     const ss = String(Math.floor((S.elapsed % 60000) / 1000)).padStart(2, '0');
@@ -189,7 +189,7 @@ export class VoiceInput extends React.Component {
       <div style={sx('display:inline-flex;align-items:center;gap:8px')}>
         <div
           onClick={() => !disabled && !S.busy && this.toggle()}
-          title={S.recording ? 'Stop recording (Esc)' : S.busy ? 'Transcribing…' : 'Record voice — click to start'}
+          title={disabled ? (disabledReason || 'Voice input is not available') : S.recording ? 'Stop recording (Esc)' : S.busy ? 'Transcribing…' : 'Record voice — click to start'}
           style={{
             ...sx('display:inline-flex;align-items:center;justify-content:center;border-radius:99px;cursor:pointer;flex:none;transition:background .15s,border-color .15s'),
             width: size, height: size,

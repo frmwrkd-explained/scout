@@ -74,6 +74,21 @@ function dropSentence(d) {
   return { code: String(text), plain: hit ? hit[1] : text };
 }
 
+// `excluded[]` (backend/memory.mjs) is a different list from `dropped[]` — these are stale
+// PLAYBOOK claims left out of the cache on purpose (Law 3: a claim nobody has re-verified does not
+// get to keep claiming it works), not something the token budget forced out. Each entry is a
+// string like `playbook/two-message-rule (stale — re-verify or retire)`; split the path off the
+// parenthetical reason so the entry can link to the actual claim (Law 8) instead of only naming it.
+function excludedEntry(e) {
+  const text = String(e || '');
+  const m = /^([\w./-]+)(?:\s*\((.*)\))?\s*$/.exec(text);
+  const rawPath = m ? m[1] : null;
+  return {
+    path: rawPath ? (rawPath.endsWith('.md') ? rawPath : rawPath + '.md') : null,
+    reason: (m && m[2]) || text,
+  };
+}
+
 // The cache is wrapped in `<scout-context v="184" generated="…" project="…">`. The wrapper is the
 // agent's contract, not the person's, so it is lifted into the header and out of the reading.
 function parseCache(text) {
@@ -174,8 +189,11 @@ export default function WhatTheyKnow({ onOpenPath, project = '', refreshKey = 0 
   const over = tokens > budget;
   const version = data.version ?? data.v ?? null;
   const dropped = [].concat(data.dropped || []).filter(Boolean).map(dropSentence);
+  const excluded = [].concat(data.excluded || []).filter(Boolean).map(excludedEntry);
   const { attrs, blocks } = parseCache(text);
-  const cachePath = project ? 'projects/' + project + '/.cache/context.md' : '.scout/cache/context.md';
+  // The envelope carries the REAL path (backend/memory.mjs `readCache` → `meta.path`) — the guess
+  // below is only the fallback for an older payload that predates it.
+  const cachePath = data.path || (project ? 'projects/' + project + '/.cache/context.md' : '.scout/cache/context.md');
   const tone = over ? 'var(--danger)' : tokens / budget > 0.8 ? 'var(--warn)' : 'var(--ok)';
 
   return (
@@ -260,11 +278,38 @@ export default function WhatTheyKnow({ onOpenPath, project = '', refreshKey = 0 
               ))}
             </ul>
           </div>
-        ) : (
+        ) : null}
+
+        {/* Law 3, made visible: a playbook claim nobody has re-verified lately does not get to
+            keep claiming it works, so it is left out of the wake-up note — but it is not thrown
+            away, and this is where she can see exactly what was excluded and go re-check it. A
+            SEPARATE panel from `dropped` above: that one is the token budget forcing a cut,
+            this one is decay doing its job on purpose (docs/01_CANON.md Law 3). */}
+        {excluded.length ? (
+          <div style={{ ...sx('display:flex;flex-direction:column;gap:8px;padding:11px 13px;border-radius:8px'), background: 'var(--sunk)', border: '1px solid var(--border-2)' }}>
+            <span style={{ ...mono('font-size:9px;font-weight:800;letter-spacing:.14em'), color: 'var(--fg-muted)' }}>
+              LEFT OUT BECAUSE NOBODY HAS CONFIRMED IT LATELY · {excluded.length}
+            </span>
+            <span style={sx('font-size:11.5px;line-height:1.55;color:var(--fg-soft)')}>
+              These playbook claims are stale (Law 3) — not deleted, just not read on wake until
+              someone re-verifies them.
+            </span>
+            <ul style={sx('margin:2px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:5px')}>
+              {excluded.map((e, i) => (
+                <li key={i} style={sx('font-size:11.5px;line-height:1.55;color:var(--fg-soft);display:flex;align-items:baseline;gap:8px;flex-wrap:wrap')}>
+                  <span>{e.reason}</span>
+                  {e.path ? <PathLink path={e.path} onOpenPath={onOpenPath} /> : null}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {!dropped.length && !excluded.length ? (
           <span style={{ ...mono('font-size:9.5px;font-weight:700;letter-spacing:.1em'), color: 'var(--fg-faint)' }}>
             NOTHING WAS LEFT OUT — THEY READ ALL OF IT
           </span>
-        )}
+        ) : null}
 
         {blocks.length
           ? blocks.map((b, i) => <Block key={i} block={b} onOpenPath={onOpenPath} />)

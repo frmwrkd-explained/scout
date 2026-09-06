@@ -14,7 +14,7 @@
 import React from 'react';
 import { sx } from './sx';
 import { api } from './api';
-import { Card, Empty, InlineEdit, Chip } from './ui';
+import { Btn, Card, Empty, Input, InlineEdit, Chip } from './ui';
 import {
   mono, listOf, fm, bodyOf, pathOf, idOf, checkedAt, fadeFg,
   PathLink, Bar, Age, useResource, useMemoryWriter, SaveNote, Loading, Failed, ScreenHead,
@@ -230,20 +230,64 @@ function GoalCard({ goal, onOpenPath, onSave }) {
   );
 }
 
+// The whole of the create control: a label, and everything else is the card's own inline editors
+// (target, deadline) once it exists. `POST /api/goals` (backend/memory.mjs) turns the label into
+// the slug and needs nothing else — a goal with a label and no number beats no goal.
+function NewGoalInline({ value, onChange, onCreate, onCancel, busy }) {
+  return (
+    <div style={{ ...sx('display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 14px;border-radius:8px'), background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+      <Input autoFocus value={value} onChange={e => onChange(e.target.value)}
+        placeholder="What are you chasing? e.g. Book 6 hazing stories"
+        onKeyDown={e => { if (e.key === 'Enter') onCreate(); if (e.key === 'Escape') onCancel(); }}
+        style={sx('flex:1;min-width:220px;font-size:13px;padding:8px 12px')} />
+      <Btn size="sm" variant="primary" busy={busy} disabled={!value.trim()} onClick={onCreate}>Create</Btn>
+      <Btn size="sm" variant="ghost" disabled={busy} onClick={onCancel}>Cancel</Btn>
+    </div>
+  );
+}
+
 export default function Goals({ onOpenPath, onWrote }) {
   const { data, error, loading, reload } = useResource(() => api.goals(), []);
   const writer = useMemoryWriter(() => { reload(); onWrote && onWrote(); });
+  const [creating, setCreating] = React.useState(false);
+  const [label, setLabel] = React.useState('');
+
+  const create = async () => {
+    const trimmed = label.trim();
+    if (!trimmed) return;
+    const ok = await writer.save('NEW GOAL', () => api.createGoal({ label: trimmed }));
+    if (ok) { setCreating(false); setLabel(''); }
+  };
+  const cancelCreate = () => { setCreating(false); setLabel(''); };
 
   if (loading && !data) return <Loading what="YOUR GOALS" />;
 
   const goals = listOf(data, 'goals', 'items');
   if (!goals.length) {
+    if (error) {
+      return (
+        <Failed
+          error={error}
+          title="NO GOALS SET"
+          body={String(error.message || error)}
+        />
+      );
+    }
     return (
-      <Failed
-        error={error}
-        title="NO GOALS SET"
-        body={error ? String(error.message || error) : 'A goal is one number with a date on it. Your assistants read it every morning and it is how they decide what is worth doing first.'}
-      />
+      <div style={sx('flex:1;display:flex;align-items:center;justify-content:center;padding:40px')}>
+        {creating ? (
+          <div style={sx('width:100%;max-width:460px')}>
+            <NewGoalInline value={label} onChange={setLabel} onCreate={create} onCancel={cancelCreate} busy={writer.note?.kind === 'saving'} />
+          </div>
+        ) : (
+          <Empty
+            size="page" style={sx('max-width:460px')}
+            title="NO GOALS SET"
+            body="A goal is one number with a date on it. Your assistants read it every morning and it is how they decide what is worth doing first."
+            action={{ onClick: () => setCreating(true), label: '+ New goal' }}
+          />
+        )}
+      </div>
     );
   }
 
@@ -266,8 +310,14 @@ export default function Goals({ onOpenPath, onWrote }) {
         line={behindCount
           ? behindCount + (behindCount === 1 ? ' goal is behind' : ' goals are behind') + '. Your assistants read these every morning and put the behind ones first — change a number here and they change what they do next.'
           : 'Every goal is on track. Your assistants read these every morning and work the closest deadline first.'}
-        right={<SaveNote state={writer.note} />}
-      />
+        right={
+          <>
+            <SaveNote state={writer.note} />
+            {creating ? null : <Btn variant="secondary" size="sm" onClick={() => setCreating(true)}>+ New goal</Btn>}
+          </>
+        }>
+        {creating ? <NewGoalInline value={label} onChange={setLabel} onCreate={create} onCancel={cancelCreate} busy={writer.note?.kind === 'saving'} /> : null}
+      </ScreenHead>
 
       <div style={sx('flex:1;min-height:0;overflow-y:auto;padding:18px 20px 32px')}>
         <div style={sx('display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;align-items:start')}>

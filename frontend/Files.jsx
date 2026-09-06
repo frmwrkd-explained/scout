@@ -53,22 +53,40 @@ function ago(iso) {
   return new Date(iso).toISOString().slice(0, 10);
 }
 // every ancestor of 'data/guests/maria-santos.md' → ['', 'data', 'data/guests']
-function ancestors(p) {
-  const segs = String(p || '').split('/').filter(Boolean).slice(0, -1);
+// `includeSelf` is for a path that IS itself a folder (WHAT THEY KNOW's SOURCE links point at
+// `goals/`, `territory/`, `data/` …, item 15) — the chain must expand the folder itself, not stop
+// one level above it.
+function ancestors(p, includeSelf = false) {
+  const segs = String(p || '').split('/').filter(Boolean);
+  if (!includeSelf) segs.pop();
   const out = [''];
   segs.reduce((acc, s) => { const next = acc ? acc + '/' + s : s; out.push(next); return next; }, '');
   return out;
+}
+// A path with no extension in its last segment is a directory. Files rows never have this shape
+// (a file always ends `.md`/`.json`/…), so it is a safe, cheap test with no extra round trip.
+const looksLikeDir = p => !!p && !/\.[^/.]+$/.test(String(p).replace(/\/+$/, ''));
+
+// the platform word Reveal actually opens, per navigator.platform (item 20) — the button used to
+// say "Finder" on every OS, including the two it has never been true on.
+function platformWord() {
+  const p = (typeof navigator !== 'undefined' && navigator.platform) || '';
+  if (/mac/i.test(p)) return 'Finder';
+  if (/win/i.test(p)) return 'Explorer';
+  return 'file manager';
 }
 
 // ── one row in the tree ─────────────────────────────────────────────────────────────────────
 // Folder and file share a row shape on purpose: the tree is a list of things on disk, and the
 // caret is what says which kind it is. Selected is the neutral raised chip treatment (§6) —
 // never an accent fill, which means "click this", not "you are here".
-function Row({ depth, name, kind, open, on, count, meta, onClick }) {
+function Row({ depth, name, kind, open, on, count, meta, onClick, draggable, onDragStart }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      draggable={draggable}
+      onDragStart={onDragStart}
       className={on ? '' : 'hRow'}
       title={name}
       style={{
@@ -116,7 +134,15 @@ function Tree({ dir, depth, listings, openDirs, selected, onToggle, onPick }) {
         </React.Fragment>
       ))}
       {listing.files.map(f => (
-        <Row key={f.path} depth={depth} name={f.name} kind="file" on={selected === f.path} meta={bytes(f.size)} onClick={() => onPick(f.path)} />
+        // A record is a card the whiteboard already knows how to place — item 17's "drop the
+        // project brief". Only `.md` carries frontmatter the board can resolve into one, so only
+        // `.md` rows are draggable; a `.json`/binary row would land as FILE NOT FOUND forever.
+        <Row key={f.path} depth={depth} name={f.name} kind="file" on={selected === f.path} meta={bytes(f.size)} onClick={() => onPick(f.path)}
+          draggable={f.path.endsWith('.md')}
+          onDragStart={f.path.endsWith('.md') ? e => {
+            e.dataTransfer.setData('application/x-scout-node', JSON.stringify({ t: 'document', path: f.path }));
+            e.dataTransfer.effectAllowed = 'copy';
+          } : undefined} />
       ))}
     </>
   );
@@ -133,7 +159,7 @@ function Preview({ file, mode, onMode, error }) {
         size="page"
         style={sx('max-width:440px;margin:40px auto')}
         title="Pick a file — this is what is actually on disk"
-        body="Everything Scout knows is a plain markdown file in this folder. Nothing is hidden here: what you see is the file, frontmatter and all, and Reveal in Finder opens the real folder."
+        body={'Everything Scout knows is a plain markdown file in this folder. Nothing is hidden here: what you see is the file, frontmatter and all, and Reveal in ' + platformWord() + ' opens the real folder.'}
       />
     );
   }
@@ -143,7 +169,7 @@ function Preview({ file, mode, onMode, error }) {
         size="page"
         style={sx('max-width:420px;margin:40px auto')}
         title={'BINARY — ' + bytes(file.size)}
-        body="Not text, so there is nothing honest to show here. Reveal in Finder opens it in whatever the machine uses for this kind of file."
+        body={'Not text, so there is nothing honest to show here. Reveal in ' + platformWord() + ' opens it in whatever the machine uses for this kind of file.'}
       />
     );
   }
@@ -188,7 +214,7 @@ function Preview({ file, mode, onMode, error }) {
 
       {file.truncated && raw ? (
         <div style={{ ...mono('font-size:9.5px;letter-spacing:.12em;margin-top:12px'), color: 'var(--fg-faint)' }}>
-          TRUNCATED AT 512 KB — REVEAL IN FINDER FOR THE WHOLE FILE
+          {'TRUNCATED AT 512 KB — REVEAL IN ' + platformWord().toUpperCase() + ' FOR THE WHOLE FILE'}
         </div>
       ) : null}
     </div>
@@ -236,13 +262,18 @@ export default function Files({ path = '', arg = '', onOpenPath, onSelect }) {
 
   React.useEffect(() => { load(''); }, [load]);
 
-  // Open a path handed in from a record: expand every ancestor and select the file.
+  // Open a path handed in from a record: expand every ancestor and select the file. WHAT THEY
+  // KNOW's per-block SOURCE links point at a FOLDER (`goals/`, `territory/`, `data/` …, item 15) —
+  // an extensionless initial path is treated as the directory it is: expand it (and everything
+  // above it — `includeSelf`) and select nothing, rather than asking api.fileRead for a folder and
+  // showing "that is a folder" as if the link were broken.
   React.useEffect(() => {
     if (!initial) return;
-    const chain = ancestors(initial);
+    const isDir = looksLikeDir(initial);
+    const chain = ancestors(initial, isDir);
     setOpenDirs(prev => { const next = new Set(prev); chain.forEach(d => next.add(d)); return next; });
     chain.forEach(load);
-    setSelected(initial);
+    setSelected(isDir ? '' : initial);
   }, [initial, load]);
 
   // Read whatever is selected. The guard on `live` is the stale-response case: click three files
@@ -285,7 +316,7 @@ export default function Files({ path = '', arg = '', onOpenPath, onSelect }) {
 
   return (
     <div style={sx('flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden')}>
-      {/* header — where you are, and the way out to Finder */}
+      {/* header — where you are, and the way out to the OS file browser */}
       <div style={sx('flex:none;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 20px 12px')}>
         <div style={sx('display:flex;align-items:baseline;gap:9px;min-width:0')}>
           <span style={{ ...mono('font-size:9px;font-weight:700;letter-spacing:.16em;flex:none'), color: 'var(--fg-faint)' }}>PATH</span>
@@ -303,11 +334,11 @@ export default function Files({ path = '', arg = '', onOpenPath, onSelect }) {
         <div style={sx('display:flex;align-items:center;gap:10px;flex:none')}>
           {revealed ? (
             <span style={{ ...mono('font-size:9.5px;letter-spacing:.12em'), color: 'var(--fg-faint)' }}>
-              {revealed.startsWith('could not') ? revealed.toUpperCase() : 'OPENED IN FINDER'}
+              {revealed.startsWith('could not') ? revealed.toUpperCase() : 'OPENED IN ' + platformWord().toUpperCase()}
             </span>
           ) : null}
           {/* the screen's one solid accent fill — its primary action (docs/DESIGN.md) */}
-          <Btn variant="primary" size="sm" onClick={reveal}>Reveal in Finder</Btn>
+          <Btn variant="primary" size="sm" onClick={reveal}>{'Reveal in ' + platformWord()}</Btn>
         </div>
       </div>
 
@@ -331,7 +362,7 @@ export default function Files({ path = '', arg = '', onOpenPath, onSelect }) {
                   {bytes(file.size)}{file.modified ? ' · ' + ago(file.modified).toUpperCase() : ''}
                 </span>
                 {/* the way back up: from the bytes to the record. Ghost, not accent — the one
-                    solid accent fill on this screen is Reveal in Finder. */}
+                    solid accent fill on this screen is Reveal. */}
                 {onOpenPath && RENDERABLE.has(file.ext) ? (
                   <Btn size="sm" onClick={() => onOpenPath(file.path)}>Open as record</Btn>
                 ) : null}

@@ -36,38 +36,10 @@
 import React from 'react';
 import { sx } from './sx';
 import { MONO } from './tokens';
+import { api } from './api';
 import { Btn, Card, Empty, Eyebrow, Input } from './ui';
 import { monoStyle } from './Assistants';
 import VoiceInput from './VoiceInput';
-
-// ── the three intake calls ────────────────────────────────────────────────────────────────────
-// frontend/api.js is the integrator's file and has no intake methods yet, so they live here,
-// written the same way — same error unwrapping, same JSON options. When `api.intake`,
-// `api.intakeAnswer` and `api.intakeBuild` land in api.js, delete this block and import them.
-// `POST /api/collections/propose` already exists (backend/proposals.mjs) and is deliberately used
-// as-is: one propose door, one queue, one approval surface.
-const j = async r => {
-  if (!r.ok) {
-    let msg = 'api ' + r.status;
-    try { const b = await r.clone().json(); if (b && b.error) msg = b.error; } catch { /* non-JSON */ }
-    const e = new Error(msg);
-    e.status = r.status;
-    throw e;
-  }
-  return r.json();
-};
-const post = (p, body) => fetch(p, {
-  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-}).then(j);
-
-const intake = {
-  state: () => fetch('/api/intake').then(j),
-  answer: (key, value, actor) => post('/api/intake/answer', { key, value, actor }),
-  build: actor => post('/api/intake/build', { actor }),
-  // The agent proposes, the human disposes (Law 4) — so the card is created BY the agent, and the
-  // person meets it in DECIDE like every other decision they will ever make in this app.
-  proposeCollection: card => post('/api/collections/propose', { ...card, actor: 'scout' }),
-};
 
 // ── small shared pieces ───────────────────────────────────────────────────────────────────────
 
@@ -122,14 +94,21 @@ export default function Interview({ actor = 'crystal', app = null, onDone, onCan
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState(null);
   const [proposal, setProposal] = React.useState(null);
+  // Whether a transcription key is configured — GET /api/state's publicSettings() redacts a set
+  // key rather than omitting it, so its presence (not its value) is the signal. A denied mic or a
+  // missing key used to fail silently on question 1, because this screen never passed `app` to
+  // VoiceInput at all; now it does (App.jsx), and the mic disables itself with a reason instead of
+  // recording ten seconds of silence into a 400.
+  const [micKey, setMicKey] = React.useState(true);
 
   // Resume where they left off. Every answer is already on disk, so this is the whole of "nothing
   // is lost" on the client side: there is no draft state to restore because there is no draft.
   React.useEffect(() => {
     let alive = true;
-    intake.state()
+    api.intake()
       .then(s => { if (!alive) return; setState(s); setAt(s.step); setDraft(String((s.answers || {})[(s.questions[s.step] || {}).key] || '')); })
       .catch(e => { if (alive) setError(e.message); });
+    api.state().then(s => { if (alive) setMicKey(!!(s.settings && s.settings.groqApiKey)); }).catch(() => {});
     return () => { alive = false; };
   }, []);
 
@@ -153,7 +132,7 @@ export default function Interview({ actor = 'crystal', app = null, onDone, onCan
     }
     setBusy(true); setError(null);
     try {
-      const s = await intake.answer(q.key, draft, actor);
+      const s = await api.intakeAnswer(q.key, draft, actor);
       setState(s);
       const k = at + 1;
       setAt(k);
@@ -168,8 +147,8 @@ export default function Interview({ actor = 'crystal', app = null, onDone, onCan
     setBusy(true); setError(null);
     try {
       // Two writes and one card: me.md and the ground need nobody's permission, the list does.
-      const built = await intake.build(actor);
-      const card = await intake.proposeCollection(built.card);
+      const built = await api.intakeBuild(actor);
+      const card = await api.proposeCollection(built.card);
       setProposal(card);
       setState(built.state || state);
     } catch (e) {
@@ -278,6 +257,8 @@ export default function Interview({ actor = 'crystal', app = null, onDone, onCan
           </div>
           {/* the interview is voice-enabled (GOAL.md) — the same recorder every other surface uses */}
           <VoiceInput app={app} size={38}
+            disabled={!micKey}
+            disabledReason="No transcription key configured yet — add one in Settings"
             onText={t => setDraft(d => (d.trim() ? d.replace(/\s*$/, ' ') + t : t))} />
         </div>
 
