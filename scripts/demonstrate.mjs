@@ -49,6 +49,9 @@ const { app } = await import('../backend/index.mjs');
 const server = app.listen(0, '127.0.0.1');
 await new Promise(r => server.once('listening', r));
 const BASE = 'http://127.0.0.1:' + server.address().port;
+// The Index's api base must name the port that is actually bound, not the 5177 default.
+const { setSelfPort } = await import('../backend/agentHome.mjs');
+setSelfPort(server.address().port);
 
 // ── plumbing ────────────────────────────────────────────────────────────────────────────────
 const C = { dim: '\x1b[2m', red: '\x1b[31m', green: '\x1b[32m', yellow: '\x1b[33m', bold: '\x1b[1m', off: '\x1b[0m' };

@@ -17,6 +17,9 @@ import {
   listTerritories, getTerritory, saveTerritory, territoryStats, proposeTerritory,
   registerTerritoryRoutes, COMPUTED_KEYS,
 } from '../backend/territory.mjs';
+// Proposing ground is a DECIDE card now, so the queue is part of this module's contract.
+import { listProposals, accept } from '../backend/proposals.mjs';
+import { cancelCacheRegen } from '../backend/memory.mjs';
 
 const R = () => getStorageRoot();
 const write = (rel, body) => {
@@ -44,6 +47,9 @@ const GUEST_COLLECTION = {
 
 function seed() {
   freshRoot();
+  // saveTerritory schedules a (debounced, unref'd) cache regeneration by default now — drop any
+  // pending one so a timer from the previous test never renders against this test's root.
+  cancelCacheRegen();
   saveCollection(GUEST_COLLECTION);
   saveTerritory('nurses-ph', { label: 'Nurses PH', kind: 'facebook-group', access: 'joined', last_swept: '2026-08-17' }, { actor: 'crystal' });
   saveTerritory('ofw-stories', { label: 'OFW Stories', kind: 'facebook-group', access: 'joined' }, { actor: 'crystal' });
@@ -130,14 +136,46 @@ test('listTerritories carries stats and decay, best ground first', () => {
   assert.equal(typeof list[0].stale, 'boolean');
 });
 
-test('a proposed territory lands untried and proposed — never requested', () => {
+// ── proposing ground writes NOTHING (Law 4) ────────────────────────────────────────────────────
+// This wrote `territory/<id>.md` with `proposed: true` until 2026-09-06, and memory.mjs then
+// rendered that unapproved ground under `## NEVER TRIED` — so an agent could name a place and read
+// it back on its next wake as somewhere it was allowed to work, with nobody having said yes. The
+// gate lives in the pipeline: a DECIDE card, and only accepting it writes a file.
+
+test('DEMONSTRATE · proposing ground makes a card and writes no territory file', async () => {
   seed();
-  const t = proposeTerritory({ label: 'Frat Alumni PH', kind: 'facebook-group', why: 'three shortlists mention it' }, { actor: 'vetter' });
-  assert.equal(t.id, 'frat-alumni-ph');
-  assert.equal(t.data.access, 'untried', 'Law 4 — an agent proposes, it does not join');
-  assert.equal(t.data.proposed, true);
-  assert.equal(t.data.created_by, 'vetter');
-  assert.throws(() => proposeTerritory({ label: 'Frat Alumni PH' }, { actor: 'vetter' }), /already exists/);
+  const card = await proposeTerritory(
+    { label: 'Frat Alumni PH', kind: 'facebook-group', url: 'https://facebook.com/groups/frat', why: 'three shortlists mention it' },
+    { actor: 'vetter' });
+
+  assert.equal(card.kind, 'territory', 'it is a card, not a territory');
+  assert.equal(card.status, 'open');
+  assert.equal(card.created_by, 'vetter');
+  assert.match(card.why, /three shortlists/);
+  assert.equal(fs.existsSync(path.join(R(), 'territory', 'frat-alumni-ph.md')), false,
+    'Law 4 — an agent proposes; nothing is written until a human disposes');
+  assert.equal(getTerritory('frat-alumni-ph'), null);
+  assert.equal(listProposals({ status: 'open' }).length, 1, 'one card in the one queue');
+
+  // …and accepting it is what creates the ground, at `requested`: they agreed the agent may ASK.
+  await accept(card.id, { actor: 'crystal' });
+  const t = getTerritory('frat-alumni-ph');
+  assert.ok(t, 'accepting the card is the only thing that writes the file');
+  assert.equal(t.access, 'requested', 'requested, never joined — joining is Facebook\'s decision');
+  assert.equal(t.data.label, 'Frat Alumni PH', 'and what the finder knew travelled on the card');
+  assert.equal(t.data.kind, 'facebook-group');
+});
+
+test('a proposal is idempotent, refuses ground that already exists, and refuses a card with no `why`', async () => {
+  seed();
+  const first = await proposeTerritory({ label: 'Frat Alumni PH', why: 'three shortlists mention it' }, { actor: 'vetter' });
+  const again = await proposeTerritory({ label: 'Frat Alumni PH', why: 'three shortlists mention it' }, { actor: 'vetter' });
+  assert.equal(again.id, first.id, 'an agent that re-proposes every morning must not grow the queue');
+  assert.equal(listProposals({ status: 'open' }).length, 1);
+
+  await assert.rejects(() => proposeTerritory({ label: 'Nurses PH', why: 'x' }, { actor: 'vetter' }), /already exists/);
+  await assert.rejects(() => proposeTerritory({ label: 'Cebu Nurses' }, { actor: 'vetter' }),
+    /`why`/, 'the human decides on the reason, so there has to be one');
 });
 
 test('the routes serve the rollup and refuse to store one', async () => {
@@ -166,10 +204,23 @@ test('the routes serve the rollup and refuse to store one', async () => {
     assert.deepEqual(patched.stripped, ['hit_rate']);
     assert.equal(patched.territory.stats.hit_rate, 11.1, 'still the rollup, not the 90 that was sent');
 
+    // The route an agent actually calls, with the body backend/mcp.mjs sends (`name`, not `label`).
+    // It must make a card and leave `territory/` alone.
     const proposed = await (await fetch(base + '/api/territory/propose', {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ label: 'Cebu Nurses', kind: 'facebook-group', actor: 'scout-fb' }),
+      body: JSON.stringify({ name: 'Cebu Nurses', kind: 'facebook-group', why: '4 of 9 shortlists are members', actor: 'scout-fb' }),
     })).json();
-    assert.equal(proposed.territory.data.access, 'untried');
+    assert.equal(proposed.card.kind, 'territory');
+    assert.equal(proposed.card.status, 'open');
+    assert.match(proposed.note, /nothing was written/i, 'said out loud, so the agent does not go and work it');
+    assert.equal(fs.existsSync(path.join(R(), 'territory', 'cebu-nurses.md')), false);
+    assert.equal((await (await fetch(base + '/api/territory')).json()).territory.length, 2,
+      'still the two territories that were seeded');
+
+    const noWhy = await fetch(base + '/api/territory/propose', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Davao Nurses', actor: 'scout-fb' }),
+    });
+    assert.equal(noWhy.status, 400);
   } finally { server.close(); }
 });

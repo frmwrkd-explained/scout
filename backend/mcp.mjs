@@ -398,15 +398,17 @@ const BINDINGS = {
   },
 
   'POST /api/territory/propose': {
-    note: 'Propose a group you want to work. It lands in DECIDE at access "proposed"; accepting it means you MAY ASK to join, not that you are in.',
+    note: 'Propose a group you want to work. `why` is mandatory. NOTHING is written to territory/ — it becomes a DECIDE card; accepting it means you MAY ASK to join, not that you are in.',
     schema: S.open({
       id: S.s('Proposed territory id, lower-kebab.'),
       name: S.s('What the group is actually called.'),
       url: S.s('Where it is.'),
       why: S.s('The evidence that it is worth the time.'),
       actor: ACTOR,
-    }),
-    run: a => ({ ok: true, territory: proposeTerritory(a, { actor: actorOf(a) }) }),
+    }, ['why']),
+    // proposeTerritory is async since it makes a card through proposals.propose(); an un-awaited
+    // call answered `{ territory: {} }` while the card was in fact created.
+    run: async a => ({ ok: true, card: await proposeTerritory(a, { actor: actorOf(a) }) }),
   },
 
   'PUT /api/views/:collection': {
@@ -519,6 +521,35 @@ function unboundRun(route) {
   };
 }
 
+// ── the cache, on a door with no event loop to spare ───────────────────────────────────────────
+//
+// Law 7 is a CONTRACT, and `scout_get_cache_version` is the promise: an unchanged `v` means the
+// context you cached is still good. `records.mjs` and the memory writers schedule the regeneration
+// on a 2s debounce whose timer is `unref`ed — right for a server that stays up, wrong here twice
+// over. Reproduced in one session: upsert a guest, call `scout_get_context`, and the briefing still
+// said `guest 0`; the MCP process then exited and the regeneration never happened at all, so the
+// NEXT run's `GET /api/cache/version` was unchanged too and the agent skipped the re-read.
+//
+// So this door SETTLES the cache after every mutating call and once more on the way out. An MCP
+// session is short and single-threaded: the debounce buys nothing here, and the agent's very next
+// tool call is the one that must see the truth.
+// `flushCacheRegen()` and not `regenerateCache()`: it cancels the pending debounce and runs it ONLY
+// if one was pending. That difference is the whole of Law 7's other half — `v` moves on a
+// regeneration and never on a read, so a tool that wrote nothing must leave the integer alone or an
+// agent re-reads its whole context after every dry-run match.
+export async function settleCache() {
+  const m = await import('./memory.mjs').catch(() => null);
+  if (!m || typeof m.flushCacheRegen !== 'function') return false;
+  try { return !!m.flushCacheRegen(); }
+  catch { return false; /* a cache that will not regenerate is still only a cache */ }
+}
+
+// A tool may have written unless it is a GET. Derived from the route string rather than kept as a
+// second list, for the same reason the tool surface itself is: a hand-maintained list of "which
+// tools write" drifts from the bindings inside a week. Being wrong here is free — `settleCache()`
+// is a no-op when nothing is pending.
+const mutates = tool => !String(tool.route).startsWith('GET ');
+
 export function toolsFrom(capabilities = INDEX_CAPABILITIES) {
   const seen = new Set();
   return capabilities.map(cap => {
@@ -594,6 +625,9 @@ async function callTool(params) {
   }
 
   const out = await tool.run(args);
+  // Before the reply goes back, not on a timer that this process may never live to fire. The agent's
+  // next call is often `scout_get_context`, and it must see what it just wrote.
+  if (mutates(tool)) await settleCache();
   // The wake-up tool returns the cache AS TEXT — the same bytes the API serves bare. Handing an
   // agent its briefing as an escaped JSON blob is how you burn a third of the budget on backslashes.
   const text = tool.text ? String(out ?? '') : JSON.stringify(out ?? null, null, 2);
@@ -668,6 +702,10 @@ export function createServer({ log = () => {} } = {}) {
     tools: TOOLS,
     listTools: () => TOOLS.map(publicTool),
     handleMessage: msg => handleMessage(msg, { log }),
+    // The host going away is the last chance to write the cache. `scripts/scout-mcp.mjs` awaits
+    // this before it exits, so a session that ends one millisecond after a write still leaves the
+    // next run a `v` it can trust. Safe to call twice.
+    close: () => settleCache(),
   };
 }
 
@@ -721,8 +759,10 @@ export function start({ input = process.stdin, output = process.stdout, log = nu
   input.on('end', () => {
     if (buffer.trim()) handle(buffer);
     buffer = '';
-    // Let the last reply land before the process is allowed to fall off the end of the loop.
-    chain.then(() => say('stdin closed'));
+    // Let the last reply land before the process is allowed to fall off the end of the loop, and
+    // settle the hot cache on the way out — a debounced regeneration on an `unref`ed timer does not
+    // survive an exit, and losing it tells the NEXT run that nothing changed.
+    chain = chain.then(() => server.close()).then(() => say('stdin closed'));
   });
   input.on('error', e => say('stdin error: ' + e.message));
 

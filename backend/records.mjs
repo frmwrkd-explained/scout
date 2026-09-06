@@ -28,6 +28,12 @@ import { getStorageRoot, readMd, writeMd, revOf } from './store.mjs';
 import { getCollection, listCollections, gateField, primaryField, AUTO_FIELDS } from './collections.mjs';
 import { allDocuments, documentsFor, matchesQuery } from './documents.mjs';
 import { logEvent, readEvents, eventsFor, EVENT_TYPES } from './log.mjs';
+// proposals.mjs imports store.mjs and nothing else; it reaches back into this file only through a
+// runtime `await import()`, so this is not a load-time cycle. It is imported statically on purpose:
+// raising the DECIDE card has to happen inside the same synchronous `store` verdict, and making
+// upsertRecord async to lazy-load one function would change a signature three modules and eight
+// test files call directly.
+import { propose as proposeCard, listProposals } from './proposals.mjs';
 
 // index.mjs hands `logEvent` to every module rather than letting each import it, so there is
 // exactly one append point and nowhere for a mutation to happen quietly. It is the same function
@@ -37,7 +43,26 @@ import { logEvent, readEvents, eventsFor, EVENT_TYPES } from './log.mjs';
 // be rewritten whenever the store changes, whichever of the three doors the change came through.
 let emit = logEvent;
 let onMutation = () => {};
-const touched = () => { try { onMutation(); } catch { /* a stale _known.md never fails a write */ } };
+
+// EVERY write verb in this file ends here, and that is the only reason Law 7 holds. The hot cache
+// is a contract; a write that does not invalidate it makes `GET /api/cache/version` tell an agent
+// its stale context is still good. It has to fire IN THE PROCESS THAT WROTE — the API server, an
+// MCP session, the inbox watcher — so it is called from the verb rather than registered as a route
+// hook, and unconditionally rather than per path: `PATCH /api/records` is the door the document
+// surface sends every `.md` through, memory objects included.
+//
+// `import()` rather than a static import of memory.mjs: memory.mjs imports this file, and this is
+// the one edge that would have to be resolved at load time. Fire-and-forget rather than awaited,
+// so a write never waits on a cache, and the regeneration is debounced 2s in memory.mjs anyway.
+function bumpCache() {
+  import('./memory.mjs')
+    .then(m => { try { m.scheduleCacheRegen({}); } catch { /* a cache that will not schedule is still only a cache */ } })
+    .catch(() => { /* memory.mjs is optional to a bare records import */ });
+}
+const touched = () => {
+  try { onMutation(); } catch { /* a stale _known.md never fails a write */ }
+  bumpCache();
+};
 
 // ── constants ──────────────────────────────────────────────────────────────────────────────────
 
@@ -116,6 +141,49 @@ function absOf(relPath) {
   if (abs !== root && !abs.startsWith(root + path.sep)) throw new RecordError('path escapes the store', 400);
   if (!abs.endsWith('.md')) throw new RecordError('a record path ends in .md', 400);
   return abs;
+}
+
+// ── scope: this module writes `data/`, and delegates everything else ───────────────────────────
+//
+// `PATCH /api/records` is the door `App.openPath` sends EVERY `.md` through — a guest, a group, a
+// territory, a playbook claim, a goal, `me.md`. It was writing all of them with the generic record
+// writer, which has three consequences and all three were reproduced:
+//
+//   · **Law 4 had a side door.** `collectionOf('me.md')` is null, so there is no gate field, so the
+//     agent branch never fires: an agent PATCHed `me.md` to `name: HACKED` and got 200, while
+//     `PUT /api/me` refused the identical write with 403. Same for `goals/`.
+//   · **Law 7 was broken.** The memory writers schedule the hot-cache regeneration; the generic
+//     writer did not, so correcting a territory through the document surface left the agent's
+//     wake-up context saying the opposite of the file for as long as nobody touched a memory route.
+//   · **territory.mjs stopped being the sole writer of the rollups.** A workspace whose `territory`
+//     collection declares `finds`/`wins` (the shipped template does) put them on the property table,
+//     and the generic writer wrote whatever was typed there.
+//
+// So: a path under `data/` is a record and is written here. A path outside it belongs to the module
+// that owns that object, and the patch is DELEGATED to it — which is also how the refusal, the
+// stripping and the cache bump come back for free, in one place, phrased the one way.
+export const RECORD_ROOT = 'data/';
+export const isRecordPath = (relPath) => String(relPath || '').split(path.sep).join('/').startsWith(RECORD_ROOT);
+
+// module + function, resolved lazily at call time. `id` is the file's own slug.
+const DELEGATES = [
+  { re: /^me\.md$/, mod: './memory.mjs', fn: 'writeMe', kind: 'identity' },
+  // One segment, because that is what the memory modules address: `scoutPaths.goal(id)` is
+  // `goals/<safe(id)>.md` and nothing nested is a goal. A deeper path is not that object and must
+  // not be handed to a writer that would `safe()` it into a different file.
+  { re: /^goals\/([^/]+)\.md$/, mod: './memory.mjs', fn: 'saveGoal', kind: 'goal' },
+  { re: /^playbook\/([^/]+)\.md$/, mod: './memory.mjs', fn: 'savePlaybook', kind: 'playbook' },
+  { re: /^learnings\/([^/]+)\.md$/, mod: './memory.mjs', fn: 'saveLearning', kind: 'learning' },
+  { re: /^territory\/([^/]+)\.md$/, mod: './territory.mjs', fn: 'saveTerritory', kind: 'territory' },
+];
+
+function delegateFor(relPath) {
+  const p = String(relPath || '').split(path.sep).join('/');
+  for (const d of DELEGATES) {
+    const m = d.re.exec(p);
+    if (m) return { ...d, id: m[1] || null };
+  }
+  return null;
 }
 
 // A collection is a saved query, so its home folder is read off the query rather than invented:
@@ -411,9 +479,62 @@ function cleanInput(input) {
   return out;
 }
 
+// ── a found record becomes a decision ──────────────────────────────────────────────────────────
+//
+// GOAL.md §3 opens the day with "six things need her", and the FIRST of the six is "a found guest".
+// DECIDE and TODAY's NEEDS YOU count proposal cards and nothing else, so forty overnight finds read
+// as `NEEDS YOU: 0` while forty files sit in `data/` marked `proposed: true` that nobody is ever
+// shown. An agent posting a separate finding card by hand closed the gap for the agents that knew
+// to; the ones that followed the router skill's write step did not, and the loop the whole product
+// exists for silently did not run.
+//
+// So a `store` by an agent raises the card here — one place, whichever door the write came through.
+// Only `store`: `update`/`merge` land on a record the human has already been shown, and `skip`
+// wrote nothing at all. Only when no OPEN finding card already points at that record — `record`, and
+// never `path`, which is the CARD's own file (docs/decisions.md D7).
+//
+// A card that cannot be raised NEVER fails the write. The record is on disk and in the log; the
+// card is derived from it, and losing a derived thing must not lose the finding.
+export function openFindingRecords() {
+  try {
+    return new Set(listProposals({ status: 'open', kind: 'finding' }).map(c => String(c.record || '')).filter(Boolean));
+  } catch { return new Set(); }
+}
+
+function raiseFindingCard(input, { actor, collection, relPath, title, seen: given }) {
+  try {
+    // The batch reads the open queue once and passes the set down. A lone caller that did not gets
+    // it read here rather than skipping the check — a duplicate card is a chore for a person.
+    const seen = given || openFindingRecords();
+    if (seen.has(relPath)) return null;
+    const found_in = input.found_in ?? input.territory ?? null;
+    const score = input.score ?? null;
+    const source = input.source ?? input.url ?? null;
+    // `why` is mandatory on a card and the agent contract makes it mandatory on a finding too. When
+    // one arrives without it the card still has to exist — an unexplained find is exactly the thing
+    // a human should be shown — so the card says so rather than inventing a reason.
+    const why = String(input.why || '').trim()
+      || 'The assistant did not say why. Open the record before deciding.';
+    const card = proposeCard({
+      kind: 'finding',
+      record: relPath,
+      collection: collection.id,
+      title: String(title),
+      why,
+      ...(found_in ? { territory: found_in } : {}),
+      ...(score === null || score === '' ? {} : { score }),
+      ...(source ? { source_url: source } : {}),
+      // Altitude 3 is the document itself, which is the best evidence there is.
+      evidence: ['[[' + relPath.replace(/\.md$/, '') + ']]'],
+    }, { actor });
+    seen.add(relPath);
+    return card;
+  } catch { return null; }
+}
+
 // ── the four verbs ─────────────────────────────────────────────────────────────────────────────
 
-function upsertOne(input, { actor, via, rows, collection }) {
+function upsertOne(input, { actor, via, rows, collection, openFindings = null }) {
   const agent = isAgentActor(actor);
   const gate = gateInfo(collection);
   const prim = primaryField(collection);
@@ -474,6 +595,11 @@ function upsertOne(input, { actor, via, rows, collection }) {
     writeMd(abs, data, String(input.body || input.content || '').trim() ? String(input.body || input.content).trim() + '\n' : '');
     const result = { verdict: 'store', id: slug, path: directPath, confidence: matches.length ? matches[0].confidence : 0 };
     emit({ type: 'store', actor, target: directPath, detail: { collection: collection.id, via, confidence: result.confidence } });
+    // What an agent found lands in front of the human as one card, not only as a file (GOAL §3).
+    if (agent) {
+      const card = raiseFindingCard(input, { actor, collection, relPath: directPath, title, seen: openFindings });
+      if (card) result.card = card.id;
+    }
     touched();
     rows.push({ id: slug, path: directPath, title, __title: title, ...data });   // visible to the rest of the batch
     return result;
@@ -513,7 +639,7 @@ export function upsertRecord(input = {}, { actor = DEFAULT_ACTOR, via = 'api' } 
   const collectionId = input.collection;
   if (!collectionId) throw new RecordError('upsert needs a collection', 400);
   const { collection, rows } = candidateRows(collectionId);
-  return upsertOne(input, { actor, via, rows, collection });
+  return upsertOne(input, { actor, via, rows, collection, openFindings: isAgentActor(actor) ? openFindingRecords() : null });
 }
 
 // ONE near-match pass for the batch (T06 step 4): the candidate set is loaded once and each stored
@@ -524,13 +650,17 @@ export function batchUpsert(items = [], { actor = DEFAULT_ACTOR, via = 'api' } =
   const byCollection = new Map();
   const tally = { store: 0, update: 0, merge: 0, skip: 0 };
   const results = [];
+  // ONE read of the open queue for the batch, for the same reason there is one near-match pass:
+  // fifty findings must not cost fifty full scans of `proposals/`. Cards raised along the way join
+  // the set, so a batch carrying the same person twice raises one card.
+  const openFindings = isAgentActor(actor) ? openFindingRecords() : null;
   for (const item of list) {
     const id = item && item.collection;
     try {
       if (!id) throw new RecordError('every item needs a collection', 400);
       if (!byCollection.has(id)) byCollection.set(id, candidateRows(id));
       const { collection, rows } = byCollection.get(id);
-      const r = upsertOne(item, { actor, via, rows, collection });
+      const r = upsertOne(item, { actor, via, rows, collection, openFindings });
       tally[r.verdict] = (tally[r.verdict] || 0) + 1;
       results.push(r);
     } catch (e) {
@@ -553,6 +683,16 @@ function loadDoc(relPath) {
   if (!fs.existsSync(abs)) throw new RecordError('no record at ' + relPath, 404);
   const { data, content } = readMd(abs);
   return { abs, path: rel(abs), data, content };
+}
+
+// `loadDoc` is happy to open any `.md` in the store, which is right for reading and wrong for the
+// two verbs that RELOCATE a file. Named per verb so the sentence tells the caller what to do
+// instead, and logged as `refused` like every other border refusal so the attempt is in Activity.
+function refuseOutsideData(relPath, verb, actor) {
+  if (isRecordPath(relPath)) return;
+  throw refuse('only records under ' + RECORD_ROOT + ' can be ' + verb
+    + ' — "' + relPath + '" is memory, and memory is edited where it lives',
+  { actor, target: String(relPath), verb });
 }
 
 export function moveRecord(relPath, { to, actor = DEFAULT_ACTOR, reason = null } = {}) {
@@ -593,6 +733,12 @@ export function archiveRecord(relPath, { reason, actor = DEFAULT_ACTOR } = {}) {
   }
   const doc = loadDoc(relPath);
   if (doc.path.startsWith('data/_archive/')) throw new RecordError('that record is already archived', 400);
+  // Archiving MOVES the file into `data/_archive/`. Pointed at a memory object it therefore moves
+  // identity, a goal or a territory out of the workspace and into the record store — reproduced:
+  // `POST /api/records/archive {path:'me.md', reason:'bad-data', actor:'scout-fb'}` answered 200 and
+  // `me.md` was gone. Memory is retired through its own module (`status: retired`), never archived
+  // as a record, and nothing on this door may take a file out from under Law 1.
+  refuseOutsideData(doc.path, 'archived', actor);
   const collection = collectionOf(doc.path, doc.data, doc.content);
   const bucket = (collection && collection.id) || doc.path.split('/')[1] || 'record';
   const dest = 'data/_archive/' + bucket + '/' + path.basename(doc.path);
@@ -625,6 +771,9 @@ export function archiveRecord(relPath, { reason, actor = DEFAULT_ACTOR } = {}) {
 export function acceptRecord(relPath, { actor = DEFAULT_ACTOR } = {}) {
   if (isAgentActor(actor)) throw refuse('only a human accepts a quarantined record', { actor, target: String(relPath) });
   const doc = loadDoc(relPath);
+  // Quarantine only exists under `data/` (`isQuarantined` returns false everywhere else), so
+  // "accepting" a memory object would write a `quarantined: false` that answered no question.
+  refuseOutsideData(doc.path, 'accepted', actor);
   const collection = collectionOf(doc.path, doc.data, doc.content);
   const now = new Date().toISOString();
   const history = [].concat(doc.data.history || []);
@@ -641,13 +790,86 @@ export function acceptRecord(relPath, { actor = DEFAULT_ACTOR } = {}) {
   return readRecord(doc.path);
 }
 
+// What the delegate is handed. The document surface sends `{ patch: { …fields, body }, rev, actor }`
+// and the agent doors send the fields flat; `body` travels INSIDE the patch, which is where every
+// memory writer reads it from too. Control keys are dropped — `id` is the file's own slug and
+// `collection` means nothing to a memory object — and so are the four fields every writer stamps
+// itself, because a surface echoing `updated_by` back would otherwise decide its own provenance.
+const DELEGATE_DROP = new Set(['collection', 'id', 'path', 'content', 'actor', 'via', 'rev', 'type',
+  'created', 'created_by', 'updated', 'updated_by']);
+function delegatePatch(patch) {
+  const out = {};
+  for (const [k, v] of Object.entries(patch || {})) {
+    if (DELEGATE_DROP.has(k)) continue;
+    out[k] = v;
+  }
+  if (patch && patch.body === undefined && patch.content !== undefined) out.body = String(patch.content);
+  return out;
+}
+
+// The document surface's save, for anything that is NOT a record: `me.md`, a goal, a playbook claim,
+// a learning, a territory. It is DELEGATED rather than reimplemented, which is the whole of the fix
+// — the owning module already carries the refusal, the stripping, the log line and the cache bump,
+// and every one of those was missing when this file wrote the bytes itself. The return shape is the
+// surface's contract (`{ path, rev, data, content }`), read back off disk so it describes what
+// actually landed rather than what was asked for.
+async function patchDelegated(doc, patch, { actor, current, hit }) {
+  const mod = await import(hit.mod);
+  const fn = mod[hit.fn];
+  if (typeof fn !== 'function') {
+    throw new RecordError(hit.fn + '() is not available (expected in backend/' + hit.mod.slice(2) + ')', 501);
+  }
+  const clean = delegatePatch(patch);
+  const body = clean.body;
+  // Same rule as a record: a patch that changes nothing is not a write, or merely opening `me.md`
+  // restamps `verified_at` and tells decay a person re-verified their identity by scrolling past it.
+  const bodyChanged = body !== undefined && String(body) !== doc.content;
+  const fieldKeys = Object.keys(clean).filter(k => k !== 'body');
+  const same = fieldKeys.every(k => JSON.stringify(doc.data[k]) === JSON.stringify(clean[k]));
+  if (same && !bodyChanged) {
+    return { path: doc.path, rev: current, data: doc.data, content: doc.content, unchanged: true };
+  }
+
+  // `writeMe` is the one delegate whose body is an argument rather than a patch key.
+  // Awaited: these are synchronous today, and a writer that becomes async later must not silently
+  // start returning a promise the surface reads `data` off.
+  if (hit.kind === 'identity') {
+    const { body: b, ...data } = clean;
+    await fn(b === undefined ? undefined : String(b), data, { actor });
+  } else {
+    await fn(hit.id, clean, { actor });
+  }
+
+  const after = readMd(doc.abs);
+  const changed = fieldKeys.filter(k => JSON.stringify(doc.data[k]) !== JSON.stringify(after.data[k]));
+  if (String(after.content) !== doc.content) changed.push('body');
+  return {
+    path: doc.path, rev: revOf(after.data, after.content),
+    data: after.data, content: after.content,
+    delegated: hit.kind, changed,
+  };
+}
+
 // The document surface's save. Unlike ingest this OVERWRITES, on purpose — a human editing a field
 // means it — and the rev check is what stops a concurrent agent write from being clobbered.
-export function patchRecord(relPath, patch = {}, { actor = DEFAULT_ACTOR, rev = null } = {}) {
+export async function patchRecord(relPath, patch = {}, { actor = DEFAULT_ACTOR, rev = null } = {}) {
   const doc = loadDoc(relPath);
   const current = revOf(doc.data, doc.content);
+  // The rev check happens HERE for every path, delegated or not: no memory writer takes a `rev`,
+  // and the conflict UX (T04) is a property of this door, not of the module behind it.
   if (rev != null && String(rev) !== current) {
     throw new RecordError('this record changed underneath you', 409, { rev: current, data: doc.data });
+  }
+  // Outside `data/` this file is not the writer. A memory object goes to its own module — which is
+  // what makes an agent's PATCH of `me.md` refuse with the same 403 sentence `PUT /api/me` uses,
+  // instead of succeeding because a file in no collection has no gate to enforce.
+  const hit = isRecordPath(doc.path) ? null : delegateFor(doc.path);
+  if (hit) {
+    const out = await patchDelegated(doc, patch, { actor, current, hit });
+    // No `emit` here on purpose. The owning module already wrote the log line for its own object,
+    // and docs/08 §1 has one append point: a second line from this door would show one edit twice.
+    if (!out.unchanged) touched();
+    return out;
   }
   const collection = collectionOf(doc.path, doc.data, doc.content);
   const gate = gateInfo(collection);
@@ -817,10 +1039,12 @@ export function registerRecordRoutes(app, deps = {}) {
     } catch (e) { send(res, e); }
   });
 
-  app.patch('/api/records', (req, res) => {
+  // `patchRecord` is async because a memory object is written by the module that owns it, and that
+  // module is imported lazily to keep the memory ↔ records edge off the load path.
+  app.patch('/api/records', async (req, res) => {
     try {
       const b = req.body || {};
-      res.json(patchRecord(resolveTarget(b.path || b.id), b.patch || {}, { actor: actorOf(req), rev: b.rev ?? null }));
+      res.json(await patchRecord(resolveTarget(b.path || b.id), b.patch || {}, { actor: actorOf(req), rev: b.rev ?? null }));
     } catch (e) { send(res, e); }
   });
 

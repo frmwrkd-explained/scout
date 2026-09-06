@@ -44,12 +44,25 @@ class TerritoryError extends Error {
 // ── hooks ──────────────────────────────────────────────────────────────────────────────────────
 // The event log is the default (docs/08 §1 — one append path, and every mutation lands in it), so a
 // territory written by a direct call is logged exactly like one written through the route.
-// `afterWrite` is the debounced cache regeneration; memory.mjs wires it lazily, because importing
-// memory.mjs from here would close a load-time cycle whose TDZ is import-order dependent.
-const hooks = { logEvent: logEventDefault, afterWrite: () => {} };
+//
+// `afterWrite` is the debounced cache regeneration and `propose` is the DECIDE queue. Both DEFAULT
+// to the real thing rather than to a no-op, resolved through a LAZY import so that pulling
+// memory.mjs or proposals.mjs in from here can never close a load-time cycle (memory.mjs statically
+// imports this module, and its TDZ is import-order dependent). This is the same reasoning that
+// makes memory.mjs default `readEvents` to the real reader: a hook nobody wired is the section
+// that is silently never rendered, or in this case the cache that is silently never invalidated.
+//
+// The MCP process (scripts/scout-mcp.mjs) registers no routes at all, so before these defaults
+// existed every territory it wrote left a stale hot cache behind it.
+const hooks = {
+  logEvent: logEventDefault,
+  afterWrite: () => { import('./memory.mjs').then(m => m.scheduleCacheRegen({}), () => { /* a cache that cannot be scheduled is still only a cache */ }); },
+  propose: null,   // null → resolved lazily from backend/proposals.mjs at call time
+};
 export function setTerritoryHooks(next = {}) {
   if (typeof next.logEvent === 'function') hooks.logEvent = next.logEvent;
   if (typeof next.afterWrite === 'function') hooks.afterWrite = next.afterWrite;
+  if (typeof next.propose === 'function') hooks.propose = next.propose;
   return hooks;
 }
 
@@ -237,26 +250,71 @@ export function saveTerritory(id, patch = {}, { actor = 'crystal' } = {}) {
   return { ...getTerritory(key), stripped };
 }
 
-// An agent that finds new ground proposes it. It lands as `untried` + `proposed: true` — visible
-// in the cache's NEVER TRIED, and never `requested` until a human says so (Law 4).
-export function proposeTerritory(input = {}, { actor = 'scout-fb' } = {}) {
-  const id = safe(String(input.id || input.label || '').trim().toLowerCase().replace(/\s+/g, '-'));
+// ── proposing new ground ───────────────────────────────────────────────────────────────────────
+//
+// An agent that finds new ground PROPOSES it. It does not write it.
+//
+// Until 2026-09-06 this wrote `territory/<id>.md` directly with `proposed: true` and created no
+// card, and memory.mjs then rendered that unapproved ground under `## NEVER TRIED` — so an agent
+// could name a place, read it back on its next wake as somewhere it was allowed to work, and
+// nobody had ever said yes. That is Law 4 inverted: "agents propose, humans dispose, and the gate
+// lives in the pipeline, never in a prompt."
+//
+// The `territory` card kind already exists (docs/08 §8) and its accept path calls saveTerritory()
+// below with `access: 'requested'` — the human agreeing the agent may ASK to join, which is not
+// the same as being in. So this adds no second writer and no second approval surface: the only
+// path from "an agent saw a group" to "a file in territory/" now runs through DECIDE.
+//
+// The facts about the ground travel INSIDE the card's `territory` value — `{ id, label, kind, url }`
+// — which is the shape proposals.mjs `territoryOf()` normalises on both validate and accept. They
+// have to travel somewhere: the card is what the human decides on, and a territory created by an
+// approval must not arrive with no label. They cannot travel at the card's top level because a
+// territory's `kind` (facebook-group) and the CARD's `kind` (territory) are two different things
+// under one word.
+const TERRITORY_FACTS = ['label', 'kind', 'url'];
+
+// Lazy, for the reason above the hooks object. An injected `propose` (deps, or a test) wins.
+async function proposeCard(card, opts) {
+  const fn = hooks.propose || (await import('./proposals.mjs')).propose;
+  return fn(card, opts);
+}
+
+export async function proposeTerritory(input = {}, { actor = 'scout-fb' } = {}) {
+  // `name` is what skills/scout-router and backend/mcp.mjs call it; `label` is what the file calls
+  // it. Accept both rather than dropping the one the agent actually sent.
+  const label = String(input.label || input.name || input.title || input.id || '').trim();
+  const id = safe(String(input.id || label).trim().toLowerCase().replace(/\s+/g, '-'));
   if (!id) throw new TerritoryError('a proposed territory needs an id or a label');
   if (fs.existsSync(territoryFile(id))) throw new TerritoryError('territory "' + id + '" already exists', 409);
-  const { id: _drop, why, ...rest } = input;
-  const saved = saveTerritory(id, {
-    label: input.label || id,
-    ...rest,
-    access: 'untried',
-    proposed: true,
-    verified_at: today(),
+  const why = String(input.why || '').trim();
+  if (!why) {
+    throw new TerritoryError('a proposed territory needs `why` — the evidence that this ground is worth the time. It is the thing they decide on.');
+  }
+
+  const ground = { id };
+  for (const k of TERRITORY_FACTS) {
+    if (input[k] !== undefined && input[k] !== null && input[k] !== '') ground[k] = String(input[k]);
+  }
+  ground.label = ground.label || label || id;
+
+  const card = await proposeCard({
+    kind: 'territory',
+    // Deterministic, so an agent that re-proposes the same ground every morning does not grow the
+    // queue by a card a day — propose() is idempotent on `id`.
+    id: 'territory-' + id,
+    territory: ground,
+    title: ground.label,
+    ...(Array.isArray(input.evidence) && input.evidence.length ? { evidence: input.evidence } : {}),
+    why,
   }, { actor });
-  hooks.logEvent({ type: 'propose', actor, target: saved.path, detail: { why: why || '' } });
-  return saved;
+
+  hooks.logEvent({ type: 'propose', actor, target: card.path, detail: { territory: id, why } });
+  return card;
 }
 
 // ── routes ─────────────────────────────────────────────────────────────────────────────────────
-// registerTerritoryRoutes(app, { logEvent, afterWrite }) — both optional, both no-ops if absent.
+// registerTerritoryRoutes(app, { logEvent, afterWrite, propose }) — all optional; each defaults to
+// the real thing (the log, the debounced cache regeneration, the DECIDE queue).
 export function registerTerritoryRoutes(app, deps = {}) {
   setTerritoryHooks(deps);
 
@@ -264,11 +322,20 @@ export function registerTerritoryRoutes(app, deps = {}) {
     res.json({ territory: listTerritories() });
   });
 
-  // propose is declared BEFORE /:id so "propose" is never read as a territory id
-  app.post('/api/territory/propose', (req, res) => {
+  // propose is declared BEFORE /:id so "propose" is never read as a territory id.
+  // It writes NOTHING to territory/ — it makes a DECIDE card. See proposeTerritory above.
+  app.post('/api/territory/propose', async (req, res) => {
     try {
       const actor = String(req.body?.actor || 'scout-fb');
-      res.json({ ok: true, territory: proposeTerritory(req.body || {}, { actor }) });
+      const card = await proposeTerritory(req.body || {}, { actor });
+      res.json({
+        ok: true,
+        card,
+        status: card.status,
+        // Said out loud, because an agent that believes it just got the ground would go and work it.
+        note: 'Proposed — nothing was written to territory/. It is card ' + card.id + ' in DECIDE. ' +
+          'If they accept it the territory lands at access "requested": you may ASK to join, not that you are in.',
+      });
     } catch (e) { res.status(e.status || 400).json({ error: e.message }); }
   });
 

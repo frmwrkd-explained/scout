@@ -121,7 +121,7 @@ function normalizeFacts(list) {
   return [].concat(list ?? [])
     .filter(f => f !== null && f !== undefined && f !== '')
     .map(f => (typeof f === 'object'
-      ? { v: String(first(f.v, f.value, f.label, f.text) ?? ''), tone: toneColour(f.tone || f.fg) }
+      ? { v: String(first(f.v, f.value, f.label, f.text, f.id) ?? ''), tone: toneColour(f.tone || f.fg) }
       : { v: String(f), tone: null }))
     .filter(f => f.v);
 }

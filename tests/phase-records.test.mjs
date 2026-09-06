@@ -264,12 +264,12 @@ test('patchRecord overwrites where ingest would not, and refuses a stale rev wit
   const r = upsertRecord({ collection: 'guest', name: 'Maria Santos', handle: '@mariacooks', score: 4 });
   const read = readRecord(r.path);
 
-  const saved = patchRecord(r.path, { score: 9, handle: '@corrected' }, { actor: 'crystal', rev: read.rev });
+  const saved = await patchRecord(r.path, { score: 9, handle: '@corrected' }, { actor: 'crystal', rev: read.rev });
   assert.equal(saved.data.score, 9, 'a human edit is authoritative');
   assert.equal(saved.data.handle, '@corrected');
   assert.notEqual(saved.rev, read.rev);
 
-  assert.throws(() => patchRecord(r.path, { score: 1 }, { actor: 'crystal', rev: read.rev }), e => e.status === 409);
+  await assert.rejects(() => patchRecord(r.path, { score: 1 }, { actor: 'crystal', rev: read.rev }), e => e.status === 409);
   const http = await req('PATCH', '/api/records', { path: r.path, patch: { score: 1 }, rev: read.rev, actor: 'crystal' });
   assert.equal(http.status, 409);
   assert.equal(fm(r.path).score, 9, 'the losing write must not have landed');

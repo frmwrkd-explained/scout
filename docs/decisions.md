@@ -905,3 +905,72 @@ exist on disk, and `addField` re-validates the whole schema. A `found_in` pointi
 would therefore need a third collection file whose only purpose is to satisfy the validator — and
 gate 8, which adds a field to `#guest` through the real route, would 400 without it. Pointing at
 `#group` is both true (that is where the person was found) and self-contained.
+
+---
+
+## 2026-09-06 · Finishing pass — what an end-to-end walk found, and the calls taken fixing it
+
+Context: three auditors walked the app the way a person and an agent do — one drove every
+route with the bodies the UI sends, one read every core screen against the spec, one read the
+memory and utility screens — and 45 findings came back, most reproduced with a curl. The fixes
+were built by three parallel implementers under strict file ownership (docs/08 §0's rule). The
+decisions each of them took where the docs were silent:
+
+### The DECIDE queue
+- **A human answering her own assistant is the evidence.** A `question` card could not be accepted
+  at all — the effect wrote an active learning and `saveLearning` refused it for having no
+  `evidence[]`, a word that appears nowhere on her screen. The answer now lands with the card's own
+  file as its evidence (`[[proposals/<id>]]`, the wikilink convention every other card uses), and the
+  hot cache renders it as `question — answer` rather than a bare "Yes." bullet competing for the
+  2,000-token budget with claims that carry proof.
+- **A blocked task's card is titled the way the screen titles it.** `pullIntoDecide` read the slug
+  id and never the `question` the agent was told to send. `humanName(task)` mirrors
+  `Assistants.jsx taskTitle()` — `label || (title ≠ id) || id` — so the card and the roster agree.
+- **A territory is one shape on the way in and one function on the way out.** `territoryOf()` accepts
+  a bare id or `{ id, label, kind, url }`; a card with no resolvable id is a 400, and
+  `territory/_object_Object_.md` cannot be written again. A bare id stays a bare id on disk (Law 1 —
+  `territory: ofw-uk` is what a person should read).
+- **`POST /api/territory/propose` writes nothing.** It made a memory object with `proposed: true`
+  and no card, and the cache then listed the unapproved group under NEVER TRIED. It now makes a
+  `territory` card through `propose()`; accepting the card is what writes the file, at
+  `access: requested`. `why` is mandatory, because a card nobody can judge is a chore.
+- **An agent's `store` is a decision.** Forty overnight finds showed `NEEDS YOU: 0`, because only
+  proposal cards count. `upsertRecord` now raises a `finding` card when the actor is an agent, the
+  verdict is `store`, and no open finding card already points at the record. `update`, `merge` and
+  `skip` raise nothing. The Index and the router skill say so, so an agent does not double-post.
+
+### Tasks
+- **A task id comes from one function.** `taskIdFrom({ id, title, label })`; a POST naming nothing is
+  a 400, and `saveTask` refuses the id `untitled` when the patch names nothing. Two label-only
+  POSTs used to become one file with the second label and the first task's territory (Laws 5 and 6).
+
+### Schemas
+- **`multiselect` may declare no options — it is then an open vocabulary.** "Seeding ambiguity 1"
+  resolved: a tag field whose options must be declared up front is not a tag field. `select` and
+  `status` still require a fixed set; declared options are still validated on all three.
+- **`addField` validates the incoming field and the invariants, not the neighbours.** A pre-existing
+  bad field is returned as `warnings[]` naming it, instead of a 400 naming a field the person never
+  touched — which is what made `+ Add property` fail on the shipped #guest for a whole build.
+- **A dangling `default_view` is said, not swallowed.** `listViews` returns `warnings[]`, the UI toasts
+  it, and the template ships the views its schemas name (`needs-review`, `pipeline`, `my-best`).
+
+### Memory and the cache
+- **Worked ground is `joined` OR `finds > 0`; blocked beats worked.** Territory the interview seeds is
+  `untried`, and it stayed so after finds and a win, so the agent was told the group it won on had
+  never been tried. A rejected group with old finds renders under BLOCKED only.
+- **`proposed: true` is invisible to the cache everywhere.** Belt and braces beside the route change.
+- **Regenerations are not activity.** SINCE YOUR LAST RUN spent one of its six lines on "regenerated
+  the cache", and rendered a card's `why` prose as a tally suffix. `cache` events are excluded before
+  the cut; `reason` (a closed vocabulary) is still tallied, `why` (prose) is not.
+- **Every memory writer schedules its own regeneration.** The hook used to be wired only when routes
+  were registered, so a write from the MCP process never invalidated the cache while
+  `cache/version` swore it was fresh. `flushCacheRegen()` exists for a process about to exit.
+- **`records.mjs` writes only under `data/`.** `PATCH /api/records` — the door the document surface
+  sends every `.md` through — had no scope guard: an agent refused at `PUT /api/me` could rewrite
+  `me.md` and a goal's target through it, to HTTP 200. Outside `data/` the route now 403s an agent
+  with the memory route's own string and delegates a human's edit to the owning writer.
+- **A goal can be created.** `POST /api/goals` (409 on an existing id), and the interview writes the
+  first one from the `chasing` answer — number words parsed, a date resolved forward, progress
+  counted over the new collection's gate. A goal with a label and no number beats no goal.
+- **The Index names the port that is bound.** `selfPort()` fell back to FrameForge's 5176;
+  `setSelfPort(server.address().port)` is called from the listen callback and from `demonstrate`.

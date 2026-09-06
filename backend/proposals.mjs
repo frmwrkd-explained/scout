@@ -133,6 +133,29 @@ const REQUIRED = {
   question: ['question'],
 };
 
+// A territory card names its ground either as an id — `territory: ofw-uk` — or as the whole object
+// the finder saw: `{ id, label, kind, url }`. Both are legal (the agent has an id; the memory
+// layer's `POST /api/territory/propose` has the object), and both resolve HERE, so there is one
+// place that turns a card's `territory` into an id plus a patch.
+//
+// Without it, `saveTerritory(card.territory, …)` was handed the object, `safe(String(object))`
+// produced `_object_Object_`, and accepting the card wrote `territory/_object_Object_.md` with
+// `label: undefined` — a 200, a file, and nothing anybody asked for.
+export function territoryOf(value) {
+  if (typeof value === 'string' || typeof value === 'number') {
+    const id = String(value).trim();
+    return id ? { id } : null;
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const id = String(value.id ?? value.slug ?? '').trim();
+  if (!id) return null;
+  const out = { id };
+  for (const k of ['label', 'kind', 'url']) {
+    if (value[k] !== undefined && value[k] !== null && value[k] !== '') out[k] = String(value[k]);
+  }
+  return out;
+}
+
 function validate(card) {
   if (!card || typeof card !== 'object') throw new ProposalError('a proposal must be an object');
   if (!CARD_KINDS.includes(card.kind)) {
@@ -151,6 +174,18 @@ function validate(card) {
     if (card[k] === undefined || card[k] === null || card[k] === '') {
       throw new ProposalError('a ' + card.kind + ' card needs `' + k + '`');
     }
+  }
+  if (card.kind === 'territory') {
+    const ground = territoryOf(card.territory);
+    if (!ground) {
+      throw new ProposalError(
+        'a territory card names its ground with an id — `territory: "ofw-uk"`, or the whole thing: '
+        + '`territory: { id, label, kind, url }`');
+    }
+    // Normalised in place, so the effect and the card agree. A bare id stays a BARE ID on disk:
+    // `territory: ofw-uk` is what a person opening the file should read, and `{ id: ofw-uk }` with
+    // nothing else in it is the same fact spelled worse (Law 1).
+    card.territory = (ground.label || ground.kind || ground.url) ? ground : ground.id;
   }
   if (card.kind === 'schema') {
     // Views are free (agent contract §4) — proposing one wastes a human decision on something that
@@ -228,6 +263,23 @@ function learningIdFor(card) {
   return card.id;
 }
 
+// The interview records the view it intends (`pending_view`) and flushes it in `settleWorkspace()`,
+// which until now only ran on the next `GET /api/intake` — a route the UI does not call after the
+// human accepts the card. So the collection landed and its view existed only as the thing
+// `listViews()` regenerates on read: not a file, not in the vault, not travelling with the data,
+// and not readable by an agent (docs/02_DATA_MODEL.md §3).
+//
+// Imported lazily: intake.mjs imports collections, views, memory, territory and tasks, and a static
+// import here would be a cycle. A view is free and reversible (agent contract §4), so a failure to
+// settle must never fail an approval that has already happened.
+async function settleAfterCollection(deps) {
+  try {
+    const settle = await resolve('settleWorkspace', './intake.mjs', deps);
+    if (settle) return settle();
+  } catch { /* the collection exists; the view regenerates on read until someone asks again */ }
+  return null;
+}
+
 async function effectFor(card, actor, deps) {
   switch (card.kind) {
     case 'finding': {
@@ -243,9 +295,15 @@ async function effectFor(card, actor, deps) {
 
     case 'territory': {
       const saveTerritory = needed(await resolve('saveTerritory', './territory.mjs', deps), 'saveTerritory', 'backend/territory.mjs');
+      // Resolved through the one normaliser, so a card written before this existed (a plain string
+      // in `proposals/` on disk) and a card written by the memory layer (an object) take the same
+      // path. Everything the card knows about the ground travels with it — a territory created by
+      // an approval should not arrive with `label: undefined`.
+      const { id, ...ground } = territoryOf(card.territory) || {};
+      if (!id) throw new ProposalError('this card names no ground — `territory` must carry an id');
       // `requested`, not `member`: accepting means the agent MAY ASK to join. Joining is Facebook's
       // decision, not ours, and recording it as membership would poison every hit-rate that follows.
-      return { effect: 'territory', result: await saveTerritory(card.territory, { access: 'requested', access_changed: nowIso() }, { actor }) };
+      return { effect: 'territory', result: await saveTerritory(id, { ...ground, access: 'requested', access_changed: nowIso() }, { actor }) };
     }
     case 'learning': {
       const saveLearning = needed(await resolve('saveLearning', './memory.mjs', deps), 'saveLearning', 'backend/memory.mjs');
@@ -265,7 +323,9 @@ async function effectFor(card, actor, deps) {
         const subtables = [...(parent.subtables || []).filter(s => s.id !== card.subtable.id), card.subtable];
         return { effect: 'subtable', result: await saveCollection({ ...parent, subtables }) };
       }
-      return { effect: 'collection', result: await saveCollection(card.schema) };
+      const result = await saveCollection(card.schema);
+      await settleAfterCollection(deps);
+      return { effect: 'collection', result };
     }
     case 'question': {
       const answer = String(card.answer || '').trim();
@@ -276,7 +336,21 @@ async function effectFor(card, actor, deps) {
       }
       const saveLearning = needed(await resolve('saveLearning', './memory.mjs', deps), 'saveLearning', 'backend/memory.mjs');
       const id = learningIdFor(card);
-      return { effect: 'learning', result: await saveLearning(id, { status: 'active', claim: answer, question: card.question, evidence: card.evidence, verified_at: nowIso() }, { actor }) };
+      // A QUESTION CARD CARRIES NO EVIDENCE, and `validate()` does not ask for any — the whole
+      // point of the kind is that the agent does not know. memory.mjs refuses an ACTIVE learning
+      // with an empty evidence[], so every answered question 400ed, and the five rejection reasons
+      // are all about a bad proposal — none of them fits "she answered it". A blocked assistant
+      // therefore added one card that could never be cleared.
+      //
+      // The resolution: a human answering her own assistant IS the evidence, and the card is where
+      // that happened. Its own file is the provenance, so the claim is traceable to the question,
+      // the answer and who gave it — which is what evidence[] is for.
+      // A wikilink with no extension, which is the convention everywhere else evidence is written
+      // (records.mjs `raiseFinding`, and every seeded card) — both readers accept either form.
+      const evidence = (Array.isArray(card.evidence) && card.evidence.length)
+        ? card.evidence
+        : ['[[' + String(card.path).replace(/\.md$/, '') + ']]'];
+      return { effect: 'learning', result: await saveLearning(id, { status: 'active', claim: answer, question: card.question, evidence, verified_at: nowIso() }, { actor }) };
     }
     default:
       throw new ProposalError('unknown card kind "' + card.kind + '"');

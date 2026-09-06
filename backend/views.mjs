@@ -78,6 +78,11 @@ function readFile(id) {
   } catch { return []; }
 }
 
+// A dangling `default_view` is announced once per process rather than printed on every read — the
+// rail calls listViews on every collection switch, and a warning that repeats is a warning nobody
+// reads.
+const announced = new Set();
+
 export function listViews(collectionId) {
   const collection = getCollection(collectionId);
   if (!collection) return null;
@@ -87,7 +92,22 @@ export function listViews(collectionId) {
   const views = saved.length ? saved : [defaultView(collection)];
   const wantedDefault = collection.default_view;
   const dflt = views.find(v => v.id === wantedDefault) || views[0];
-  return { collection, views, defaultViewId: dflt.id };
+
+  // A schema naming a view that does not exist used to fall through in silence: App.pickCollection
+  // does `Math.max(0, views.findIndex(...))`, so the dangling id resolved to index 0 and the person
+  // was shown a different view than the collection asked for, forever, with nothing said. The
+  // shipped `#guest` declared `default_view: needs-review` and no views file was ever written, so
+  // that was the first-run experience. Law 8: never silent.
+  const warnings = [];
+  if (wantedDefault && dflt.id !== wantedDefault) {
+    const line = '#' + collectionId + ' names default_view "' + wantedDefault
+      + '", which is not one of: ' + views.map(v => v.id).join(' · ')
+      + '. Opening on "' + dflt.id + '" instead.';
+    warnings.push(line);
+    const key = collectionId + '\u0000' + wantedDefault + '\u0000' + views.map(v => v.id).join(',');
+    if (!announced.has(key)) { announced.add(key); console.warn('scout · views · ' + line); }
+  }
+  return { collection, views, defaultViewId: dflt.id, warnings };
 }
 
 export function getView(collectionId, viewId) {

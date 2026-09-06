@@ -72,6 +72,9 @@ export function upsertRecord(input, { actor = 'crystal', via = 'api' })
 // confidence >= 60 merges into the existing record. Nothing new to add → 'skip'.
 // An agent actor lands `proposed: true` and may never write a gate stage past AGENT_MAX_STAGE.
 // Appends to log.mjs. Throws RecordError (with .status) on refusal.
+// An agent `store` also raises a `kind: 'finding'` DECIDE card (proposals.propose) unless an OPEN
+// finding card already points at that record; its id comes back as `card`. update/merge/skip raise
+// nothing. Every write verb schedules memory.scheduleCacheRegen() — in whatever process wrote.
 
 export function batchUpsert(items, { actor, via })
 // → { tally: { store, update, merge, skip }, results: [...] }   ONE near-match pass for the batch.
@@ -83,8 +86,17 @@ export function archiveRecord(path, { reason, actor })
 // reason ∈ ARCHIVE_REASONS or throws RecordError(400). Moves the file to data/_archive/<collection>/
 // keeping frontmatter, appending the reason and history. NEVER deletes.
 
-export function patchRecord(path, patch, { actor, rev })   // the document surface's save
+export async function patchRecord(path, patch, { actor, rev })   // the document surface's save
 // → { path, rev, data, content }. 409 RecordError when `rev` is stale (conflict UX).
+// ASYNC because it writes `data/` and DELEGATES everything else: me.md → memory.writeMe,
+// goals/<id>.md → saveGoal, playbook/<id>.md → savePlaybook, learnings/<id>.md → saveLearning,
+// territory/<id>.md → territory.saveTerritory (lazy import, so the memory ↔ records edge stays off
+// the load path). The rev check happens here for every path; the delegate carries the agent
+// refusal (the SAME 403 string as the memory route), the rollup stripping and its own log line.
+// A patch that changes nothing is still not a write.
+export const RECORD_ROOT = 'data/'; export function isRecordPath(relPath)
+// `archiveRecord` and `acceptRecord` refuse a path outside RECORD_ROOT with 403, logged `refused`:
+// archiving MOVES a file, and pointed at me.md it would move identity out of the workspace.
 
 export function readRecord(path)   // → { path, data, content, rev, flags }
 // flags: { quarantined, agentPromotion, staleness }  — see §4.
@@ -125,7 +137,7 @@ export function registerTerritoryRoutes(app, deps)
 
 // added while building M3 — additive, no signature above changed
 export function statsIndex(docs = null)      // ONE walk → Map<id, {finds,wins,hit_rate}>; listTerritories uses it
-export function proposeTerritory(input, { actor })   // lands `access: untried` + `proposed: true`
+export async function proposeTerritory(input, { actor })  // makes a kind:'territory' DECIDE card and writes NOTHING. `why` mandatory. Accepting the card is what writes the file, at access 'requested'
 export function setTerritoryHooks({ logEvent, afterWrite })
 export const COMPUTED_KEYS = ['finds','wins','hit_rate'];  // what saveTerritory strips
 export const WIN_STATUSES  // the fallback when a record's collection declares no gate field
@@ -172,6 +184,7 @@ export function registerScoutMemoryRoutes(app, deps)
 export function readCache({ project })  // what GET /api/context serves: the GENERATED file, so the
                                         // text an agent reads and the `v` it polls are one artefact
 export function scheduleCacheRegen({ project })   // the debounce; cancelCacheRegen() drops it
+export function flushCacheRegen()          // cancel the 2s debounce and regenerate NOW; true if it ran. For a process about to exit (the MCP door)
 export function isAgentActor(actor)     // the rule writeMe/saveGoal refuse on — see below
 export function graduationCandidates()  // project learnings that hold in a SECOND project
 export function estimateTokens(text)    // chars / 4
@@ -197,7 +210,7 @@ real `logEvent` / `readEvents`. index.mjs passes `{ logEvent }`; **`readEvents` 
 SINCE YOUR LAST RUN**, and it is defaulted rather than required so the section is never silently
 empty.
 Routes: `GET /api/context`, `GET /api/cache/version`, `POST /api/cache/regenerate`,
-`GET/PUT /api/me`, `GET /api/goals`, `PATCH /api/goals/:id`,
+`GET/PUT /api/me`, `GET /api/goals`, `POST /api/goals` (409 on an existing id), `PATCH /api/goals/:id`,
 `GET /api/playbook`, `GET /api/playbook/:id`, `PATCH /api/playbook/:id`,
 `GET /api/learnings`, `POST /api/learnings/propose`.
 
@@ -223,6 +236,8 @@ No second write path: it calls `upsertRecord`. Failures move the file to `_inbox
 export function listAssistants(); export function getAssistant(id)
 export function saveAssistant(id, patch, { actor })
 export function listTasks({ project = null, status = null })
+export function taskIdFrom({ id, title, label })   // the ONE place a task id is derived; nothing → refused
+export function humanName(task)                    // label || (title ≠ id) || id — what the screen shows
 export function saveTask(project, id, patch, { actor })
 export function claimTask(project, id, { actor })    // atomic write-then-reread; → { won: bool }
 export function listRuns({ assistant = null, limit = 20 }); export function appendRun(run)
@@ -241,6 +256,7 @@ export const CARD_KINDS = ['finding','outbound','territory','learning','schema',
 export const REJECT_REASONS = ['off-target','bad-data','duplicate','wrong-tone','already-contacted'];
 export function listProposals({ status = 'open' })  // → cards, oldest first, one at a time
 export function propose(card, { actor })            // agents only ever propose
+export function territoryOf(value)  // 'ofw-uk' | { id, label, kind, url } → { id, … } | null
 export function accept(id, { actor })               // performs the card's effect, see the table
 export function reject(id, { reason, actor })       // reason mandatory, one of REJECT_REASONS
 export function registerProposalRoutes(app, deps)

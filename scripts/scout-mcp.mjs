@@ -31,8 +31,17 @@ process.on('unhandledRejection', e => { say('unhandled rejection: ' + (e && e.st
 
 const { start } = await import('../backend/mcp.mjs');
 
-start({ input: process.stdin, output: OUT, log: say });
+const server = start({ input: process.stdin, output: OUT, log: say });
 
 // stdin closing is the host going away — finish what is in flight, then leave. Nothing here holds
 // the loop open by itself, so an empty queue exits on its own.
-process.stdin.on('close', () => { setTimeout(() => process.exit(0), 50).unref(); });
+//
+// `server.close()` first, and awaited: the hot cache is regenerated on a 2s DEBOUNCE whose timer is
+// `unref`ed, so in a process that lives for four seconds it never fires. The agent's next run then
+// asks `GET /api/cache/version`, sees the same integer, and skips re-reading a context that no
+// longer describes the workspace — Law 7 broken by an exit rather than by a bug in the render.
+process.stdin.on('close', () => {
+  Promise.resolve(server.close())
+    .catch(e => say('cache did not settle on exit: ' + (e && e.message)))
+    .then(() => { setTimeout(() => process.exit(0), 50).unref(); });
+});

@@ -1,0 +1,25 @@
+[
+  {
+    "id": "my-best",
+    "label": "My best",
+    "type": "table",
+    "filter": [],
+    "sort": [
+      {
+        "field": "wins",
+        "dir": "desc"
+      }
+    ],
+    "group": null,
+    "fields": [
+      "label",
+      "kind",
+      "access",
+      "last_swept",
+      "finds",
+      "wins"
+    ],
+    "card": null,
+    "density": "compact"
+  }
+]

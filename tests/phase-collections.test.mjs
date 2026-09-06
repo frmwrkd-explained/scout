@@ -445,3 +445,99 @@ test('the store walk skips the disposable and the not-yet-admitted', () => {
   assert.ok(!paths.some(p => p.startsWith('_inbox/')), '_inbox/ has not passed the pipeline');
   assert.ok(paths.includes('data/guests/maria-santos.md'));
 });
+
+// ── `+ Add property`, on the collections that actually ship ────────────────────────────────────
+//
+// Every test above declares its own fixture, and every fixture was valid — so the one thing nobody
+// tested was the schema the app SHIPS. `#guest` declares `tags: multiselect` with no options[], and
+// `addField` re-validated the whole schema through `saveCollection`, so that pre-existing field
+// 400ed every later write of the collection: `+ Add property` had never worked on a real workspace,
+// for the human OR for an accepted agent `schema` card (GOAL gate 8), and the error named a field
+// nobody had touched. "A fixture that is easier than production tests the easy case" (HANDOVER §3).
+
+const WORKSPACES = ['workspace-template', 'workspace-demo'];
+
+function rootFrom(name) {
+  const root = freshRoot();
+  fs.cpSync(path.join(path.dirname(new URL(import.meta.url).pathname), '..', name), root, { recursive: true });
+  return root;
+}
+
+for (const ws of WORKSPACES) {
+  test('every collection in ' + ws + ' takes a new field through the route AddField.jsx posts to', async () => {
+    rootFrom(ws);
+    const { body: list } = await req('GET', '/api/collections');
+    const ids = (list.collections || []).map(c => c.id);
+    assert.ok(ids.length, ws + ' ships no collections');
+    for (const id of ids) {
+      // exactly the body frontend/AddField.jsx sends: { ...field, actor }
+      const r = await req('POST', '/api/collections/' + id + '/fields', { key: 'home_city', type: 'text', actor: 'crystal' });
+      assert.equal(r.status, 200, '#' + id + ' refused a plain text field: ' + JSON.stringify(r.body));
+      assert.ok((r.body.fields || []).some(f => f.key === 'home_city'), '#' + id + ' did not gain the field');
+      // a field that was already invalid is NAMED rather than allowed to block an unrelated write
+      for (const w of r.body.warnings || []) assert.match(w, /^existing field `.+` is invalid: /);
+    }
+  });
+
+  test('every collection in ' + ws + ' opens on the view its schema names', async () => {
+    rootFrom(ws);
+    const { body: list } = await req('GET', '/api/collections');
+    for (const c of list.collections || []) {
+      const { body } = await req('GET', '/api/views/' + c.id);
+      assert.deepEqual(body.warnings, [],
+        '#' + c.id + ' names a default_view that does not exist: ' + JSON.stringify(body.warnings));
+      if (c.default_view) assert.equal(body.defaultViewId, c.default_view);
+    }
+  });
+}
+
+test('a dangling default_view is reported, not silently swapped for whatever is first', async () => {
+  freshRoot();
+  saveCollection({ ...GUEST, default_view: 'needs-review' });
+  const { body } = await req('GET', '/api/views/guest');
+  // App.pickCollection does Math.max(0, findIndex(...)), so the dangling id resolved to index 0 and
+  // she was shown a different view than the collection asked for, forever, with nothing said.
+  assert.equal(body.defaultViewId, 'all', 'it still opens on something');
+  assert.equal(body.warnings.length, 1, 'and it says so');
+  assert.match(body.warnings[0], /needs-review/);
+  assert.match(body.warnings[0], /#guest/);
+});
+
+// ── the open vocabulary ────────────────────────────────────────────────────────────────────────
+// docs/decisions.md "seeding ambiguity 1", resolved: a multiselect with no options[] is a TAG
+// FIELD — the next tag is legal because the person typed it. select and status are not.
+
+test('a multiselect may declare no options — select and status may not', async () => {
+  freshRoot();
+  const open = await req('POST', '/api/collections', {
+    id: 'tagged', query: { path: 'data/tagged/**' },
+    fields: [{ key: 'name', type: 'text', primary: true }, { key: 'tags', type: 'multiselect' }],
+  });
+  assert.equal(open.status, 200, 'an open vocabulary was refused: ' + JSON.stringify(open.body));
+
+  for (const type of ['select', 'status']) {
+    const r = await req('POST', '/api/collections', {
+      id: 'fixed-' + type, query: { path: 'data/x/**' },
+      fields: [{ key: 'name', type: 'text', primary: true }, { key: 'stage', type }],
+    });
+    assert.equal(r.status, 400, type + ' must still require a fixed set');
+    assert.match(r.body.error, /needs a non-empty options\[\]/);
+  }
+});
+
+test('a multiselect that DOES declare options still has them validated', async () => {
+  freshRoot();
+  const bad = await req('POST', '/api/collections', {
+    id: 'badtags', query: { path: 'data/x/**' },
+    fields: [{ key: 'name', type: 'text', primary: true }, { key: 'tags', type: 'multiselect', options: ['ok', { colour: 'accent' }] }],
+  });
+  assert.equal(bad.status, 400);
+  assert.match(bad.body.error, /every option needs a value/);
+
+  const notAList = await req('POST', '/api/collections', {
+    id: 'strtags', query: { path: 'data/x/**' },
+    fields: [{ key: 'name', type: 'text', primary: true }, { key: 'tags', type: 'multiselect', options: 'ph, health' }],
+  });
+  assert.equal(notAList.status, 400);
+  assert.match(notAList.body.error, /options must be a list/);
+});

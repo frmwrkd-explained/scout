@@ -22,11 +22,12 @@ import {
   QUESTIONS, QUESTION_KEYS, PLAIN_TYPE,
   isFirstRun, identityWritten, interviewState, saveAnswer, proposeWorkspace, buildWorkspace,
   settleWorkspace, collectionIdFrom, territoriesFrom, meFrom, registerIntakeRoutes, intakePath,
+  goalFrom, deadlineFrom, targetFrom,
 } from '../backend/intake.mjs';
 import { validateSchema, saveCollection, getCollection, listCollectionIds } from '../backend/collections.mjs';
 import { listViews, inferViewType } from '../backend/views.mjs';
 import { propose, accept, getProposal } from '../backend/proposals.mjs';
-import { readMe, cancelCacheRegen } from '../backend/memory.mjs';
+import { readMe, cancelCacheRegen, listGoals, renderCache } from '../backend/memory.mjs';
 import { getTerritory, listTerritories } from '../backend/territory.mjs';
 import { writeMd } from '../backend/store.mjs';
 
@@ -315,8 +316,10 @@ test('a view is created without approval once the collection lands, with the typ
   }, { actor: 'scout' });
   await accept(card.id, { actor: 'crystal' });
 
-  const settled = settleWorkspace();
-  assert.ok(settled, 'the view lands as soon as there is a collection to hang it on');
+  // Either door settles it — proposals.mjs flushes the pending view the moment the collection
+  // lands, and `GET /api/intake` calls settleWorkspace() for anyone who got here another way. What
+  // matters is the OUTCOME: once the collection exists, the view is a FILE.
+  settleWorkspace();
   const viewsFile = path.join(R(), '.scout', 'views', 'guest.json');
   assert.ok(fs.existsSync(viewsFile), 'saved in the vault, so it travels with the data');
 
@@ -417,3 +420,78 @@ test('build refuses while a required answer is still missing', async () => {
 });
 
 test.after(() => cancelCacheRegen());
+
+// ── 5 · the first goal ─────────────────────────────────────────────────────────────────────────
+//
+// "What are you chasing right now, and by when?" only ever became a paragraph in me.md until
+// 2026-09-06, so the hot cache's `## GOALS` section was empty in every workspace this interview
+// has built — and nothing in the app could create a goal at all.
+
+test('a date is read off her own sentence, conservatively, and never lands in the past', () => {
+  const now = Date.UTC(2026, 8, 6); // 2026-09-06
+
+  assert.equal(deadlineFrom('Six guests with a hazing story, by the end of August', now).deadline, '2027-08-31',
+    'the END of August, and the NEXT one — a goal that is already overdue on the day it is set is worse than no date');
+  assert.equal(deadlineFrom('Six placements filled before the end of October.', now).deadline, '2026-10-31');
+  assert.equal(deadlineFrom('Book six by 2026-11-30', now).deadline, '2026-11-30', 'an ISO date, as an agent would send it');
+  assert.equal(deadlineFrom('Ten signed by 30 September', now).deadline, '2026-09-30');
+  assert.equal(deadlineFrom('Ten signed by September 30', now).deadline, '2026-09-30');
+  assert.equal(deadlineFrom('Get to twelve by the end of the year', now).deadline, '2026-12-31');
+
+  // Not sure is not a date. Inventing one would put a deadline on her screen she never said.
+  assert.equal(deadlineFrom('More guests, soon', now).deadline, null);
+  assert.equal(deadlineFrom('', now).deadline, null);
+});
+
+test('the number is read from what is left once the date is out of the sentence', () => {
+  assert.equal(targetFrom('Six guests with a hazing story'), 6, 'people write this answer in words');
+  assert.equal(targetFrom('Book 6 hazing stories'), 6);
+  assert.equal(targetFrom('More guests than last month'), null, 'no number is no number');
+  // the trap this exists for: the 2026 of a date must never become the target
+  const { deadline, match } = deadlineFrom('Six guests by 2026-08-31');
+  assert.equal(deadline, '2026-08-31');
+  assert.equal(targetFrom('Six guests by 2026-08-31'.replace(match, ' ')), 6);
+});
+
+test('the goal counts itself from the records, through the new collection\'s own gate', () => {
+  freshRoot();
+  answerAll();
+  const plan = proposeWorkspace(ANSWERS);
+  const { id, patch } = goalFrom(ANSWERS.chasing, plan.schema);
+
+  assert.equal(patch.label, 'Six guests with a hazing story, by the end of August');
+  assert.equal(patch.target, 6);
+  assert.match(String(patch.deadline), /^\d{4}-08-31$/);
+  // the rollup: the gate field's `done` group, so renaming `won` to `signed` moves progress with
+  // no code change — and `archived` is never progress (Law 5 keeps a reject, it does not count it).
+  assert.deepEqual(patch.count, { path: 'data/guest/**', where: { status: 'won' } });
+  assert.ok(id.length && id.length <= 60);
+});
+
+test('a chasing answer with no number and no date still becomes a goal', () => {
+  const g = goalFrom('More people who actually reply');
+  assert.equal(g.patch.label, 'More people who actually reply');
+  assert.equal(g.patch.target, undefined);
+  assert.equal(g.patch.deadline, undefined);
+  assert.equal(goalFrom('   '), null, 'and a blank answer is no goal, not an empty one');
+});
+
+test('DEMONSTRATE · after the interview builds, there is a goal and the cache has a GOALS section', () => {
+  freshRoot();
+  cancelCacheRegen();
+  answerAll();
+  const built = buildWorkspace({ actor: 'crystal' });
+
+  const goals = listGoals();
+  assert.equal(goals.length, 1, 'the interview leaves exactly one goal, from her own sentence');
+  assert.equal(goals[0].id, built.goal.id);
+  assert.equal(goals[0].target, 6);
+  assert.equal(goals[0].current, 0, 'counted from her records — there are none yet');
+  assert.equal(goals[0].computed, true, 'and it is a ROLLUP, not a number anybody typed');
+  assert.equal(goals[0].data.created_by, 'crystal', 'human-owned, like me.md');
+
+  const { text } = renderCache({});
+  assert.match(text, /## GOALS\n- Six guests with a hazing story/,
+    'and the agent reads it on wake — the whole reason a goal exists');
+  cancelCacheRegen();
+});

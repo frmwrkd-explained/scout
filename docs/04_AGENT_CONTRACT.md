@@ -36,7 +36,7 @@ Then, and only when needed:
 curl -s -X POST .../api/records/upsert -d '{ "collection":"guest", "name":"...", "found_in":"nurses-ph", ... }'
 ```
 
-Response is the verdict — `store` · `update` · `merge` · `skip`. Working a group for an hour? **One batch of 20–50**, not fifty calls. `POST /api/records/match` checks without writing.
+Response is the verdict — `store` · `update` · `merge` · `skip`. A `store` by an agent also raises a `finding` card in DECIDE, carrying the `why`, `score`, `source` and `found_in` that came with it — so an overnight sweep arrives as decisions rather than as files nobody is shown. Do not post a finding card as well: `update`, `merge` and `skip` raise nothing, and a second card puts the same person in the queue twice. Working a group for an hour? **One batch of 20–50**, not fifty calls. `POST /api/records/match` checks without writing.
 
 Required on every finding: `found_in` (territory scores are computed from it — omit it and the app cannot learn), `source` (the URL actually seen), `score` with a one-line `why` tied to the doctrine.
 

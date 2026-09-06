@@ -56,10 +56,13 @@ Never decide "this is new" yourself. Submit it and read the verdict.
 
 | Mode | Do this |
 |---|---|
-| API | `POST /api/records/upsert` → `{"action": "store" \| "update" \| "merge" \| "skip"}` |
+| API | `POST /api/records/upsert` → `{"verdict": "store" \| "update" \| "merge" \| "skip"}` |
 | Folder | write one `.md` per finding into `_inbox/`, named `<your-agent-id>-<slug>.md` |
 
 Working a group for an hour? Collect and submit **one batch of 20–50**, not fifty calls.
+
+**A `store` lands in front of them as a card — you do not need to post a finding card as well.**
+The upsert raises it and hands you its id in `card`. `update`, `merge` and `skip` raise nothing.
 
 **Required on every finding — no exceptions:**
 

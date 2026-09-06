@@ -10,7 +10,7 @@
 import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
-import { isQuarantined as isQuarantinedRule } from './records.mjs';
+import { isQuarantined as isQuarantinedRule, slugify } from './records.mjs';
 import { getStorageRoot, stamp, safeScope, dayMs } from './store.mjs';
 
 // safeScope is the one project-id sanitizer (store.mjs) — an allowlist, and the same one
@@ -196,7 +196,7 @@ export function registerMemoryRoutes(app, deps = {}) {
 // every import declaration to the top of the module, so their position is presentational only.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 
-import { readMd, writeMd, safe } from './store.mjs';
+import { readMd, writeMd, safe, day } from './store.mjs';
 import { allDocuments, matchesQuery, firstParagraph } from './documents.mjs';
 import { listCollections, gateField } from './collections.mjs';
 import { staleness, isStale, ageDays, agoLabel, agoFrom, daysUntil, dayOf } from './decay.mjs';
@@ -547,6 +547,10 @@ function shapeLearning(l, now) {
     data: l.data,
     body: l.body,
     claim: String(l.data.claim || firstLine(l.body) || l.id),
+    // A learning that came from an answered `question` card carries what was ASKED. Its claim is
+    // the answer, and an answer without its question is not a thing anybody can learn from —
+    // `- Yes.` was a real line in a real cache. The renderer prints both when both are there.
+    question: String(l.data.question || '').trim() || null,
     scope: String(l.data.scope || 'project'),
     project: l.data.project ? String(l.data.project) : null,
     evidence, counterExamples: counter,
@@ -741,9 +745,23 @@ function goalLine(g) {
 }
 
 function territorySections(m, level) {
-  const open = m.territory.filter(t => t.access === 'joined');
-  const blocked = m.territory.filter(t => BLOCKED_ACCESS.includes(t.access) || t.access === 'requested');
-  const untried = m.territory.filter(t => t.access === 'untried');
+  // Belt and braces on Law 4. A territory carrying `proposed: true` is ground nobody approved, so
+  // it is not ground at all here — not best, not blocked, and above all not NEVER TRIED, which an
+  // agent reads as an invitation. The gate itself lives in the pipeline (POST /api/territory/propose
+  // makes a DECIDE card and writes no file); this is the second place it holds, because the cache
+  // is what an agent believes.
+  const pool = m.territory.filter(t => t.data.proposed !== true);
+  // Blocked wins over worked: a place that refused us is not "best ground" however many finds came
+  // out of it before the refusal, and printing it twice would read as two different places.
+  const isBlocked = t => BLOCKED_ACCESS.includes(t.access) || t.access === 'requested';
+  const blocked = pool.filter(isBlocked);
+  // WORKED ground is ground that has produced something, whatever `access` says. Territory the
+  // first-run interview seeds is `access: untried` and stays untried — nothing promotes it, and
+  // nothing should: `access` is the human's word about membership, and finds are evidence about
+  // yield. Filtering BEST GROUND on `joined` alone meant the agent was told that the group it had
+  // already won in had "never been tried" (Law 7 — it re-derives what it already knew).
+  const open = pool.filter(t => !isBlocked(t) && (t.access === 'joined' || t.stats.finds > 0));
+  const untried = pool.filter(t => !isBlocked(t) && t.access === 'untried' && t.stats.finds === 0);
 
   const best = [...open].sort((a, b) => b.stats.hit_rate - a.stats.hit_rate || b.stats.finds - a.stats.finds);
   // Compression rung 1 keeps exactly top-5 + stalest-3 + all blocked (docs/03_MEMORY.md §2).
@@ -793,21 +811,33 @@ function territorySections(m, level) {
 }
 
 const SINCE_MAX_LINES = 6;
+// Events the app produces ABOUT ITSELF. "scout regenerated the cache 1" is not news to the agent
+// reading the very cache that line is in, and with six lines to spend it crowded out the things a
+// human actually decided while the agent was away — which is the entire point of the section.
+// Derived, not mutations: they stay in the event log (Law 8, nothing is hidden), they are simply
+// not what "since your last run" means.
+const DERIVED_EVENT_TYPES = new Set(['cache']);
+
 function sinceLines(m, level) {
-  if (!m.events.length) return { lines: [], dropped: [] };
+  const events = m.events.filter(e => !DERIVED_EVENT_TYPES.has(String(e.type || '')));
+  if (!events.length) return { lines: [], dropped: [] };
   const label = m.since ? ' (' + sinceLabel(m.since, m.now) + ')' : '';
   const L = ['## SINCE YOUR LAST RUN' + label];
   if (level >= 4) {
-    const byType = tally(m.events.map(e => String(e.type || 'event')));
-    L.push('- ' + m.events.length + ' events: ' + byType);
-    return { lines: L, dropped: ['since-your-last-run detail (' + m.events.length + ' events → counts only)'] };
+    const byType = tally(events.map(e => String(e.type || 'event')));
+    L.push('- ' + events.length + ' events: ' + byType);
+    return { lines: L, dropped: ['since-your-last-run detail (' + events.length + ' events → counts only)'] };
   }
   const groups = new Map();
-  for (const e of m.events) {
+  for (const e of events) {
     const k = String(e.actor || '?') + '|' + String(e.type || 'event');
     const row = groups.get(k) || { actor: String(e.actor || '?'), type: String(e.type || 'event'), n: 0, reasons: [] };
     row.n++;
-    const reason = e.detail && (e.detail.reason || e.detail.why);
+    // `reason` ONLY — it is a closed vocabulary (records.mjs ARCHIVE_REASONS), so "2× off-target,
+    // 1× already-contacted" is a real tally and the most useful line in the section. `why` is free
+    // prose (a proposal's whole argument, a refusal's explanation) and tallying it produced
+    // `scout-fb proposed 4: 1× three shortlists mention it` — a paragraph inside a count.
+    const reason = e.detail && e.detail.reason;
     if (reason) row.reasons.push(String(reason));
     groups.set(k, row);
   }
@@ -907,7 +937,13 @@ function compose(m, level, version) {
   if (level >= 3 && m.learnings.length !== learnings.length) {
     dropped.push('learnings older than ' + LEARNING_COMPRESS_DAYS + 'd unverified (' + (m.learnings.length - learnings.length) + ')');
   }
-  if (learnings.length) { L.push('## LEARNED'); for (const l of learnings) L.push('- ' + l.claim); L.push(''); }
+  if (learnings.length) {
+    L.push('## LEARNED');
+    // `question — claim`, so an answered question card reads as the exchange it was rather than as
+    // the bare answer. See shapeLearning.
+    for (const l of learnings) L.push('- ' + (l.question ? l.question + ' — ' + l.claim : l.claim));
+    L.push('');
+  }
 
   const since = sinceLines(m, level);
   dropped.push(...since.dropped);
@@ -933,7 +969,10 @@ function compose(m, level, version) {
 }
 
 // THE ONLY producer of the agent's wake-up context.
-export function renderCache({ project = null, now = Date.now(), docs = null, version = null } = {}) {
+// `actor` is who asked for this render. It defaults to the app itself, because the overwhelming
+// majority of renders are the debounced regeneration nobody typed; a route passes its caller so a
+// person pressing Regenerate in WHAT THEY KNOW is not recorded in Activity as an agent's work.
+export function renderCache({ project = null, now = Date.now(), docs = null, version = null, actor = 'scout' } = {}) {
   ensureWired();
   const m = gather({ project, now, docs });
   // No invented number: an un-generated cache renders v="0", which is exactly what
@@ -956,19 +995,19 @@ export function renderCache({ project = null, now = Date.now(), docs = null, ver
   const excluded = m.playbook.filter(p => p.stale).map(p => 'playbook/' + p.id + ' (stale — re-verify or retire)');
   const tokens = estimateTokens(out.text);
   if (out.dropped.length || excluded.length) {
-    hooks.logEvent({ type: 'cache', actor: 'scout', target: (m.pid ? 'projects/' + m.pid + '/.cache/context.md' : '.scout/cache/context.md'), detail: { tokens, dropped: out.dropped, excluded } });
+    hooks.logEvent({ type: 'cache', actor: String(actor || 'scout'), target: (m.pid ? 'projects/' + m.pid + '/.cache/context.md' : '.scout/cache/context.md'), detail: { tokens, dropped: out.dropped, excluded } });
   }
   return { text: out.text, tokens, chars: out.text.length, version: v, project: m.pid, dropped: out.dropped, excluded, budget: CACHE_TOKEN_BUDGET };
 }
 
 // Writes the file and increments `v`. An agent that cached a context asks GET /api/cache/version —
 // one cheap call — to learn whether it must re-read.
-export function regenerateCache({ project = null, now = Date.now() } = {}) {
+export function regenerateCache({ project = null, now = Date.now(), actor = 'scout' } = {}) {
   ensureWired();
   // The version counter is per scope, so read it from the scope this render will actually write.
   const pid = scopeOf(project);
   const next = readVersion(pid).v + 1;
-  const rendered = renderCache({ project, now, version: next });
+  const rendered = renderCache({ project, now, version: next, actor });
   const dir = scoutPaths.cacheDir(pid);
   fs.mkdirSync(dir, { recursive: true });
   const file = scoutPaths.cache(pid);
@@ -1027,6 +1066,26 @@ export function cancelCacheRegen() {
   cacheTimers.clear();
 }
 
+// Run any pending regeneration NOW instead of in two seconds' time, and return whether it ran.
+//
+// The debounce is right for a process that stays up: fifty records in one batch must cost one
+// render, not fifty. It is wrong for a process that is about to exit — the MCP door (door 3) does
+// its writes and dies, and an unref'd timer that never fires leaves the next agent reading a cache
+// that predates the work. A caller that is finishing a unit of work calls this; nobody else has to.
+export function flushCacheRegen() {
+  if (!cacheTimers.size) return false;
+  const keys = [...cacheTimers.keys()];
+  for (const t of cacheTimers.values()) clearTimeout(t);
+  cacheTimers.clear();
+  let ran = false;
+  for (const key of keys) {
+    // A cache that cannot be written is still only a cache (Law 1) — never fail the caller's work
+    // because the derived file could not be rebuilt.
+    try { regenerateCache({ project: key || null }); ran = true; } catch { /* rebuildable */ }
+  }
+  return ran;
+}
+
 // ── routes ─────────────────────────────────────────────────────────────────────────────────────
 // registerScoutMemoryRoutes(app, { logEvent, readEvents, lastRunAt }) — all optional, all no-ops.
 export function registerScoutMemoryRoutes(app, deps = {}) {
@@ -1069,7 +1128,9 @@ export function registerScoutMemoryRoutes(app, deps = {}) {
   });
 
   app.post('/api/cache/regenerate', (req, res) => {
-    try { res.json({ ok: true, ...regenerateCache({ project: req.body?.project || null }) }); }
+    // The caller's actor, not a hardcoded agent. Every regeneration used to land in Activity as
+    // `scout`, so a person pressing Regenerate in WHAT THEY KNOW read back as an agent at work.
+    try { res.json({ ok: true, ...regenerateCache({ project: req.body?.project || null, actor: actorOf(req) }) }); }
     catch (e) { fail(res, e); }
   });
 
@@ -1080,6 +1141,48 @@ export function registerScoutMemoryRoutes(app, deps = {}) {
   });
 
   app.get('/api/goals', (_req, res) => res.json({ goals: listGoals() }));
+
+  // Something has to be able to CREATE a goal. Until 2026-09-06 only GET and PATCH existed, so the
+  // first-run interview could ask "what are you chasing right now, and by when?" and the answer
+  // could only ever become a paragraph in me.md: the hot cache's GOALS section — the one object in
+  // memory with its own clock, and what makes a behind-schedule goal surface on TODAY — was empty
+  // in every workspace this app has ever built, and no door in the app could fill it.
+  //
+  // `by` is accepted as an alias for `deadline` because that is the word the question uses and the
+  // word an agent will send. Human-owned like me.md: saveGoal refuses an agent actor with a 403.
+  app.post('/api/goals', (req, res) => {
+    try {
+      const b = req.body || {};
+      const label = String(b.label || b.title || b.statement || '').trim();
+      const id = safe(slugify(String(b.id || label)));
+      if (!label && !String(b.id || '').trim()) {
+        return res.status(400).json({ error: 'a goal needs a label — one number, with a date on it' });
+      }
+      // The file, not listGoals(): POST creates, and asking whether one exists must not cost a
+      // walk of the whole store.
+      if (fs.existsSync(scoutPaths.goal(id))) {
+        return res.status(409).json({ error: 'goal "' + id + '" already exists — PATCH /api/goals/' + id + ' to change it' });
+      }
+      const patch = { label: label || id };
+      const target = Number(b.target);
+      if (Number.isFinite(target)) patch.target = target;
+      const when = b.by ?? b.deadline ?? '';
+      // day() normalises whatever arrives — a bare `2026-10-31`, an ISO timestamp, a Date that came
+      // through JSON — to the YYYY-MM-DD every other date in the store is written as. Text it
+      // cannot parse is kept verbatim rather than silently dropped: it is still what they said.
+      const deadline = day(when) || String(when).trim();
+      if (deadline) patch.deadline = deadline;
+      if (b.unit) patch.unit = String(b.unit);
+      if (b.project) patch.project = String(b.project);
+      // The rollup. `count` is what makes progress a computed fact rather than a number somebody
+      // typed once and never came back to (docs/03_MEMORY.md §1, goalProgress above).
+      if (b.count && typeof b.count === 'object') patch.count = b.count;
+      if (b.threshold !== undefined) patch.threshold = b.threshold;
+      if (b.body !== undefined) patch.body = String(b.body ?? '');
+      res.json({ ok: true, goal: saveGoal(id, patch, { actor: actorOf(req) }) });
+    } catch (e) { fail(res, e); }
+  });
+
   app.patch('/api/goals/:id', (req, res) => {
     try { res.json({ ok: true, goal: saveGoal(req.params.id, patchOf(req), { actor: actorOf(req) }) }); }
     catch (e) { fail(res, e); }

@@ -185,7 +185,10 @@ export default class App extends React.Component {
       screen: navigate ? 'collection' : s.screen,
     }));
     try {
-      const { views } = await api.views(id);
+      // `warnings` names a `default_view` that points at nothing — silently falling back to
+      // index 0 is how #guest opened as a board called "Everything" for a whole build.
+      const { views, warnings } = await api.views(id);
+      if (warnings && warnings.length) this.setState({ toast: warnings[0] });
       const results = await Promise.all(views.map(v => api.documents(id, v.id).catch(() => null)));
       const viewCounts = {};
       views.forEach((v, i) => { if (results[i]) viewCounts[v.id] = results[i].rows.length; });

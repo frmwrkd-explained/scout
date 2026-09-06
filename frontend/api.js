@@ -337,6 +337,7 @@ export const api = {
   saveMe: (body, data, actor) => fetch('/api/me', { method: 'PUT', ...opts({ body, data, actor }) }).then(j),
   goals: () => fetch('/api/goals').then(j),
   saveGoal: (id, patch, actor) => fetch('/api/goals/' + encodeURIComponent(id), { method: 'PATCH', ...opts({ patch, actor }) }).then(j),
+  createGoal: body => fetch('/api/goals', { method: 'POST', ...opts(body) }).then(j),   // 409 on an existing id
   territory: () => fetch('/api/territory').then(j),
   territoryOne: id => fetch('/api/territory/' + encodeURIComponent(id)).then(j),
   saveTerritory: (id, patch, actor) => fetch('/api/territory/' + encodeURIComponent(id), { method: 'PATCH', ...opts({ patch, actor }) }).then(j),

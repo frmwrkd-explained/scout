@@ -10,15 +10,16 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import express from 'express';
+import { execFileSync } from 'node:child_process';
 import { freshRoot, getStorageRoot } from './helpers.mjs';
 import { saveCollection } from '../backend/collections.mjs';
-import { saveTerritory } from '../backend/territory.mjs';
+import { saveTerritory, getTerritory } from '../backend/territory.mjs';
 import {
   CACHE_TOKEN_BUDGET, CACHE_CHAR_BUDGET, estimateTokens,
   readMe, writeMe, listGoals, saveGoal, getGoal,
   listPlaybook, getPlaybook, savePlaybook, listLearnings, saveLearning, graduationCandidates,
   renderCache, readCache, cacheVersion, regenerateCache, scheduleCacheRegen, cancelCacheRegen,
-  registerScoutMemoryRoutes, setScoutMemoryHooks, isAgentActor,
+  flushCacheRegen, registerScoutMemoryRoutes, setScoutMemoryHooks, isAgentActor,
 } from '../backend/memory.mjs';
 
 const R = () => getStorageRoot();
@@ -465,4 +466,214 @@ test('the routes serve one artefact, and hold the two gates', async () => {
     assert.equal(pb.wins, 9);
     assert.equal((await fetch(base + '/api/playbook/nope')).status, 404);
   } finally { server.close(); cancelCacheRegen(); }
+});
+
+// ── worked ground, unapproved ground, and what the agent is told about each ────────────────────
+
+test('DEMONSTRATE · ground it has already won in is BEST GROUND, whatever `access` says', () => {
+  seed();
+  // Exactly what the first-run interview seeds: she named the place, nobody joined anything, and
+  // `access` stays `untried` forever because nothing promotes it (and nothing should — access is
+  // her word about membership). Then the work happens.
+  saveTerritory('cebu-carers', { label: 'Cebu Carers', kind: 'facebook-group', access: 'untried', last_swept: day(1), verified_at: day(1) }, { actor: 'crystal' });
+  write('data/guests/c1.md', '---\nname: C1\nstatus: won\nfound_in: cebu-carers\n---\n\nbody\n');
+  write('data/guests/c2.md', '---\nname: C2\nstatus: needs-review\nfound_in: cebu-carers\n---\n\nbody\n');
+
+  const { text } = renderCache({});
+  assert.match(text, /## BEST GROUND[\s\S]*#group\/cebu-carers\s+50% · 1 win \/ 2 finds/,
+    'Law 7 — it must not be told to rediscover the group it already won in');
+  assert.ok(!/## NEVER TRIED[\s\S]*cebu-carers/.test(text), 'and it is certainly not "never tried"');
+  // access is NOT auto-promoted: the file still says what the human said.
+  assert.equal(getTerritory('cebu-carers').access, 'untried');
+  cancelCacheRegen();
+});
+
+test('unapproved ground is in no section of the cache — not even NEVER TRIED (Law 4)', () => {
+  seed();
+  // A territory carrying `proposed: true` is ground nobody approved. Before the gate moved into
+  // the pipeline, POST /api/territory/propose wrote exactly this file and the agent read it back
+  // on its next wake as somewhere it was allowed to work.
+  write('territory/frat-alumni-ph.md',
+    '---\nid: frat-alumni-ph\ntype: territory\nkind: facebook-group\naccess: untried\nproposed: true\n' +
+    'created_by: vetter\nverified_at: ' + day(0) + '\n---\n\nFound by the vetter.\n');
+  const { text } = renderCache({});
+  assert.ok(!/frat-alumni-ph/.test(text), 'nobody said yes, so it is not ground');
+
+  // …and once a human accepts the card, `access: requested` puts it in BLOCKED as pending, which
+  // is the honest state: we asked, nobody has answered.
+  saveTerritory('frat-alumni-ph', { access: 'requested', proposed: undefined }, { actor: 'crystal' });
+  assert.match(renderCache({}).text, /## BLOCKED[\s\S]*#group\/frat-alumni-ph\s+pending since/);
+  cancelCacheRegen();
+});
+
+test('a place that refused us is BLOCKED, never best ground, however many finds came out of it', () => {
+  seed();
+  saveTerritory('manila-nurses', { label: 'Manila Nurses', kind: 'facebook-group', access: 'rejected', access_changed: day(38), verified_at: day(38) }, { actor: 'crystal' });
+  write('data/guests/m1.md', '---\nname: M1\nstatus: won\nfound_in: manila-nurses\n---\n\nbody\n');
+  const { text } = renderCache({});
+  assert.match(text, /## BLOCKED[\s\S]*manila-nurses[\s\S]*do not re-request/);
+  const best = text.split('## BLOCKED')[0];
+  assert.ok(!/manila-nurses/.test(best), 'a place that will not have us is not "best ground"');
+  cancelCacheRegen();
+});
+
+// ── SINCE YOUR LAST RUN says what a human did, not what the app did to itself ──────────────────
+
+test('regenerating the cache twice adds no line to SINCE YOUR LAST RUN', () => {
+  seed();
+  const events = [];
+  setScoutMemoryHooks({
+    logEvent: e => { events.push({ ...e, at: Date.now() }); },
+    readEvents: () => events.slice().reverse(),
+  });
+  regenerateCache({});
+  regenerateCache({});
+  const { text } = renderCache({});
+  assert.ok(!/regenerated the cache/.test(text),
+    'the cache telling the agent it regenerated itself is not news, and it costs one of six lines');
+  setScoutMemoryHooks({ readEvents: () => [] });
+  cancelCacheRegen();
+});
+
+test('a tally row is a tally — a reason is counted, a card\'s prose is not', () => {
+  seed();
+  setScoutMemoryHooks({ readEvents: () => ([
+    { at: Date.now() - 3600e3, type: 'archive', actor: 'crystal', target: 'a', detail: { reason: 'off-target' } },
+    { at: Date.now() - 3600e3, type: 'archive', actor: 'crystal', target: 'b', detail: { reason: 'off-target' } },
+    { at: Date.now() - 3600e3, type: 'propose', actor: 'scout-fb', target: 'p', detail: { why: 'three of the last six shortlists are members of this group' } },
+    { at: Date.now() - 3600e3, type: 'cache', actor: 'scout', target: '.scout/cache/context.md', detail: {} },
+  ]) });
+  const { text } = renderCache({});
+  assert.match(text, /- crystal rejected 2: 2× off-target/, 'a closed vocabulary IS a tally, and the best line in the section');
+  assert.match(text, /- scout-fb proposed 1\n/, 'but free prose after a count is a paragraph in a tally row');
+  assert.ok(!/three of the last six/.test(text));
+  assert.ok(!/regenerated the cache/.test(text));
+  setScoutMemoryHooks({ readEvents: () => [] });
+  cancelCacheRegen();
+});
+
+// ── an answered question ───────────────────────────────────────────────────────────────────────
+
+test('an answered question renders as the exchange, never as the bare answer', () => {
+  seed();
+  saveLearning('rank-video', {
+    claim: 'Yes.', question: 'Should I rank video over photos?',
+    evidence: ['[[proposals/q-video]]'], status: 'active', verified_at: day(0),
+  }, { actor: 'crystal' });
+  const { text } = renderCache({});
+  assert.match(text, /## LEARNED[\s\S]*- Should I rank video over photos\? — Yes\./,
+    '"- Yes." on its own is not a thing anybody can learn from');
+  cancelCacheRegen();
+});
+
+// ── goals can be created ───────────────────────────────────────────────────────────────────────
+
+test('POST /api/goals creates a goal, refuses an agent, and refuses a duplicate', async () => {
+  seed();
+  const app = express();
+  app.use(express.json());
+  registerScoutMemoryRoutes(app, { readEvents: () => [] });
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise(r => server.once('listening', r));
+  const base = 'http://127.0.0.1:' + server.address().port;
+  const post = (p, body) => fetch(base + p, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  try {
+    // the body the interview and an agent-facing door actually send: `by`, not `deadline`
+    const made = await post('/api/goals', {
+      label: 'Book 6 hazing stories', target: 6, by: '2026-10-31', unit: 'stories',
+      count: { path: 'data/guests/**', where: { status: 'won' } }, actor: 'crystal',
+    });
+    assert.equal(made.status, 200);
+    const { goal } = await made.json();
+    assert.equal(goal.id, 'book-6-hazing-stories');
+    assert.equal(goal.target, 6);
+    assert.equal(goal.data.deadline, '2026-10-31', '`by` is the word the question uses');
+    assert.equal(goal.current, 2, 'progress is a rollup from the first read — 2 of the 12 seeded guests are won');
+    assert.equal(goal.computed, true);
+
+    assert.equal((await (await fetch(base + '/api/goals')).json()).goals.length, 2, 'and GET sees it');
+
+    // human-owned, like me.md (docs/03 §1) — an agent proposes a change, it does not write one
+    assert.equal((await post('/api/goals', { label: 'Book 40', actor: 'scout-fb' })).status, 403);
+    // POST creates. Changing one is a PATCH, and saying so is better than silently overwriting.
+    assert.equal((await post('/api/goals', { label: 'Book 6 hazing stories', actor: 'crystal' })).status, 409);
+    assert.equal((await post('/api/goals', { actor: 'crystal' })).status, 400);
+  } finally { server.close(); cancelCacheRegen(); }
+});
+
+test('a regeneration is logged against whoever asked for it, not always an agent', () => {
+  seed();
+  // renderCache only logs when it dropped or excluded something, so give it something to exclude:
+  // a claim past its window stays in its file and out of the cache (docs/03_MEMORY.md §4).
+  savePlaybook('follower-count', { claim: 'more followers, more replies', evidence: ['[[data/guests/g2]]'], verified_at: day(90) }, { actor: 'crystal' });
+  const events = [];
+  setScoutMemoryHooks({ logEvent: e => events.push(e), readEvents: () => [] });
+
+  regenerateCache({ actor: 'crystal' });
+  const byPerson = events.filter(e => e.type === 'cache');
+  assert.equal(byPerson.length, 1, 'the render logged what it left out');
+  assert.equal(byPerson[0].actor, 'crystal', 'a person pressing Regenerate is not an agent at work');
+
+  events.length = 0;
+  regenerateCache({});                       // the debounced one nobody typed
+  assert.equal(events.filter(e => e.type === 'cache')[0].actor, 'scout');
+
+  setScoutMemoryHooks({ logEvent: () => {} });
+  cancelCacheRegen();
+});
+
+// ── flushing the debounce ──────────────────────────────────────────────────────────────────────
+
+test('flushCacheRegen runs a pending regeneration now — for a process about to exit', () => {
+  seed();
+  const before = cacheVersion({}).v;
+  scheduleCacheRegen({});
+  assert.equal(cacheVersion({}).v, before, 'still only scheduled');
+  assert.equal(flushCacheRegen(), true, 'it ran');
+  assert.equal(cacheVersion({}).v, before + 1, 'and the file and its version moved');
+  assert.equal(flushCacheRegen(), false, 'nothing pending, nothing to run');
+  cancelCacheRegen();
+});
+
+// The MCP door (door 3) is a SEPARATE PROCESS that registers no routes and may never call a
+// memory.mjs function at all — so this has to be checked in a process where nothing has wired
+// anything, which is what makes it a child process rather than another case below. Before the
+// default hook existed, `saveTerritory` there scheduled nothing and the next agent woke to a cache
+// that predated the work.
+test('a territory written with nothing else loaded still invalidates the cache', () => {
+  const root = freshRoot();
+  const code = [
+    "const { saveTerritory } = await import(" + JSON.stringify(new URL('../backend/territory.mjs', import.meta.url).href) + ");",
+    "saveTerritory('cebu-carers', { label: 'Cebu Carers', kind: 'facebook-group' }, { actor: 'scout-fb' });",
+    // memory.mjs is imported AFTER the write, so its ensureWired() cannot be what scheduled it.
+    "const mem = await import(" + JSON.stringify(new URL('../backend/memory.mjs', import.meta.url).href) + ");",
+    "console.log(JSON.stringify({ flushed: mem.flushCacheRegen(), v: mem.cacheVersion({}).v }));",
+  ].join('\n');
+  const out = execFileSync(process.execPath, ['--input-type=module', '-e', code], {
+    encoding: 'utf8',
+    env: { ...process.env, SCOUT_DATA: root, SCOUT_CONFIG: path.join(root, 'config.md'), SCOUT_TEST: '1', SCOUT_NO_LISTEN: '1' },
+  });
+  const got = JSON.parse(out.trim().split('\n').pop());
+  assert.equal(got.flushed, true, 'the write scheduled a regeneration with no route and no hook wired');
+  assert.equal(got.v, 1, 'and the cache it produced is the first version of that workspace');
+});
+
+test('every memory write invalidates the cache by itself, with no route registered', () => {
+  seed();
+  cancelCacheRegen();
+  const writes = [
+    () => writeMe('Crystal, updated.', {}, { actor: 'crystal' }),
+    () => saveGoal('book-8', { target: 9 }, { actor: 'crystal' }),
+    () => savePlaybook('posting-windows', { wins: 3, evidence: ['[[e]]'] }, { actor: 'scout-fb' }),
+    () => saveLearning('video-beats-photos', { claim: 'x', evidence: ['[[e]]'] }, { actor: 'crystal' }),
+    () => saveTerritory('nurses-ph', { last_swept: day(0) }, { actor: 'scout-fb' }),
+  ];
+  for (const w of writes) {
+    cancelCacheRegen();
+    const before = cacheVersion({}).v;
+    w();
+    assert.equal(flushCacheRegen(), true, 'the write scheduled a regeneration');
+    assert.equal(cacheVersion({}).v, before + 1);
+  }
+  cancelCacheRegen();
 });

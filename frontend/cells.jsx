@@ -14,7 +14,7 @@ import { sx } from './sx';
 import { MONO } from './tokens';
 import { Freshness } from './Freshness';
 import { useContextMenu } from './ContextMenu';
-import { Chip } from './ui';
+import { Chip, Input } from './ui';
 
 const mono = (extra = '') => ({ ...sx('font-size:11px;font-weight:500;font-variant-numeric:tabular-nums;' + extra), fontFamily: MONO });
 
@@ -385,12 +385,22 @@ const StatusEditor = props => <ChoiceEditor {...props} showGroup />;
 
 // ── multiselect ────────────────────────────────────────────────────────────────────────────────
 // The chips are `Chip` from the registry (ui.jsx). Clicking one drops it, exactly as the design
-// draws it; `+ tag` opens the remaining options.
+// draws it; `+ tag` opens the remaining options. A multiselect with NO options[] is an OPEN
+// VOCABULARY — a tag field (backend/collections.mjs FIELD_TYPES, docs/02_DATA_MODEL.md §2) — so
+// there is nothing for `+ tag` to offer, and the affordance is a typed one instead.
 function MultiSelectEditor({ field, value, onChange }) {
   const menu = useContextMenu();
   const chosen = asList(value).map(String);
-  const rest = optionsOf(field).filter(o => !chosen.includes(String(o.value)));
+  const all = optionsOf(field);
+  const open = !all.length;
+  const rest = all.filter(o => !chosen.includes(String(o.value)));
   const items = rest.map(o => ({ label: String(o.value), onClick: () => onChange([...chosen, o.value]) }));
+  const [draft, setDraft] = React.useState('');
+  const add = () => {
+    const t = draft.trim();
+    setDraft('');
+    if (t && !chosen.includes(t)) onChange([...chosen, t]);
+  };
   return (
     <>
       <span style={sx('display:inline-flex;align-items:center;gap:5px;flex-wrap:wrap')}>
@@ -399,7 +409,15 @@ function MultiSelectEditor({ field, value, onChange }) {
             title="Remove" onClick={() => onChange(chosen.filter(x => x !== t))}
             style={{ ...sx('border-radius:6px'), borderColor: colourOf(field, t) === 'var(--border-2)' ? 'var(--border-2)' : colourOf(field, t) }} />
         ))}
-        {items.length ? (
+        {open ? (
+          <Input value={draft} placeholder="+ tag" aria-label="Add a tag"
+            onChange={e => setDraft(e.target.value)} onBlur={add}
+            onKeyDown={e => {
+              if (e.key === 'Enter') { e.preventDefault(); add(); }
+              if (e.key === 'Escape') setDraft('');
+            }}
+            style={{ ...mono('font-size:10px;font-weight:600'), ...sx('width:96px;height:22px;padding:0 8px;border-radius:6px') }} />
+        ) : items.length ? (
           <button type="button" onClick={menu.open(items)} className="hFgL"
             style={{ ...BARE, ...mono('font-size:10px;font-weight:600;height:22px;padding:0 8px;border-radius:6px'), color: 'var(--fg-faint)' }}>
             + tag

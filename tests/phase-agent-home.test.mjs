@@ -12,7 +12,8 @@ import { saveSettings } from '../backend/store.mjs';
 import {
   renderIndex, renderCoreApiRef, prepareAgentHome, agentHomeDir, systemRouterDir,
   listSkillPacks, packId, readHouseRules, writeHouseRules, houseRulesActive,
-  registerChatTool, clearChatTools, listChatTools, chatSkillsSurface
+  registerChatTool, clearChatTools, listChatTools, chatSkillsSurface,
+  selfPort, selfApiBase, setSelfPort
 } from '../backend/agentHome.mjs';
 
 // ── build a fake global skill dir + a mountable multi-file pack repo ──
@@ -260,4 +261,45 @@ test('toggling a pack changes the next session Index via the HTTP route', async 
   idx = await req('GET', '/api/chat/sessions/' + sid + '/index');
   assert.match(idx.body.index, new RegExp('\\[skills/' + id + '\\]'));
   assert.ok(fs.existsSync(idx.body.coreApiRef));
+});
+
+// ── the api base the Index promises ────────────────────────────────────────────────────────────
+//
+// The Index's `api:` line is the first thing an agent reads and the base of every call it makes,
+// so a wrong port is not a cosmetic defect — it is ECONNREFUSED on the agent's first request. The
+// fallback was 5176, which is FrameForge's port; Scout's is 5177 (CLAUDE.md §Ports). And an
+// ephemeral bind (`listen(0)`, which is what `npm run demonstrate` and every harness does) has a
+// port no environment variable can predict, so the process that binds has to inject it.
+test('the Index names the port that is actually bound, and 5177 when nothing is', () => {
+  const savedEnv = process.env.SCOUT_SELF_PORT;
+  const savedArgv = process.argv[2];
+  const savedPort = process.env.PORT;
+  try {
+    delete process.env.SCOUT_SELF_PORT;
+    delete process.env.PORT;
+    process.argv[2] = undefined;
+    setSelfPort(null);
+    assert.equal(selfPort(), 5177, 'Scout is 5177 — 5176 is the app this one was forked from');
+    assert.match(renderIndex({ project: null, packs: [], tools: [] }), /api: http:\/\/127\.0\.0\.1:5177/);
+
+    setSelfPort(49321);
+    assert.equal(selfApiBase(), 'http://127.0.0.1:49321');
+    assert.match(renderIndex({ project: null, packs: [], tools: [] }), /api: http:\/\/127\.0\.0\.1:49321/);
+    assert.equal(process.env.SCOUT_SELF_PORT, '49321',
+      'and a spawned agent process inherits the same answer');
+
+    // The injected port is the truth IN THIS PROCESS, not a read of the environment — otherwise
+    // anything that clears the variable silently moves the Index back to a port nothing is on.
+    delete process.env.SCOUT_SELF_PORT;
+    assert.equal(selfPort(), 49321, 'the bound port survives the environment being cleared');
+
+    setSelfPort(null);
+    assert.equal(process.env.SCOUT_SELF_PORT, undefined,
+      'and a reset clears both halves — a stale port in the environment is worse than none');
+  } finally {
+    setSelfPort(null);
+    if (savedEnv === undefined) delete process.env.SCOUT_SELF_PORT; else process.env.SCOUT_SELF_PORT = savedEnv;
+    if (savedPort === undefined) delete process.env.PORT; else process.env.PORT = savedPort;
+    process.argv[2] = savedArgv;
+  }
 });

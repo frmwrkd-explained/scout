@@ -11,7 +11,6 @@ created_by: vetter
 updated: '2026-09-05'
 updated_by: vetter
 verified_at: '2026-09-05'
-proposed: true
 ---
 Found by the vetter while checking a referral. Nobody has asked to join yet —
 it is the obvious next piece of ground for the hazing project.
