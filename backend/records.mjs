@@ -39,12 +39,18 @@ let emit = logEvent;
 let onMutation = () => {};
 const touched = () => { try { onMutation(); } catch { /* a stale _known.md never fails a write */ } };
 
+// Identity lives in ONE place now (backend/actors.mjs) — this module used to define it, and
+// memory.mjs defined a second copy that disagreed with it. Re-exported here so every existing
+// importer, and every test, keeps reaching for it where it has always been.
+import { DEFAULT_ACTOR, isAgentActor, actorRegistry } from './actors.mjs';
+import { slugify } from './store.mjs';
+export { DEFAULT_ACTOR, isAgentActor, actorRegistry, slugify };
+
 // ── constants ──────────────────────────────────────────────────────────────────────────────────
 
 export const ARCHIVE_REASONS = ['off-target', 'bad-data', 'duplicate', 'wrong-tone', 'already-contacted'];
 export const AGENT_MAX_STAGE = 'shortlist';   // index into the gate field's options
 export const MERGE_CONFIDENCE = 60;           // >= this merges into the existing record (T06 step 3)
-export const DEFAULT_ACTOR = 'crystal';       // §3: a UI call with no actor is the human
 
 export class RecordError extends Error {
   constructor(message, status = 400, extra = {}) { super(message); this.status = status; Object.assign(this, extra); }
@@ -55,56 +61,19 @@ export class RecordError extends Error {
 const PIPELINE_FIELDS = new Set([...AUTO_FIELDS, 'provenance', 'archived', 'archived_at', 'archived_by', 'archive_reason', 'archived_from', 'history']);
 const INPUT_CONTROL_FIELDS = new Set(['collection', 'id', 'path', 'body', 'content', 'actor', 'via', 'rev']);
 
-// ── actors ─────────────────────────────────────────────────────────────────────────────────────
-// Which actor ids are humans is DATA, not a hard-coded list — but the default direction matters
-// more than the list does. An unknown actor is treated as an AGENT, not as a human: least
-// privilege at the border. The opposite default would mean an agent that invents an actor id
-// (`sweeper-2`) walks straight through Law 4, and the gate would only ever catch the honest.
-//
-// A human is: named in `.scout/actors.md` `humans:`, or the identity in `me.md`, or — when neither
-// file exists yet — the app's default actor. An id with `assistants/<id>.md` on disk is always an
-// agent (M4's canonical home), whatever else it claims.
+// ── actors ───────────────────────────────────────────────────────────────────────────────────
+// Moved to `backend/actors.mjs`, which is now the ONLY answer to "is this actor an agent?".
+// memory.mjs carried a second copy that disagreed about an empty actor and about where the human
+// is declared; Law 4 cannot mean two things in two files. Imported and re-exported above so this
+// module's public surface is unchanged.
 
 const R = () => getStorageRoot();
-
-function actorRegistry() {
-  const reg = { humans: new Set([DEFAULT_ACTOR]), agents: new Set() };
-  try {
-    const { data } = readMd(path.join(R(), '.scout', 'actors.md'));
-    for (const h of [].concat(data.humans || [])) reg.humans.add(String(h));
-    for (const a of [].concat(data.agents || [])) reg.agents.add(String(a));
-  } catch { /* no registry — me.md and the default carry it */ }
-  try {
-    const { data } = readMd(path.join(R(), 'me.md'));
-    const id = data.id || (data.name ? slugify(data.name) : null);
-    if (id) reg.humans.add(String(id));
-  } catch { /* no me.md yet — first run */ }
-  return reg;
-}
-
-export function isAgentActor(actor) {
-  const id = String(actor || '').trim();
-  if (!id) return true;                       // unattributed is untrusted
-  const reg = actorRegistry();
-  if (reg.agents.has(id)) return true;        // explicit beats everything
-  try { if (fs.existsSync(path.join(R(), 'assistants', id + '.md'))) return true; } catch { /* none */ }
-  return !reg.humans.has(id);
-}
 
 // ── paths and slugs ────────────────────────────────────────────────────────────────────────────
 // `store.mjs safe()` is for filesystem safety, not for identity: safe('Maria Santos') is
 // `Maria_Santos`, and the store's own shape is `maria-santos.md`. One slugifier, exported, so the
 // second one never gets written.
 
-export function slugify(s) {
-  return String(s || '')
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/['’]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 80) || 'untitled';
-}
 
 const rel = (abs) => path.relative(R(), abs).split(path.sep).join('/');
 

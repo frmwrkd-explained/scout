@@ -18,6 +18,7 @@ FrameForge's own `CLAUDE.md`, `README.md` and `ISSUES.md` are preserved as `docs
 | Datastore, paths, atomic writes, path safety | `backend/store.mjs` | `readMd`, `writeMd`, `paths`, `safe`, `safeScope`, `slugify` |
 | Collection schemas + field types | `backend/collections.mjs` | The ONLY place a field type is defined. See `docs/02_DATA_MODEL.md`. |
 | The four write verbs + near-match | `backend/records.mjs` | `upsertRecord`, `nearMatches`. **The only writer of document files.** |
+| Actor identity — is this a person or an agent | `backend/actors.mjs` | `isAgentActor` (the border rule), `isAgentForOwnedMemory` (`me.md` + `goals/`), `actorRegistry`, `DEFAULT_ACTOR`. The ONLY answer to the question; `records.mjs` and `memory.mjs` re-export, never redefine. |
 | Views (table/board/list/gallery) | `backend/views.mjs` | Saved in-vault so views travel and an agent can create one |
 | Memory + the hot cache | `backend/memory.mjs` | `renderCache` is the ONLY producer of the agent's wake-up context |
 | Decay | `backend/decay.mjs` | One function decides staleness for every object type. Never inline a second rule. |

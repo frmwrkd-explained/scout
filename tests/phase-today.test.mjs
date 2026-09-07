@@ -16,7 +16,11 @@ import { loadJsx } from './helpers.mjs';
 
 const { clock, normRun, overnightLines } = await loadJsx('frontend/Today.jsx');
 
-const at = (h, m = 0) => new Date(2026, 7, 26, h, m, 0, 0);
+// TODAY's date, never a fixed one. `overnightStart()` is relative to the current day (00:00
+// minus six hours), so a hard-coded calendar date passes on the afternoon it is written and
+// fails every day after — this file's fixtures were pinned to 2026-08-26 and the window test
+// had been red ever since. A fixture for a relative-time function has to be relative too.
+const at = (h, m = 0) => { const d = new Date(); d.setHours(h, m, 0, 0); return d; };
 const sources = { proposals: true, goals: true, assistants: true, runs: true, activity: true };
 
 test('clock reads a moment in either shape its own file produces', () => {

@@ -121,6 +121,21 @@ export function safe(name) { return name.replace(/[^\w.\-]+/g, '_'); }
 // never fires — strip everything but the slug charset so '../' can never escape the root.
 export function safeScope(s) { return String(s || '').replace(/[^\w-]+/g, ''); }
 
+// Identity, not filesystem safety — the two are different jobs and were once the same function.
+// `safe('Maria Santos')` is `Maria_Santos`; the store's own shape is `maria-santos.md`. ONE
+// slugifier, exported from here because CLAUDE.md's source-of-truth table has always said this is
+// where it lives — it just was not true until now (it sat in records.mjs, with two more copies
+// elsewhere). `records.mjs` re-exports it so every existing importer keeps working.
+export function slugify(s) {
+  return String(s || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/['\u2019]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || 'untitled';
+}
+
 // ── settings ──
 // Defaults ship EMPTY of personal paths — a fresh install points at the buyer's own skills
 // via Settings (or ~/.claude/skills, picked up automatically when present).

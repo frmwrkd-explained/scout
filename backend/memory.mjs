@@ -13,6 +13,7 @@ import matter from 'gray-matter';
 import { isQuarantined as isQuarantinedRule } from './records.mjs';
 import { getStorageRoot, stamp, safeScope, dayMs } from './store.mjs';
 
+import { isAgentActor, isAgentForOwnedMemory } from './actors.mjs';
 // safeScope is the one project-id sanitizer (store.mjs) — an allowlist, and the same one
 // contextDir() uses, so memory/_folders and the context boards always agree on the directory.
 const projDir = pid => path.join(getStorageRoot(), 'projects', safeScope(pid));
@@ -304,32 +305,19 @@ function listDir(dir, type) {
 // (4) is deliberately fail-OPEN: a brand-new workspace has a placeholder `me.md` and no assistants,
 // and a rule that locks the person out of writing their own identity on day one would fail the
 // only gate that matters more (GOAL.md §4.1 — productive in 15 minutes).
-function sameActor(id, raw) {
-  const a = String(id || '').trim().toLowerCase();
-  const b = String(raw || '').trim().toLowerCase();
-  if (!a || !b) return false;
-  return a === b || a === b.split(/\s+/)[0] || a === b.replace(/\s+/g, '-');
-}
-function ownerOf(data = {}) {
-  for (const raw of [data.owner, data.created_by, data.name]) {
-    const s = String(raw || '').trim();
-    if (s && !s.startsWith('__')) return s; // `__NAME__` is the workspace-template placeholder
-  }
-  return null;
-}
-export function isAgentActor(actor) {
-  const id = String(actor || '').trim();
-  if (!id) return false; // no actor at all → the UI's human default (docs/08 §3)
-  if (fs.existsSync(path.join(R2(), 'assistants', safe(id) + '.md'))) return true;
-  let data = {};
-  try { data = readMd(scoutPaths.me()).data || {}; } catch { /* no me.md yet */ }
-  const declared = [].concat(data.agents ?? []).map(String);
-  if (declared.some(a => sameActor(id, a))) return true;
-  const owner = ownerOf(data);
-  return owner ? !sameActor(id, owner) : false;
-}
+// `sameActor`/`ownerOf`/`isAgentActor` used to live here — a SECOND answer to "is this an agent?",
+// and it disagreed with records.mjs on both cases that matter (an empty actor, and where the human
+// is declared). The live consequence: a workspace whose me.md carried `name: Theo` had `theo`
+// accepted as a human by the record pipeline and refused as an agent here, so the person could
+// promote a record but not correct their own identity. One rule, one function — backend/actors.mjs.
+// Re-exported because tests/phase-cache.test.mjs and the routes below import it from this module.
+export { isAgentActor };
+
+// `me.md` and `goals/` are the PERSON's files, so they use the owned-memory rule, which is open on
+// a workspace that has declared nobody yet. Everything else in this module — the learning gate
+// below — uses the strict border rule, same as the record pipeline.
 function refuseAgent(actor, what) {
-  if (isAgentActor(actor)) {
+  if (isAgentForOwnedMemory(actor)) {
     hooks.logEvent({ type: 'refused', actor, target: what, detail: { why: 'human-owned' } });
     throw new MemoryError(what + ' is human-owned — an agent may only propose a change to it', 403);
   }
