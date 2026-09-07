@@ -309,3 +309,69 @@ test('three agents claiming from one queue concurrently: no lost task, no double
     + results.map(r => r.actor + '=' + r.won.length).join(' ') + ' · dupes=0 · lost=0\n');
   assert.ok(fs.existsSync(root));
 });
+
+// ── what the card asks her, and what a task is called ─────────────────────────────────────────
+//
+// Both of these were found by driving the app the way a human and an assistant actually do, with
+// the whole suite green. See docs/decisions.md — "the agent's path was exercised and the human's
+// was not" is the same shape a third time.
+
+test('a blocked task asks HER QUESTION, not its own id', async () => {
+  freshRoot(); seedProjectDir('p');
+  // exactly what backend/agentIndex.mjs tells an agent to send: "blocked with needs_human and a
+  // plain-language question", through frontend/api.js's { patch, actor } envelope.
+  await req('POST', '/api/tasks', { project: 'p', title: 'Check UK scope', actor: 'scout' });
+  const r = await req('PATCH', '/api/tasks/check-uk-scope', {
+    patch: { status: 'blocked', needs_human: true, question: 'Are UK-based nurses in scope?' },
+    project: 'p', actor: 'scout',
+  });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.question, 'Are UK-based nurses in scope?', 'the question must round-trip onto the file');
+
+  const [card] = listProposals({ status: 'open' });
+  assert.ok(card, 'a blocked task with needs_human must raise a card');
+  assert.equal(card.kind, 'question');
+  // The defect: the card asked her `task.body || task.title`, and with no body that is the slug id.
+  assert.equal(card.question, 'Are UK-based nurses in scope?');
+  assert.notEqual(card.question, 'check-uk-scope');
+});
+
+test('a task named only by its label is asked by that label, and a body still wins over nothing', async () => {
+  freshRoot(); seedProjectDir('p');
+  // The interview writes every task with `label` and no title (backend/intake.mjs startFirstWork).
+  await req('POST', '/api/tasks', {
+    project: 'p', label: 'Look through Nurses PH for guests', status: 'blocked', needs_human: true,
+    body: 'Do you want the private group or the public page?', actor: 'scout',
+  });
+  const [card] = listProposals({ status: 'open' });
+  assert.equal(card.question, 'Do you want the private group or the public page?');
+  assert.equal(card.title, 'Look through Nurses PH for guests', 'the card names the task the way the screen does');
+});
+
+test('two tasks named only by their label are two files, not one merged one', async () => {
+  freshRoot(); seedProjectDir('p');
+  // `id || slugify(patch.title)` derived `untitled` from a label-only task, and saveTask MERGES —
+  // so the second POST landed on the first one's file and inherited its territory. Laws 5 and 6.
+  const a = await req('POST', '/api/tasks', { project: 'p', label: 'Sweep nurses-ph', territory: 'nurses-ph', actor: 'scout' });
+  const b = await req('POST', '/api/tasks', { project: 'p', label: 'Sweep ofw-uk', territory: 'ofw-uk', actor: 'scout' });
+  assert.equal(a.status, 200);
+  assert.equal(b.status, 200);
+  assert.notEqual(a.body.id, b.body.id, 'both labels slugified to the same id');
+  assert.equal(b.body.territory, 'ofw-uk', "the first task's territory leaked onto the second");
+
+  const files = fs.readdirSync(path.join(R(), 'projects', 'p', 'tasks')).filter(f => f.endsWith('.md')).sort();
+  assert.deepEqual(files, ['sweep-nurses-ph.md', 'sweep-ofw-uk.md']);
+  assert.equal(listTasks({ project: 'p' }).length, 2);
+});
+
+test('a task with no title, no label and no id is a 400 that says so — never a file called untitled', async () => {
+  freshRoot(); seedProjectDir('p');
+  const r = await req('POST', '/api/tasks', { project: 'p', status: 'open', actor: 'scout' });
+  assert.equal(r.status, 400);
+  assert.match(r.body.error, /a task needs a title/);
+  assert.ok(!fs.existsSync(path.join(R(), 'projects', 'p', 'tasks', 'untitled.md')));
+  // and the second half of the guard, for any caller that is not the route
+  assert.throws(() => saveTask('p', 'untitled', { status: 'open' }, { actor: 'scout' }), /a task needs a title/);
+  // a task somebody genuinely called "Untitled" still saves — it arrives with a name
+  assert.equal(saveTask('p', 'untitled', { label: 'Untitled' }, { actor: 'scout' }).label, 'Untitled');
+});

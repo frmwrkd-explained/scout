@@ -25,6 +25,13 @@ export const FIELD_TYPES = {
   text:        { opts: ['multiline'] },
   number:      { opts: ['display', 'min', 'max', 'precision'], displays: ['plain', 'bar', 'stars', 'currency'] },
   select:      { opts: ['options'] },
+  // AN OPEN VOCABULARY WHEN IT DECLARES NO `options[]` — a tag field, where the next tag is legal
+  // because the person typed it. `select` and `status` still require options: they are a fixed set
+  // with a colour, and a status option is also a board column, so an undeclared one has nowhere to
+  // render. Declared options on a multiselect are still validated. (docs/decisions.md, "seeding
+  // ambiguity 1", resolved in favour of the open vocabulary — the shipped `#guest` collection has
+  // shipped `tags: multiselect` with no options since M1, and the old rule made every later write
+  // of that schema, including every `+ Add property`, a 400 naming a field nobody had touched.)
   multiselect: { opts: ['options'] },
   // NOT the same as select: `group` drives board columns, "what's open", and completion counts.
   status:      { opts: ['options', 'gate'], groups: ['todo', 'active', 'done'] },
@@ -81,10 +88,18 @@ function validateField(f, i, { collectionIds }) {
   if (def.fns && f.fn && !def.fns.includes(f.fn)) {
     throw new SchemaError(where + ': fn "' + f.fn + '" is not one of ' + def.fns.join(' · '));
   }
-  if ((f.type === 'select' || f.type === 'multiselect' || f.type === 'status')) {
+  // A fixed set is required for `select` and `status` and OPTIONAL for `multiselect` (see the type
+  // table above). Whatever IS declared is validated, on all three — an open vocabulary is a field
+  // with no options, never a field with a broken one.
+  if (f.type === 'select' || f.type === 'status') {
     if (!Array.isArray(f.options) || !f.options.length) {
       throw new SchemaError(where + ': ' + f.type + ' needs a non-empty options[]');
     }
+  }
+  if (f.options !== undefined && !Array.isArray(f.options)) {
+    throw new SchemaError(where + ': options must be a list, not ' + typeof f.options);
+  }
+  if (Array.isArray(f.options)) {
     for (const o of f.options) {
       const v = typeof o === 'string' ? o : o && o.value;
       if (!v) throw new SchemaError(where + ': every option needs a value');
@@ -104,28 +119,50 @@ function validateField(f, i, { collectionIds }) {
   if (f.type === 'formula' && !f.expr) throw new SchemaError(where + ': formula needs `expr`');
 }
 
-export function validateSchema(schema, { selfId = null } = {}) {
+// The preamble every door shares: a collection is an object, with a kebab-case id and at least one
+// field. Returns the fields so callers do not re-reach for them.
+function schemaFields(schema) {
   if (!schema || typeof schema !== 'object') throw new SchemaError('a collection must be an object');
   if (!schema.id || !/^[a-z][a-z0-9-]*$/.test(schema.id)) throw new SchemaError('id must be lower-kebab-case');
   const fields = schema.fields;
   if (!Array.isArray(fields) || !fields.length) throw new SchemaError('a collection needs at least one field');
+  return fields;
+}
 
-  // A relation may point at the collection being written, which is not on disk yet on create.
-  const collectionIds = [...new Set([...listCollectionIds(), selfId, schema.id].filter(Boolean))];
-  fields.forEach((f, i) => validateField(f, i, { collectionIds }));
+// The shape of the collection itself, independent of whether each field is well formed: no
+// duplicate keys, exactly one primary, at most one gate. Split out from the per-field pass because
+// `addField` needs THESE checked over the whole schema while only the field being added is checked
+// in full — see addField().
+function validateInvariants(schema) {
+  const fields = schemaFields(schema);
 
-  const keys = fields.map(f => f.key);
+  const keys = fields.map(f => f && f.key);
   const dupe = keys.find((k, i) => keys.indexOf(k) !== i);
   if (dupe) throw new SchemaError('duplicate field key "' + dupe + '"');
 
-  const primaries = fields.filter(f => f.primary);
+  const primaries = fields.filter(f => f && f.primary);
   if (primaries.length !== 1) {
     throw new SchemaError('a collection has exactly one primary: true field (the document title) — found ' + primaries.length);
   }
-  const gates = fields.filter(f => f.gate);
+  const gates = fields.filter(f => f && f.gate);
   if (gates.length > 1) throw new SchemaError('at most one gate: true status field — found ' + gates.length);
   if (gates.length && gates[0].type !== 'status') throw new SchemaError('gate: true belongs on a status field, not a ' + gates[0].type);
+  return fields;
+}
 
+// A relation may point at the collection being written, which is not on disk yet on create.
+function knownCollectionIds(...extra) {
+  return [...new Set([...listCollectionIds(), ...extra].filter(Boolean))];
+}
+
+export function validateSchema(schema, { selfId = null } = {}) {
+  const fields = schemaFields(schema);
+  const collectionIds = knownCollectionIds(selfId, schema.id);
+  // Per-field FIRST, then the schema-level invariants. The per-field message is the one anybody
+  // actually reads — it names what that type DOES allow — and reversing the two turns
+  // `gate: true` on a text field into the vaguer whole-schema complaint.
+  fields.forEach((f, i) => validateField(f, i, { collectionIds }));
+  validateInvariants(schema);
   return schema;
 }
 
@@ -153,20 +190,53 @@ export function listCollections() {
   return listCollectionIds().map(getCollection).filter(Boolean);
 }
 
-export function saveCollection(schema) {
-  const existing = getCollection(schema.id);
-  validateSchema(schema, { selfId: existing ? schema.id : null });
+// The ONE writer of a collection file. Both doors below validate their own way and land here, so
+// there is a single place that turns a schema into bytes.
+function writeCollection(schema) {
   const { description, ...frontmatter } = schema;
   writeMd(collectionFile(schema.id), frontmatter, description ? description + '\n' : '');
   return getCollection(schema.id);
 }
 
+export function saveCollection(schema) {
+  const existing = getCollection(schema.id);
+  validateSchema(schema, { selfId: existing ? schema.id : null });
+  return writeCollection(schema);
+}
+
 // Adding a field never rewrites existing documents. Missing = empty (§2).
+//
+// This validates THE FIELD BEING ADDED in full, plus the schema-level invariants — and deliberately
+// does NOT re-validate the siblings that were already on disk. It used to, through saveCollection,
+// and the shipped `#guest` collection declares `tags: multiselect` with no options[]: under the old
+// rule that field was invalid, so EVERY later write of that schema 400ed with
+// `fields[7] (tags): multiselect needs a non-empty options[]`. `+ Add property` had therefore never
+// worked on the shipped collection, for the human (AddField.jsx) or for an accepted agent `schema`
+// card (GOAL gate 8) — and the error named a field nobody had touched.
+//
+// A bad neighbour is now NAMED and returned as a warning rather than allowed to block a write that
+// was not aimed at it. Not silent (Law 8), not fatal.
 export function addField(id, field) {
   const c = getCollection(id);
   if (!c) throw new SchemaError('no collection "' + id + '"');
-  if ((c.fields || []).some(f => f.key === field.key)) throw new SchemaError('field "' + field.key + '" already exists on ' + id);
-  return saveCollection({ ...c, fields: [...(c.fields || []), field] });
+  if (!field || typeof field !== 'object' || Array.isArray(field)) {
+    throw new SchemaError('a field is an object: { key, type, ... }');
+  }
+  const fields = [...(c.fields || [])];
+  if (fields.some(f => f && f.key === field.key)) throw new SchemaError('field "' + field.key + '" already exists on ' + id);
+
+  const collectionIds = knownCollectionIds(id);
+  validateField(field, fields.length, { collectionIds });
+  const next = { ...c, fields: [...fields, field] };
+  validateInvariants(next);
+
+  const warnings = [];
+  fields.forEach((f, i) => {
+    try { validateField(f, i, { collectionIds }); }
+    catch (e) { warnings.push('existing field `' + ((f && f.key) || i) + '` is invalid: ' + e.message); }
+  });
+  const saved = writeCollection(next);
+  return warnings.length ? { ...saved, warnings } : saved;
 }
 
 export function fieldOf(collection, key) {

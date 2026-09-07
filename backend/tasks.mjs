@@ -67,6 +67,22 @@ export function slugify(s) {
     .replace(/[^\w]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'untitled';
 }
 
+// What `slugify` returns when it was given nothing. Named because two places have to recognise it.
+const UNTITLED = 'untitled';
+
+// THE ONE PLACE A TASK ID IS DERIVED. `POST /api/tasks` used to do `id || slugify(patch.title)`,
+// and the human line on a task lives in `label` (that is how the interview writes all three of
+// hers) — so a task posted with only a `label` slugified to `untitled`, and `saveTask` MERGES into
+// an existing file. Two such tasks became ONE file carrying the second one's label over the first
+// one's territory: a task silently overwritten (Law 5) and two entities in one file (Law 6).
+export function taskIdFrom({ id = null, title = null, label = null } = {}) {
+  const given = String(id || '').trim();
+  if (given) return given;
+  const named = String(title || '').trim() || String(label || '').trim();
+  if (!named) throw new TaskError('a task needs a title — pass `title` (or `label`), or name the `id` yourself');
+  return slugify(named);
+}
+
 // The event log is another module's contract (docs/08 §1) and may not have landed yet. Resolve it
 // at call time: an injected logEvent wins, then backend/log.mjs, then nothing. This is an adapter
 // to someone else's signature, not a second log — never write log lines here.
@@ -169,6 +185,16 @@ export function getTask(project, id) {
   };
 }
 
+// The human line on a task lives in `label`, as it does on goals, projects and territory — getTask
+// falls `title` back to the id, so an id-shaped title is not a title, it is the absence of one.
+// Mirrors frontend/Assistants.jsx `taskTitle()`, which is where the same rule is applied on screen;
+// the backend cannot import a .jsx, and a card that names a task must name it the way the screen does.
+export function humanName(task) {
+  if (!task) return '';
+  const title = task.title && task.title !== task.id ? String(task.title).trim() : '';
+  return String(task.label || '').trim() || title || String(task.id || '');
+}
+
 // Route params carry a task id with no project (`POST /api/tasks/:id/claim`), so the id has to be
 // resolvable on its own. Prefer the named project, else the first project holding that file.
 export function findTask(id, { project = null } = {}) {
@@ -201,6 +227,12 @@ export function saveTask(project, id, patch = {}, { actor = 'crystal' } = {}) {
   if (!pid) throw new TaskError('a task belongs to a project — `project` is required');
   const clean = String(id || '').trim();
   if (!ID_RE.test(clean)) throw new TaskError('task id must be a slug (letters, digits, - and _)');
+  // The second half of taskIdFrom's guard, for any caller that is not the route: `untitled` is what
+  // an id derived from nothing looks like, and merging into it is how two tasks became one file.
+  // A task genuinely called "Untitled" still saves — it arrives with a title or a label.
+  if (clean === UNTITLED && !String(patch.title || patch.label || '').trim()) {
+    throw new TaskError('a task needs a title — `untitled` is the id of a task nobody named');
+  }
   if (patch.status && !TASK_STATUS.includes(patch.status)) {
     throw new TaskError('status must be one of ' + TASK_STATUS.join(' · '));
   }
@@ -394,7 +426,7 @@ export function registerTaskRoutes(app, deps = {}) {
   app.post('/api/tasks', async (req, res) => {
     try {
       const { project, id, actor, ...patch } = req.body || {};
-      const taskId = id || slugify(patch.title);
+      const taskId = taskIdFrom({ id, title: patch.title, label: patch.label });
       const t = saveTask(project, taskId, patch, { actor: actorOf(req) });
       await event(deps, { type: 'store', actor: actorOf(req), target: t.path, detail: { task: t.id } });
       // `needs_human: true` pulls the task straight into the DECIDE queue (T12 step 5). One queue —
@@ -452,8 +484,12 @@ async function pullIntoDecide(task, actor, deps) {
     return await propose({
       id: 'task-' + task.project + '-' + task.id,
       kind: 'question',
-      title: task.title,
-      question: task.body || task.title,
+      title: humanName(task),
+      // `question` FIRST. The Index tells an agent to block a task with "needs_human and a
+      // plain-language question", the field round-trips onto the file, and this read it back as
+      // `task.body || task.title` — so the card in DECIDE asked her the task's SLUG. She was handed
+      // "check-uk-scope" and expected to answer it.
+      question: task.question || task.body || task.label || task.id,
       why: 'A task in ' + task.project + ' is blocked and needs an answer.',
       task: task.id,
       project: task.project,

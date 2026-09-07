@@ -1,9 +1,22 @@
-# HANDOVER — Scout, as of 2026-08-26
+# HANDOVER — Scout, as of 2026-09-07
 
-**M0–M5 are built. `npm test` is green (625 tests, 623 pass, 2 skipped, 0 fail) and
-`npm run demonstrate` walks GOAL.md's ten gates against a real running app and prints the
-evidence for each one — currently 10 of 10, including gate 1's last clause: a first real
-finding arrives before the session ends.**
+**M0–M5 are built. `npm test` is green (668 tests, 666 pass, 2 skipped, 0 fail) and
+`npm run demonstrate` walks GOAL.md's ten gates against a real running app — from a fresh clone,
+against the checked-in `workspace-demo/` — and prints the evidence for each one: 10 of 10,
+including gate 1's last clause: a first real finding arrives before the session ends.**
+
+The runner is wired. `backend/dispatch.mjs` puts an assistant out through a local CLI, and
+TODAY's one accent fill is that button — see `docs/decisions.md`, "Wiring the runner". Actor
+identity, which used to be answered twice and differently, is now one function in
+`backend/actors.mjs`.
+
+The 2026-09-06 finishing pass: three auditors walked the app the way a person and an agent do and
+reproduced 45 findings; the fixes and the calls taken are in `docs/decisions.md` under that date.
+The short version — the DECIDE queue's `question` card could not be accepted, an agent's overnight
+finds never reached the queue, `PATCH /api/records` let an agent rewrite `me.md`, memory edits made
+on the document surface never reached the hot cache, the MCP door never invalidated it, goals could
+not be created, TODAY's one accent fill was dead, there was no search, no settings, no theme
+control, and ~4,450 lines of FrameForge frontend nothing imported. All closed.
 
 This file tells you where things stand, what was decided, and what will bite you. It does not
 replace the spec — it tells you how the spec has actually been applied.
@@ -32,8 +45,9 @@ Then `docs/02_DATA_MODEL.md`, `03_MEMORY.md`, `04_AGENT_CONTRACT.md`, `05_UI_SPE
 ```bash
 npm ci
 find . -name "._*" -not -path "./node_modules/*" -delete   # ALWAYS, see §3
-npm test                     # 625 tests
-npm run demonstrate          # the ten gates, against a throwaway copy of workspace/
+npm test                     # 668 tests
+npm run demonstrate          # the ten gates, against a throwaway copy of the workspace
+npm run demo                 # workspace-demo/ → workspace/, so `npm start` has something in it
 npm run server               # express on 5177
 npm run dev                  # vite on 5178, proxies /api → 127.0.0.1:5177
 ```
@@ -51,6 +65,24 @@ agentCommand: <repo>/tests/fixtures/stub-sortie.mjs
 
 It reads its brief, finds the API base and its own actor id in it, and writes a finding through
 door 1 — the same gated, deduped, logged pipeline `_inbox/` and MCP go through.
+
+### There are two workspaces, and only one of them is yours
+
+`workspace/` is **a user's data** and is gitignored, so a fresh clone does not have one.
+`workspace-demo/` is a **checked-in fixture** — Crystal, 22 guests, 8 groups, 7 pieces of ground, a
+DECIDE queue and a memory that already decays — with nobody's real names in it.
+
+- **`npm run demonstrate`** copies `workspace/` when it exists and `workspace-demo/` when it does
+  not, and **prints which one it used**. Both are copied to a temp dir first: a demonstration that
+  mutates the workspace it is demonstrating can only be run once.
+- **`npm run demo`** copies `workspace-demo/` → `workspace/` and sweeps `._*` on the way in. It
+  **refuses to overwrite an existing `workspace/`** — one line, exit 1. Law 5 is not a rule about
+  the app only, and a convenience script that clobbers somebody's vault to save them one `rm` is
+  the same failure with a friendlier name.
+- Edit the fixture the way you would edit any vault: it is plain markdown, and every file in it is
+  in the exact shape the pipeline writes (`docs/decisions.md`, "A checked-in demonstration
+  workspace"). `workspace-demo/data/guests/ana-villaflor.md` is deliberately left without
+  `provenance: pipeline` — see §6.
 
 ---
 
@@ -308,6 +340,16 @@ pick its proxy target. Pass the port as argv. The proxy target stays `127.0.0.1`
 4. **`documentsFor()` still counts quarantined rows**; the route filters them, and
    `sweepQuarantine()` runs at boot so the flag is on disk and `territory.mjs` scores agree. If you
    add a third consumer, call `isQuarantined` from `records.mjs` — do not write a second predicate.
+4b. **`moveRecord` and `upsertRecord` on a collection whose home is outside `data/`** (the
+   template's `#territory` over `territory/**`) write through the generic writer rather than
+   `saveTerritory`, so a board drag on a territory skips the `access_changed` stamp. `patchRecord`
+   DOES delegate — it is the only writer that calls `delegateFor` (`docs/08` §3). Not a gate hole —
+   the gate still refuses agents and the cache still bumps — but the same shape one level up.
+   Delegating means making `moveRecord` async.
+4c. **`frontend/api.js` still carries FrameForge-only methods** (`/api/board`, `/api/assets`,
+   `/api/generations`, `/api/manual`, …) beside the SCOUT block. Their callers are deleted; the
+   methods were left because pruning them needs a grep per method against the surviving surfaces.
+   A method for a route that 404s is a lie about what the app can do — prune them.
 5. **Light mode deviates from `docs/05_UI_SPEC.md` §4 in three tokens** — `--fg-muted`, `--fg-faint`
    and `--warn`, because §4's printed values fail §4's own 4.5:1 rule (`--fg-faint` measured 2.78:1).
    Hue and saturation kept, lightness only. `tests/phase-theme-contrast.test.mjs` asserts every pair
@@ -347,7 +389,7 @@ GATE 4  The gate holds
    ✓ so is the quarantine
 ```
 
-`workspace/data/guests/ana-villaflor.md` is **deliberately** left without `provenance: pipeline` so
+`workspace-demo/data/guests/ana-villaflor.md` is **deliberately** left without `provenance: pipeline` so
 the quarantine state is visible in the UI and provable in the demonstration. It is not a mistake.
 
 Gate 1 ends with the clause this project could not demonstrate until the runner was wired:
@@ -371,11 +413,22 @@ and lands a gated record. The judgement is whatever CLI she connects.
 
 ## 7 · If you are picking this up cold
 
-Run `npm run demonstrate` first. It boots the real app against a copy of the workspace, walks the
-ten gates in the order a person meets them, and prints what it saw. In four minutes you will know
-more about this codebase than this document can tell you — and if something is broken, it will name
-the gate rather than the stack frame.
+Run `npm run demonstrate` first. It boots the real app against a copy of the workspace — yours if
+you have one, the checked-in `workspace-demo/` fixture otherwise — walks the ten gates in the order
+a person meets them, and prints what it saw. In four minutes you will know more about this codebase
+than this document can tell you, and if something is broken it will name the gate rather than the
+stack frame.
 
-Then open the app (`npm start`), press `D`, and work the queue with the keyboard. That is the
-product. Then press **Send them out** and watch what comes back — point `agentCommand` at the stub
-first (§1) if you would rather not spend anything to see it.
+Then give yourself a workspace and open the app:
+
+```bash
+npm run demo     # workspace-demo/ → workspace/ ; refuses if you already have one
+npm start        # build + serve on 5177
+```
+
+Press `D` and work the queue with the keyboard. That is the product. From that point `workspace/`
+is yours — it is gitignored, nothing in this repo will overwrite it, and `npm run demo` will refuse
+to run again rather than take it from you.
+
+Then press **Send them out** and watch what comes back — point `agentCommand` at the stub first
+(§1) if you would rather not spend anything to see it.

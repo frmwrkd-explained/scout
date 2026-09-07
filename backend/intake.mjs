@@ -26,7 +26,7 @@ import path from 'node:path';
 import { getStorageRoot, readMd, writeMd } from './store.mjs';
 import { listCollectionIds, getCollection, AUTO_FIELDS } from './collections.mjs';
 import { defaultView, saveView } from './views.mjs';
-import { readMe, writeMe } from './memory.mjs';
+import { readMe, writeMe, saveGoal } from './memory.mjs';
 import { saveTerritory } from './territory.mjs';
 import { slugify } from './records.mjs';
 // tasks.mjs does not import this module, so a static import is safe and there is no cycle.
@@ -336,6 +336,133 @@ export function territoriesFrom(where) {
   return out;
 }
 
+// ── the first goal ─────────────────────────────────────────────────────────────────────────────
+//
+// "What are you chasing right now, and by when?" is the one question whose answer contains a
+// NUMBER and a DATE, and until 2026-09-06 it only ever became a paragraph in me.md. So the hot
+// cache's `## GOALS` section was empty in every workspace this interview has ever built — the one
+// memory object with its own clock, the thing that puts a behind-schedule goal at the top of
+// TODAY, and it did not exist because nothing in the app could create one.
+//
+// Everything below is READ OFF HER OWN SENTENCE and nothing is invented. The parsing is
+// deliberately conservative: a number it is not sure about is no number, and a date it is not sure
+// about is no date. **A goal with a label and no number is better than no goal** — it still names
+// what she is chasing in the file her assistants read every morning, and both are one edit away on
+// the GOALS screen.
+
+// Spelled-out numbers, because that is how people write this answer: the question's own example is
+// "Six guests with a hazing story, by the end of August." A digit-only reader finds nothing in it.
+const NUMBER_WORDS = {
+  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+  eleven: 11, twelve: 12, fifteen: 15, twenty: 20, twentyfive: 25, thirty: 30, forty: 40, fifty: 50, hundred: 100,
+};
+const MONTH_NAMES = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+const MONTH_RE = '(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)';
+const monthIndex = word => MONTH_NAMES.findIndex(m => m.startsWith(String(word || '').toLowerCase().replace(/[^a-z]/g, '').slice(0, 3)));
+const iso = (y, m, d) => new Date(Date.UTC(y, m, d)).toISOString().slice(0, 10);
+const lastDayOf = (y, m) => new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+
+// The year nobody wrote down. "by the end of August" means the next end of August — this year if
+// it has not happened yet, next year if it has. Guessing backwards would ship a goal that is
+// already overdue on the day she created it.
+function resolveYear(month, day, now) {
+  const d = new Date(now);
+  const y = d.getUTCFullYear();
+  const today = Date.UTC(y, d.getUTCMonth(), d.getUTCDate());
+  return Date.UTC(y, month, day) >= today ? y : y + 1;
+}
+
+// → { deadline, match } · `match` is the exact substring consumed, so the number reader below
+// never mistakes the `2026` of a date for the target.
+export function deadlineFrom(text, now = Date.now()) {
+  const s = String(text || '');
+  let m;
+
+  // 1. a written-out ISO date — unambiguous, and what an agent would send
+  if ((m = s.match(/\b(\d{4})[-/](\d{1,2})[-/](\d{1,2})\b/))) {
+    const mo = Number(m[2]) - 1, d = Number(m[3]);
+    if (mo >= 0 && mo <= 11 && d >= 1 && d <= 31) return { deadline: iso(Number(m[1]), mo, d), match: m[0] };
+  }
+  // 2. "the end of August" / "end of Aug 2027"
+  if ((m = s.match(new RegExp('\\bend of (?:the )?' + MONTH_RE + '(?:\\s+(\\d{4}))?\\b', 'i')))) {
+    const mo = monthIndex(m[1]);
+    if (mo >= 0) {
+      const y = m[2] ? Number(m[2]) : resolveYear(mo, lastDayOf(new Date(now).getUTCFullYear(), mo), now);
+      return { deadline: iso(y, mo, lastDayOf(y, mo)), match: m[0] };
+    }
+  }
+  // 3. "the end of the month" / "the end of the year" — the only two bare ones worth reading
+  if ((m = s.match(/\bend of (?:the )?month\b/i))) {
+    const d = new Date(now);
+    return { deadline: iso(d.getUTCFullYear(), d.getUTCMonth(), lastDayOf(d.getUTCFullYear(), d.getUTCMonth())), match: m[0] };
+  }
+  if ((m = s.match(/\bend of (?:the )?year\b/i))) {
+    return { deadline: iso(new Date(now).getUTCFullYear(), 11, 31), match: m[0] };
+  }
+  // 4. "30 August" / "30th Aug 2026"
+  if ((m = s.match(new RegExp('\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:of\\s+)?' + MONTH_RE + '(?:\\s+(\\d{4}))?\\b', 'i')))) {
+    const d = Number(m[1]), mo = monthIndex(m[2]);
+    if (mo >= 0 && d >= 1 && d <= lastDayOf(2024, mo)) {
+      return { deadline: iso(m[3] ? Number(m[3]) : resolveYear(mo, d, now), mo, d), match: m[0] };
+    }
+  }
+  // 5. "August 30" / "Aug 30th, 2026"
+  if ((m = s.match(new RegExp('\\b' + MONTH_RE + '\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s+(\\d{4}))?\\b', 'i')))) {
+    const mo = monthIndex(m[1]), d = Number(m[2]);
+    if (mo >= 0 && d >= 1 && d <= lastDayOf(2024, mo)) {
+      return { deadline: iso(m[3] ? Number(m[3]) : resolveYear(mo, d, now), mo, d), match: m[0] };
+    }
+  }
+  return { deadline: null, match: null };
+}
+
+// The number she is chasing. 1–3 digits only, so a bare year left over from a date she wrote in
+// some form this reader did not recognise can never become a target of 2026.
+export function targetFrom(text) {
+  const s = String(text || '');
+  const digits = s.match(/\b(\d{1,3})\b/);
+  if (digits) return Number(digits[1]);
+  const words = s.toLowerCase().match(new RegExp('\\b(' + Object.keys(NUMBER_WORDS).join('|') + ')\\b'));
+  return words ? NUMBER_WORDS[words[1]] : null;
+}
+
+// The rollup this goal counts itself with: the collection's own gate field at its `done` group.
+// That is the same declaration the board columns and the promotion gate read (docs/02 §2), so a
+// workspace that renames `won` to `signed` moves its goal progress with no code change.
+// An archive-shaped done value is skipped — a rejected record is not progress (Law 5 keeps it, it
+// does not count it).
+function countFor(schema) {
+  const gate = (schema.fields || []).find(f => f && f.gate);
+  const done = (gate && gate.options || [])
+    .filter(o => o && typeof o === 'object' && o.group === 'done')
+    .map(o => String(o.value))
+    .filter(v => !/^archiv/i.test(v));
+  if (!gate || !done.length) return null;
+  return { path: (schema.query && schema.query.path) || ('data/' + schema.id + '/**'), where: { [gate.key]: done[0] } };
+}
+
+// → { id, patch } for saveGoal, or null when she left the question blank.
+export function goalFrom(chasing, schema = null, now = Date.now()) {
+  const label = String(chasing || '').trim().replace(/\s+/g, ' ');
+  if (!label) return null;
+  const id = slugify(label).slice(0, 60) || 'first-goal';
+
+  const { deadline, match } = deadlineFrom(label, now);
+  // Read the number from what is LEFT once the date has been taken out of the sentence.
+  const target = targetFrom(match ? label.replace(match, ' ') : label);
+
+  const patch = { label: label.replace(/\.$/, '') };
+  if (deadline) patch.deadline = deadline;
+  if (target != null) patch.target = target;
+  const count = schema ? countFor(schema) : null;
+  if (count) patch.count = count;
+  patch.body = 'From the first-run interview: "' + label + '"\n\n' +
+    (count
+      ? 'Progress is counted from your records — never typed in here. Change the number or the date and your assistants change what they do next.'
+      : 'Set a number and a date on the GOALS screen and your assistants will work the closest deadline first.');
+  return { id, patch };
+}
+
 // ── me.md, in their own words ──────────────────────────────────────────────────────────────────
 //
 // Prose, first person, their sentences — not a form dump. docs/03_MEMORY.md §1: identity is
@@ -636,6 +763,18 @@ export function buildWorkspace({ actor = 'crystal' } = {}) {
     return saveTerritory(id, patch, { actor });
   });
 
+  // The first goal, from her answer to "what are you chasing right now, and by when?". Written
+  // AFTER writeMe on purpose: memory.mjs decides who is an agent from me.md's owner, so identity
+  // has to exist before anything else human-owned is written or the actor cannot be recognised.
+  // Never fatal — a goal that will not save costs her a card on the GOALS screen, not the
+  // workspace she just built.
+  let goal = null;
+  const first = goalFrom(answers.chasing, plan.schema);
+  if (first) {
+    try { goal = saveGoal(first.id, first.patch, { actor }); }
+    catch (e) { hooks.logEvent({ type: 'refused', actor, target: 'goals/' + first.id + '.md', detail: { why: e.message } }); }
+  }
+
   writeIntake({
     ...data,
     built: nowIso(),
@@ -647,7 +786,7 @@ export function buildWorkspace({ actor = 'crystal' } = {}) {
 
   hooks.logEvent({
     type: 'store', actor, target: INTAKE_REL,
-    detail: { built: plan.schema.id, fields: plan.schema.fields.length, territory: territory.length },
+    detail: { built: plan.schema.id, fields: plan.schema.fields.length, territory: territory.length, goal: goal ? goal.id : null },
   });
 
   // If the collection somehow already exists (a re-run after approval), the view lands now.
@@ -656,6 +795,7 @@ export function buildWorkspace({ actor = 'crystal' } = {}) {
   return {
     me,
     territory,
+    goal,
     schema: plan.schema,
     view: settled ? settled.view : plan.view,
     card: plan.card,

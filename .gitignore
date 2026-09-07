@@ -13,7 +13,11 @@ release/
 #   find . -name "._*" -not -path "./node_modules/*" -delete
 ._*
 
-# a workspace is a user's data — never in this repo
+# a workspace is a user's data — never in this repo.
+#
+# `workspace-demo/` is NOT that: it is a checked-in fixture with nobody's real names in it, and it
+# is what `npm run demonstrate` falls back to and what `npm run demo` copies into place. It is
+# tracked on purpose — a fresh clone that cannot demonstrate itself fails GOAL.md gate 10.
 workspace/
 .scout/index/
 .scout/cache/computed.json

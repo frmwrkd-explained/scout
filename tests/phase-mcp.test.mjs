@@ -15,7 +15,7 @@ import { getStorageRoot } from '../backend/store.mjs';
 import { INDEX_CAPABILITIES } from '../backend/agentIndex.mjs';
 import { upsertRecord } from '../backend/records.mjs';
 import { processInboxFile, ensureInbox } from '../backend/inbox.mjs';
-import { readCache } from '../backend/memory.mjs';
+import { readCache, cacheVersion, regenerateCache, cancelCacheRegen } from '../backend/memory.mjs';
 import { documentsFor } from '../backend/documents.mjs';
 import {
   handleMessage, createServer, toolsFrom, toolName, TOOLS,
@@ -475,4 +475,63 @@ test('territory: computed keys can never be written by hand through this door', 
   assert.equal(patched.territory.data.last_swept, '2026-08-19');
   assert.ok((patched.stripped || []).includes('hit_rate'),
     'a computed key was accepted from an agent instead of being stripped and reported');
+});
+
+// ── the hot cache, on a door whose process may not outlive its own debounce ────────────────────
+//
+// Law 7 is a contract and `scout_get_cache_version` is the promise an agent acts on: an unchanged
+// `v` means the context it cached is still good. Reproduced in one session before the fix:
+//
+//   scout_get_context          → COUNTS said `territory 0`, v = 1
+//   scout_post_records_upsert  → a guest was stored
+//   scout_get_context          → STILL `territory 0`; scout_get_cache_version → still v = 1
+//   …and three seconds later, over HTTP, /api/cache/version was still 1
+//
+// Two separate faults met here. Nothing in `records.mjs` invalidated the cache at all, and the
+// regeneration that memory.mjs schedules runs on a 2s debounce whose timer is `unref`ed — right for
+// a server that stays up, useless in a process that answers four tool calls and exits. So this door
+// settles the cache after every mutating call and once more on the way out.
+test('a write through this door is in the very next scout_get_context, and moves the version', async () => {
+  freshRoot();
+  seedGuestCollection();
+  cancelCacheRegen();
+
+  const before = textOf(await call('scout_get_context'));
+  const vBefore = jsonOf(await call('scout_get_cache_version')).v;
+  assert.doesNotMatch(before, /guest 1/, 'the fixture starts with no guests in COUNTS');
+
+  const stored = jsonOf(await call('scout_post_records_upsert', { ...FINDING }));
+  assert.equal(stored.verdict, 'store');
+
+  // No sleep. The agent's next call is the assertion: an MCP session is short and single-threaded,
+  // and "wait two seconds and hope" is not a contract.
+  const after = textOf(await call('scout_get_context'));
+  assert.match(after, /guest 1/,
+    'the briefing the agent reads does not contain the record it just wrote — Law 7 says it never '
+    + 're-derives what it knew, not that it is told the opposite of the store');
+  assert.notEqual(jsonOf(await call('scout_get_cache_version')).v, vBefore,
+    'scout_get_cache_version told the agent its stale context was still good');
+
+  // A dry run is not a write and must not move the version — an agent that re-reads its whole
+  // context after every match call has lost the point of having one.
+  const vAfter = jsonOf(await call('scout_get_cache_version')).v;
+  await call('scout_post_records_match', { collection: 'guest', name: 'Maria Santos' });
+  assert.equal(jsonOf(await call('scout_get_cache_version')).v, vAfter);
+  cancelCacheRegen();
+});
+
+test('closing the session settles the cache rather than losing it to an unref-ed timer', async () => {
+  freshRoot();
+  seedGuestCollection();
+  cancelCacheRegen();
+  regenerateCache({});
+  const v = cacheVersion({}).v;
+
+  // A write made through a module rather than a tool — the state a session can be in when the host
+  // goes away mid-turn. scripts/scout-mcp.mjs awaits exactly this before it exits.
+  upsertRecord({ ...FINDING, name: 'Jun Dela Cruz' }, { actor: AGENT, via: 'mcp' });
+  await createServer().close();
+  assert.notEqual(cacheVersion({}).v, v,
+    'the pending regeneration died with the process, so the NEXT run is told nothing changed');
+  cancelCacheRegen();
 });

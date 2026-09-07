@@ -15,8 +15,10 @@
 // Props:
 //   screen            current screen key — 'today' 'decide' 'project' 'collection' 'document'
 //                     'goals' 'territory' 'playbook' 'memory' 'knows' 'assistants' 'assistant'
-//                     'files' 'board'
+//                     'files' 'board' 'settings'
 //   onNavigate(key, arg)  the one navigation callback
+//   onSearch()        opens the ⌘K palette (item 11) — the SEARCH row at the top of nav is the
+//                     visible way in; the chord works with or without it.
 //   collections[]     from GET /api/collections            counts{}  id → row count
 //   activeCollection  id of the collection on screen
 //   assistants[]      from GET /api/assistants             memoryCounts { goals, territory, playbook }
@@ -97,7 +99,7 @@ function NoneYet({ children }) {
 const DOT = { running: 'var(--marked)', blocked: 'var(--warn)', idle: 'var(--border-3)' };
 
 export default function Rail({
-  screen, onNavigate,
+  screen, onNavigate, onSearch,
   collections = [], counts = {}, activeCollection, onPickCollection,
   assistants = [], activeAssistant, memoryCounts = {}, needsYou = 0,
   project, projects = [], onPickProject,
@@ -131,8 +133,10 @@ export default function Rail({
 
       <div style={sx('flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column')}>
         {/* nav — the three things she does. NEEDS YOU carries the only warn-toned count in the
-            rail, because it is the number that decides whether she opens the app at all. */}
+            rail, because it is the number that decides whether she opens the app at all. SEARCH
+            is item 11's affordance — ⌘K worked with no visible way to learn it existed. */}
         <div style={sx('padding:10px 12px;display:flex;flex-direction:column;gap:2px')}>
+          <Row label="Search" right="⌘K" onClick={onSearch} />
           <Row label="Needs you" count={needsYou} on={screen === 'decide'} onClick={go('decide')}
             countTone={needsYou > 0 ? 'var(--warn)' : 'var(--border-2)'} />
           <Row label="Today" on={screen === 'today'} onClick={go('today')} />
@@ -194,9 +198,12 @@ export default function Rail({
         </Group>
       </div>
 
-      {/* Law 8 — we compress hard, so the way down is pinned where it can always be found. */}
-      <div style={sx('flex:none;border-top:1px solid var(--line);padding:8px 12px')}>
+      {/* Law 8 — we compress hard, so the way down is pinned where it can always be found.
+          SETTINGS sits beside it — item 12 — the two rows a person looks for at the bottom of any
+          app, not buried in a menu that does not exist here. */}
+      <div style={sx('flex:none;border-top:1px solid var(--line);padding:8px 12px;display:flex;flex-direction:column;gap:2px')}>
         <Row isMono height={28} label="FILES ON DISK" on={screen === 'files'} onClick={go('files')} />
+        <Row isMono height={28} label="SETTINGS" on={screen === 'settings'} onClick={go('settings')} />
       </div>
     </aside>
   );

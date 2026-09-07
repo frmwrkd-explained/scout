@@ -169,16 +169,49 @@ export default function Document({
   // `On camera` and `Found in` appeared as editable rows on a Facebook group, and writing one
   // put a guest's field into a group's frontmatter. A schema is a property of the record, not of
   // the screen you arrived from.
+  //
+  // `ownCollection` alone cannot carry this: `null` meant BOTH "the read hasn't landed yet" AND
+  // "the server confirmed this document is in no collection", and the schema memo below treated
+  // the two the same — falling back to the RAIL's active collection either way. That is exactly
+  // how me.md gained `status: shortlist, score: 9`: opening it with #guest active, the server
+  // correctly reported no collection, and the memo still reached for #guest because it could not
+  // tell "not yet known" from "known to be none". `collectionKnown` makes the two states distinct.
   const [ownCollection, setOwnCollection] = React.useState(null);
+  const [collectionKnown, setCollectionKnown] = React.useState(false);
+  // An explicit label for a document that is in no collection at all — `identity | goal |
+  // territory | playbook | learning | assistant | task | project | other` — so the header can say
+  // what this IS (`IDENTITY · me.md`) instead of nothing, once `schema` is null. See
+  // backend/documents.mjs `kindOf`.
+  const [kind, setKind] = React.useState(null);
 
-  // THE schema this surface renders by. The document's own collection wins; the prop is the
-  // fallback for the frame before the read lands, and for a memory object (territory/, playbook/)
-  // that is in no collection at all and whose rows are inferred from its frontmatter.
+  // THE schema this surface renders by. Before the read lands, the RAIL's active collection is the
+  // best guess — it avoids a flash of unstyled rows for a seed handed in from that same collection.
+  // Once the server has actually answered (`collectionKnown`), its word is final, including "none":
+  // a memory object belongs to no collection, and PropertyRows already renders frontmatter-inferred
+  // rows for a null schema (PropertyRows.jsx) — that is what a memory object opens through.
   const schema = React.useMemo(() => {
-    if (!ownCollection) return collection;
+    if (!collectionKnown) return collection;
+    if (!ownCollection) return null;
     if (collection && collection.id === ownCollection) return collection;
     return (collections || []).find(c => c.id === ownCollection) || collection;
-  }, [ownCollection, collection, collections]);
+  }, [collectionKnown, ownCollection, collection, collections]);
+
+  // The gate's next stage — memoized above the early-return so the `A` key (below, item 3) and the
+  // header button (render, at the bottom) act on the exact same answer. Board's drag was the only
+  // way to move a record's stage with a mouse before onPromote reached this surface; this is the
+  // one keyboard equivalent, and it is the same key the button already prints.
+  const nextStage = React.useMemo(() => {
+    if (!onPromote) return null;
+    const { gate } = collapsedFields(schema, data);
+    // Only a STATUS field is a stage (docs/02 §2 — the gate guards the one `gate: true` status
+    // field). collapsedFields falls back to a `select` for the collapsed ROW, which is right for
+    // display and wrong for promotion: on #group it offered "instagram" as the next stage, and
+    // pressing it would have written `platform: instagram` through the move route.
+    if (!gate || gate.type !== 'status') return null;
+    const opts = (gate.options || []).map(o => (typeof o === 'string' ? o : o.value));
+    const i = opts.indexOf(data[gate.key]);
+    return opts[i + 1] || null;
+  }, [schema, data, onPromote]);
 
   const [mode, setMode] = React.useState('editor');
   const [propsOpen, setPropsOpen] = React.useState(() => readPref(collection?.id));
@@ -222,18 +255,45 @@ export default function Document({
   const readDisk = React.useCallback(async () => {
     try {
       const r = await api.record(path);
-      return { data: r.data || {}, content: r.content || '', rev: r.rev ?? null, flags: r.flags || null, summary: r.summary, collection: r.collection || null };
+      // `kind` is not on this envelope yet — see INTEGRATION PATCHES (records.mjs `readRecord`).
+      // `r.kind || null` picks it up the moment that patch lands, with no change needed here.
+      return { data: r.data || {}, content: r.content || '', rev: r.rev ?? null, flags: r.flags || null, summary: r.summary, collection: r.collection || null, kind: r.kind || null };
     } catch (e) {
       if (e.status && e.status !== 404) throw e;
       const d = await api.document(path);
-      return { data: d.data || {}, content: d.content || '', rev: d.rev ?? null, flags: null, summary: d.summary, collection: (d.collections || [])[0] || null };
+      return { data: d.data || {}, content: d.content || '', rev: d.rev ?? null, flags: null, summary: d.summary, collection: (d.collections || [])[0] || null, kind: d.kind || null };
     }
   }, [path]);
+
+  // The header button already called `onPromote(nextStage)` directly and never looked at what it
+  // returned. App.jsx's `onMove` — the function `onPromote` is wired to — catches every failure
+  // itself (a gate refusal included) and shows it as a toast, but resolves the SAME way whether
+  // the write landed or was refused; there is no return value this surface can trust to tell the
+  // two apart (see INTEGRATION PATCHES for a version that would). Re-reading the file after every
+  // attempt sidesteps that entirely: nothing changed ⇒ the stage shown is still the true one;
+  // something did ⇒ the button now offers the record's ACTUAL next stage instead of one already
+  // spent. Without this, promoting from either the button or the `A` key (item 3) left "shortlist
+  // A" on screen forever after a successful promote — the write landed, Activity and the
+  // collection's rows knew it, and this surface alone kept lying about it.
+  const promote = React.useCallback(async next => {
+    if (!onPromote) return;
+    try { await onPromote(next); } catch { /* a rejection (once the integration patch lands) still re-reads below */ }
+    if (!aliveRef.current) return;
+    try {
+      const d = await readDisk();
+      if (!aliveRef.current) return;
+      dataRef.current = d.data; bodyRef.current = d.content; revRef.current = d.rev;
+      setData(d.data); setBody(d.content); setFlags(d.flags); setOwnCollection(d.collection || null);
+      setCollectionKnown(true); setKind(d.kind || null);
+      setSummary(d.summary != null ? d.summary : firstParagraph(d.content));
+    } catch { /* a failed re-read leaves the last-known state on screen, which is still not wrong */ }
+  }, [onPromote, readDisk]);
 
   React.useEffect(() => {
     aliveRef.current = true;
     let cancelled = false;
     setLoadError(null); setConflict(null); setRaw(null); setOwnCollection(null);
+    setCollectionKnown(false); setKind(null);
     setSave('saved'); setSaveError(null); setBodyOpen(false);
     pendingRef.current = {}; bodyDirtyRef.current = false;
     // Switching documents re-seeds synchronously, so the surface never shows the PREVIOUS
@@ -250,6 +310,7 @@ export default function Document({
       if (cancelled) return;
       dataRef.current = d.data; bodyRef.current = d.content; revRef.current = d.rev;
       setData(d.data); setBody(d.content); setFlags(d.flags); setOwnCollection(d.collection || null);
+      setCollectionKnown(true); setKind(d.kind || null);
       setSummary(d.summary != null ? d.summary : firstParagraph(d.content));
       setLoading(false);
     }).catch(e => { if (!cancelled) { setLoadError(e.message); setLoading(false); } });
@@ -436,8 +497,9 @@ export default function Document({
   React.useEffect(() => { if (save === 'saved') setRaw(null); }, [save]);
 
   // ── keys ────────────────────────────────────────────────────────────────────────────────────
-  // `P` toggles properties (§2.1) and ⌘S / ⌃S forces the pending write. Both stand down inside any
-  // text field — an editor that eats the letter P is worse than no shortcut.
+  // `P` toggles properties (§2.1), ⌘S / ⌃S forces the pending write, and `A` promotes — the same
+  // key the header button prints (docs/05_UI_SPEC.md §5). All three stand down inside any text
+  // field — an editor that eats a letter it should have typed is worse than no shortcut.
   React.useEffect(() => {
     const editable = el => !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
     const onKey = e => {
@@ -447,11 +509,20 @@ export default function Document({
       if (e.key === 'p' || e.key === 'P') {
         e.preventDefault();
         setPropsOpen(v => { writePref(schema?.id, !v); return !v; });
+        return;
+      }
+      if ((e.key === 'a' || e.key === 'A') && nextStage) {
+        e.preventDefault();
+        // Same call the button makes — App.onMove already toasts a gate refusal (or any other
+        // failure) with the server's own message, so a keyboard promotion is refused exactly as
+        // visibly as a mouse one; `promote` (above) re-reads the file afterward either way, so
+        // the button's own label is never left promising a stage that was already spent.
+        promote(nextStage);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [schema?.id, flush]);
+  }, [schema?.id, flush, nextStage, promote]);
 
   const toggleProps = () => setPropsOpen(v => { writePref(schema?.id, !v); return !v; });
 
@@ -497,15 +568,15 @@ export default function Document({
     ? 'SAVED ' + savedAt.toTimeString().slice(0, 5)
     : look.text;
   const gateValue = gate ? data[gate.key] : null;
-  const nextStage = gate && onPromote
-    ? (() => {
-        const opts = (gate.options || []).map(o => (typeof o === 'string' ? o : o.value));
-        const i = opts.indexOf(gateValue);
-        return opts[i + 1] || null;
-      })()
-    : null;
+  // `nextStage` itself is the memo above — computed once, shared with the `A` key.
   const writer = String(data.updated_by || data.created_by || '').toUpperCase();
   const when = String(data.updated || data.created || '');
+  // Item 11 — Archive was offered on every open document, including memory objects (me.md,
+  // goals/, territory/…), where `POST /api/records/archive` now refuses with "only records under
+  // data/ can be archived — …" (`records.mjs RECORD_ROOT`/`isRecordPath`). An affordance whose
+  // capability always refuses is the pattern HANDOVER §3 warns about, so the button is offered
+  // only where the write could ever succeed.
+  const canArchive = String(path || '').startsWith('data/');
 
   return (
     <div style={sx('flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden')}>
@@ -532,6 +603,15 @@ export default function Document({
             style={{ ...mono('flex:none;font-size:10px;font-weight:500;background:none;border:none;padding:0'), color: 'var(--fg-faint)', cursor: onOpenPath ? 'pointer' : 'default' }}>
             {path}
           </button>
+          {/* No collection ⇒ this is a memory object, not a data record — label it truthfully
+              instead of silently rendering it through whatever collection the RAIL has active
+              (item 1). `kind` is 'other' for a shape not in the known list; nothing to say then. */}
+          {!schema && kind && kind !== 'other' ? (
+            <span title="This document has no collection — its rows are read from its own frontmatter, not a schema"
+              style={{ ...mono('flex:none;font-size:8.5px;font-weight:700;letter-spacing:.14em;padding:2px 7px;border-radius:5px'), border: '1px solid var(--border-3)', color: 'var(--fg-muted)' }}>
+              {kind.toUpperCase()}
+            </span>
+          ) : null}
           {flags && flags.quarantined ? (
             <span title="Written into data/ without passing the pipeline — excluded from every count until accepted"
               style={{ ...mono('flex:none;font-size:8.5px;font-weight:700;letter-spacing:.14em;padding:2px 7px;border-radius:5px'), border: '1px solid var(--danger)', color: 'var(--danger)' }}>
@@ -556,7 +636,7 @@ export default function Document({
               not reach before (the route existed, nothing in the app called it), but it is not
               what this screen is for. It never says "delete", because Scout never deletes — the
               record and its reason stay on disk, and the rejects are the training data (Law 5). */}
-          {onArchived ? (
+          {onArchived && canArchive ? (
             <Btn variant="ghost" size="sm" onClick={() => setArchiving(a => (a ? null : 'picking'))}
               disabled={archiving === 'busy'}
               title="Archive this record. Scout never deletes — it stays on disk with the reason attached."
@@ -566,7 +646,7 @@ export default function Document({
           ) : null}
           {nextStage ? (
             // The one solid accent fill on this screen (docs/05_UI_SPEC.md §6) — the primary action.
-            <Btn variant="primary" size="md" onClick={() => onPromote(nextStage)} style={sx('height:32px')}>
+            <Btn variant="primary" size="md" onClick={() => promote(nextStage)} style={sx('height:32px')}>
               <span>{String(nextStage).replace(/-/g, ' ')}</span>
               <span style={{ ...mono('font-size:9.5px;font-weight:600'), opacity: .55 }}>A</span>
             </Btn>
@@ -676,7 +756,11 @@ export default function Document({
                   options={options}
                   variant="document"
                   showAuto
-                  onAddProperty={onFieldAdded ? () => setAddingProperty(true) : undefined}
+                  // A new property is a SCHEMA change, and a document with no schema (a memory
+                  // object — `schema` null, item 1) has no schema to add it to: offering the row
+                  // would either silently target whatever collection the RAIL has active (the
+                  // exact bug this file fixes elsewhere) or add a field nobody can see used.
+                  onAddProperty={onFieldAdded && schema ? () => setAddingProperty(true) : undefined}
                   // In the row's own slot — a property is composed where the property will be,
                   // above SYSTEM, not on a dimmed copy of the page and not under the provenance.
                   addComposer={addingProperty && schema ? (

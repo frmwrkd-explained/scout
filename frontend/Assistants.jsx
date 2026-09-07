@@ -18,7 +18,14 @@
 //   currency     string       prefix for money figures. Default '$'.
 //   onHire()                  open the hiring screen (frontend/Hire.jsx). This screen's ONE solid
 //                             accent fill. Omit it and the button is disabled, never hidden.
-//   onSelect(id)              open one assistant.
+//   activeAssistant           id of the assistant clicked open — expands that card in place (its
+//                             tasks, its last runs, its cost, its scope) and scrolls to it, rather
+//                             than doing nothing, which is what clicking a row used to do.
+//   onSelect(id)              open one assistant. Toggles `activeAssistant` back to null when the
+//                             same id is clicked again — a card that only ever opens has no way
+//                             back that does not mean "go read something else".
+//   onRebrief(assistant)      opens <Hire existing={assistant}/> — the expanded card's one solid
+//                             accent fill, "Re-brief".
 //   onDecide(subject)         send her to DECIDE. subject is always
 //                             { kind:'task'|'assistant', id, path, question, task, assistant }.
 //   onOpenPath(path)          Law 8 — open the raw `.md`. Every object on this screen offers it.
@@ -316,8 +323,77 @@ function teamSentence(list) {
   return s.charAt(0).toUpperCase() + s.slice(1) + '.';
 }
 
+// The expanded card — item 8. Everything a click was supposed to reveal: what it is assigned,
+// what it has actually run, what it costs, and the ground it may work. Nothing here is a second
+// implementation of a figure or a lane — `laneOf`, `money`, `Freshness` are the same ones the rest
+// of the app uses.
+function AssistantExpanded({ a, tasks, runs, onOpenPath, onRebrief }) {
+  const mine = tasksFor(tasks, a.id);
+  const byLane = TASK_LANES.map(l => ({ lane: l, tasks: mine.filter(t => t.status === l.key) })).filter(x => x.tasks.length);
+  const recent = runsFor(runs, a.id).slice(0, 5);
+  const scope = a.scope || {};
+  const looksThrough = arr(scope.collections).map(String);
+  const ground = arr(scope.territory || scope.territories).map(String);
+
+  return (
+    <div style={sx('display:flex;flex-direction:column;gap:12px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)')}>
+      <div style={sx('display:flex;flex-wrap:wrap;gap:20px')}>
+        <div style={sx('display:flex;flex-direction:column;gap:5px;min-width:140px')}>
+          <span style={{ ...monoStyle('font-size:8.5px;font-weight:700;letter-spacing:.12em'), color: 'var(--fg-faint)' }}>LOOKS THROUGH</span>
+          {looksThrough.length
+            ? <span style={sx('font-size:11.5px;color:var(--fg-soft)')}>{looksThrough.map(c => '#' + c).join(', ')}</span>
+            : <span style={{ ...monoStyle('font-size:9.5px;font-weight:600'), color: 'var(--fg-faint)' }}>NOTHING SET</span>}
+        </div>
+        <div style={sx('display:flex;flex-direction:column;gap:5px;min-width:140px')}>
+          <span style={{ ...monoStyle('font-size:8.5px;font-weight:700;letter-spacing:.12em'), color: 'var(--fg-faint)' }}>MAY WORK</span>
+          {ground.length
+            ? <span style={sx('font-size:11.5px;color:var(--fg-soft)')}>{ground.join(', ')}</span>
+            : <span style={{ ...monoStyle('font-size:9.5px;font-weight:600'), color: 'var(--fg-faint)' }}>NO GROUND MAPPED YET</span>}
+        </div>
+        <div style={sx('display:flex;flex-direction:column;gap:5px;min-width:120px')}>
+          <span style={{ ...monoStyle('font-size:8.5px;font-weight:700;letter-spacing:.12em'), color: 'var(--fg-faint)' }}>WORKS</span>
+          <span style={{ ...monoStyle('font-size:11px;font-weight:600'), color: 'var(--fg-soft)' }}>{scheduleLabel(a.schedule)}</span>
+        </div>
+      </div>
+
+      <div style={sx('display:flex;flex-direction:column;gap:6px')}>
+        <span style={{ ...monoStyle('font-size:8.5px;font-weight:700;letter-spacing:.12em'), color: 'var(--fg-faint)' }}>TASKS · {mine.length}</span>
+        {byLane.length ? byLane.map(({ lane, tasks: ts }) => (
+          <div key={lane.key} style={sx('display:flex;flex-direction:column;gap:3px')}>
+            <span style={{ ...monoStyle('font-size:8px;font-weight:700;letter-spacing:.1em'), color: lane.color }}>{lane.name} · {ts.length}</span>
+            {ts.slice(0, 4).map(t => (
+              <div key={t.id} style={sx('display:flex;align-items:center;justify-content:space-between;gap:10px;padding:2px 0 2px 10px')}>
+                <span style={sx('flex:1;min-width:0;font-size:11.5px;color:var(--fg-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{taskTitle(t)}</span>
+                <PathLink path={t.path} onOpenPath={onOpenPath} />
+              </div>
+            ))}
+          </div>
+        )) : <span style={{ ...monoStyle('font-size:9.5px;font-weight:600'), color: 'var(--fg-faint)' }}>NO TASKS ASSIGNED</span>}
+      </div>
+
+      <div style={sx('display:flex;flex-direction:column;gap:6px')}>
+        <span style={{ ...monoStyle('font-size:8.5px;font-weight:700;letter-spacing:.12em'), color: 'var(--fg-faint)' }}>RECENT RUNS</span>
+        {recent.length ? recent.map(r => (
+          <StatLine key={r.id || (r.started + '' + r.ended)} parts={[
+            r.started ? String(r.started).slice(0, 16).replace('T', ' ') : null,
+            r.found != null ? r.found + ' FOUND' : null,
+            r.cost != null ? money(r.cost, '$') + ' SPENT' : null,
+            r.status ? String(r.status).toUpperCase() : null,
+          ]} />
+        )) : <span style={{ ...monoStyle('font-size:9.5px;font-weight:600'), color: 'var(--fg-faint)' }}>NO RUNS RECORDED</span>}
+      </div>
+
+      <div style={sx('display:flex;align-items:center;gap:10px')}>
+        <Btn size="sm" variant="secondary" disabled={!onRebrief} onClick={() => onRebrief && onRebrief(a)}>Re-brief</Btn>
+      </div>
+    </div>
+  );
+}
+
 // ── one assistant ────────────────────────────────────────────────────────────────────────────
-function AssistantCard({ a, depth, children, tasks, runs, currency, onOpenPath, onDecide, onSelect, kidStates, onSendOut, sending }) {
+function AssistantCard({ a, depth, children, tasks, runs, currency, onOpenPath, onDecide, onSelect, onRebrief, active, kidStates, onSendOut, sending }) {
+  const ref = React.useRef(null);
+  React.useEffect(() => { if (active && ref.current) ref.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, [active]);
   const state = stateOf(a);
   const meta = ASSISTANT_STATES[state];
   const doing = doingOf(a, tasks);
@@ -340,12 +416,12 @@ function AssistantCard({ a, depth, children, tasks, runs, currency, onOpenPath, 
        kidStates && kidStates.length ? kidStates.length + (kidStates.length === 1 ? ' SUB-AGENT' : ' SUB-AGENTS') : null];
 
   return (
-    <div style={{ marginLeft: depth * 22, display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div ref={ref} style={{ marginLeft: depth * 22, display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div className="hBd"
         style={{
           ...sx('display:flex;gap:11px;padding:12px 14px;border-radius:8px;transition:border-color 130ms ease'),
           background: depth ? 'var(--surface)' : 'var(--surface-2)',
-          border: '1px solid ' + (state === 'blocked' ? 'var(--border-2)' : 'var(--border)'),
+          border: '1px solid ' + (active ? 'var(--border-3)' : state === 'blocked' ? 'var(--border-2)' : 'var(--border)'),
           borderLeft: '2px solid ' + (state === 'idle' ? 'var(--line)' : meta.color),
         }}>
         <Dot tone={meta.color} glow={state !== 'idle'} style={{ marginTop: 5 }} />
@@ -412,6 +488,8 @@ function AssistantCard({ a, depth, children, tasks, runs, currency, onOpenPath, 
           ) : null}
 
           <PathLink path={a.path || ('assistants/' + a.id + '.md')} onOpenPath={onOpenPath} />
+
+          {active ? <AssistantExpanded a={a} tasks={tasks} runs={runs} onOpenPath={onOpenPath} onRebrief={onRebrief} /> : null}
         </div>
       </div>
 
@@ -423,7 +501,7 @@ function AssistantCard({ a, depth, children, tasks, runs, currency, onOpenPath, 
 // ── the screen ───────────────────────────────────────────────────────────────────────────────
 export default function Assistants({
   assistants, tasks, runs, nonce, currency = '$',
-  onHire, onSelect, onDecide, onOpenPath, onSendOut, onSendOutAll,
+  activeAssistant, onHire, onSelect, onRebrief, onDecide, onOpenPath, onSendOut, onSendOutAll,
 }) {
   // Which cards are mid-request. The RUN is not tracked here — `status: running` on the assistant
   // is, and it comes back from the server. This is only the second between the click and the
@@ -470,8 +548,12 @@ export default function Assistants({
     return (
       <AssistantCard key={a.id} a={a} depth={depth} tasks={T} runs={R} currency={currency}
         kidStates={depth ? null : kids}
-        onOpenPath={onOpenPath} onDecide={onDecide} onSelect={onSelect}
-        onSendOut={onSendOut ? sendOne : null} sending={sending.has(a.id)}>
+        active={a.id === activeAssistant}
+        onOpenPath={onOpenPath} onDecide={onDecide} onRebrief={onRebrief}
+        onSendOut={onSendOut ? sendOne : null} sending={sending.has(a.id)}
+        // Clicking the one already open closes it — a card that only ever opens has no way back
+        // that does not mean "go read something else".
+        onSelect={id => onSelect && onSelect(id === activeAssistant ? null : id)}>
         {kids.length ? (
           <div style={sx('display:flex;flex-direction:column;gap:8px')}>{kids.map(k => render(k, depth + 1))}</div>
         ) : null}

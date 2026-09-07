@@ -125,7 +125,7 @@ export function TerritoryNode({ node, card, selected, onOpen }) {
       <div style={sx('flex:none;display:flex;gap:18px;padding:9px 11px')}>
         {s ? figure('FINDS', s.finds) : null}
         {s ? figure('WINS', s.wins) : null}
-        {s ? figure('HIT RATE', Math.round((s.hit_rate || 0) * 100) + '%') : null}
+        {s ? figure('HIT RATE', Math.round(s.hit_rate || 0) + '%') : null}
         {!s ? <Props props={card.props} /> : null}
       </div>
       {card.summary ? <div style={sx('flex:1;min-height:0;overflow:hidden;padding:0 11px 9px;font-size:11.5px;line-height:1.5;color:var(--fg-muted)')}>{card.summary}</div> : null}

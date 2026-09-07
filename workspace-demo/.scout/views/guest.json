@@ -1,0 +1,75 @@
+[
+  {
+    "id": "needs-review",
+    "label": "Needs review",
+    "type": "table",
+    "filter": [
+      {
+        "field": "status",
+        "op": "is",
+        "value": "needs-review"
+      }
+    ],
+    "sort": [
+      {
+        "field": "score",
+        "dir": "desc"
+      }
+    ],
+    "group": null,
+    "fields": [
+      "name",
+      "status",
+      "score",
+      "found_in",
+      "found",
+      "tags"
+    ],
+    "card": null,
+    "density": "compact"
+  },
+  {
+    "id": "gone-cold",
+    "label": "Gone cold",
+    "type": "table",
+    "filter": [
+      {
+        "field": "status",
+        "op": "is",
+        "value": "contacted"
+      }
+    ],
+    "sort": [
+      {
+        "field": "updated",
+        "dir": "asc"
+      }
+    ],
+    "group": null,
+    "fields": [
+      "name",
+      "status",
+      "handle",
+      "found_in",
+      "updated"
+    ],
+    "card": null,
+    "density": "compact"
+  },
+  {
+    "id": "pipeline",
+    "label": "Pipeline",
+    "type": "board",
+    "filter": [],
+    "sort": [],
+    "group": "status",
+    "fields": [
+      "name",
+      "score",
+      "found_in",
+      "tags"
+    ],
+    "card": null,
+    "density": "compact"
+  }
+]

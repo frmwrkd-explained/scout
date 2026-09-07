@@ -39,7 +39,7 @@ Chosen by looking at what Notion, Airtable, Heptabase and Tesseract actually con
 | `text` | `multiline` | The default. |
 | `number` | `display: plain \| bar \| stars \| currency`, `min`, `max`, `precision` | `display` is why we don't need a separate "score" or "rating" type. |
 | `select` | `options[] {value, colour}` | Single choice with a colour chip. |
-| `multiselect` | same | Tags, categories. |
+| `multiselect` | same, **optional** | Tags, categories. With no `options[]` it is an **open vocabulary** — the next tag is legal because the person typed it. `select` and `status` still require a fixed set. |
 | **`status`** | `options[] {value, colour, group: todo\|active\|done}` | **Not the same as `select`.** The `group` drives board columns, "what's open", and completion counts. Exactly one status field per collection may set `gate: true` — that is the field the promotion gate guards. |
 | `date` | `display: absolute \| relative \| freshness`, `time: bool` | `display: freshness` renders the decay bar from Law 3. |
 | `checkbox` | — | Yes/no. |

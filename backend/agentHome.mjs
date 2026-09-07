@@ -77,10 +77,31 @@ export const houseRulesDir = () => path.join(chatRoot(), 'house-rules');
 const houseRulesFile = () => path.join(houseRulesDir(), 'SKILL.md');
 
 // ── the self API base the agent operates Scout through ──
-// 127.0.0.1 only (never localhost — the backend binds IPv4). index.mjs stamps SCOUT_SELF_PORT when it
-// binds; fall back to the documented default so a hermetic call still renders a plausible base.
+// 127.0.0.1 only (never localhost — the backend binds IPv4).
+//
+// THE BOUND PORT IS THE TRUTH, and only the process that called listen() knows it: an ephemeral
+// bind (`listen(0)`, which is what scripts/demonstrate.mjs and every test harness does) has a port
+// no environment variable can predict. setSelfPort() is how that number gets here — index.mjs
+// calls it from the listen callback with `server.address().port` — and it also stamps
+// SCOUT_SELF_PORT so a spawned agent process inherits the same answer.
+//
+// The fallback chain below is for a hermetic call with nothing bound. Its last rung was 5176,
+// which is FrameForge's port and not Scout's: `npm run demonstrate` and every embedded host
+// rendered an Index whose `api:` line named a port nothing was listening on — an agent following
+// the Index would get ECONNREFUSED on its first call. CLAUDE.md §Ports: the API is 5177.
+let SELF_PORT = null;
+export function setSelfPort(port) {
+  const n = Number(port);
+  SELF_PORT = Number.isFinite(n) && n > 0 ? n : null;
+  // Child processes (agent runs, the MCP door) read the env var, so keep the two in step — in both
+  // directions: clearing the port and leaving a stale number in the environment for a spawned
+  // agent to trust would be worse than never having set one.
+  if (SELF_PORT) process.env.SCOUT_SELF_PORT = String(SELF_PORT);
+  else delete process.env.SCOUT_SELF_PORT;
+  return SELF_PORT;
+}
 export function selfPort() {
-  return Number(process.env.SCOUT_SELF_PORT) || Number(process.argv[2]) || Number(process.env.PORT) || 5176;
+  return SELF_PORT || Number(process.env.SCOUT_SELF_PORT) || Number(process.argv[2]) || Number(process.env.PORT) || 5177;
 }
 export function selfApiBase() { return 'http://127.0.0.1:' + selfPort(); }
 

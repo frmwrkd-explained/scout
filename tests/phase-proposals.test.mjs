@@ -16,6 +16,9 @@ import {
   registerProposalRoutes, ProposalError,
 } from '../backend/proposals.mjs';
 import { saveCollection, getCollection } from '../backend/collections.mjs';
+import { getLearning } from '../backend/memory.mjs';
+import { getTerritory } from '../backend/territory.mjs';
+import { QUESTIONS, saveAnswer, buildWorkspace } from '../backend/intake.mjs';
 
 const R = () => getStorageRoot();
 
@@ -315,4 +318,117 @@ test('re-proposing the same deterministic id does not grow the queue', () => {
   assert.equal(again.duplicate, true);
   assert.equal(again.created, first.created);
   assert.equal(listProposals({ status: 'open' }).length, 1);
+});
+
+// ── the three defects an auditor found by driving the routes ───────────────────────────────────
+//
+// All three were open with this file green, because each of them lives at the seam between the
+// queue and the module behind it — the place the spy deps above deliberately stand in for.
+// These run against the REAL effects, so the seam is what is tested.
+
+test('a question card can be accepted: her answer is the claim, and the card is the evidence', async () => {
+  freshRoot();
+  // A question card carries no evidence — the whole point of the kind is that the agent does not
+  // know. `validate()` does not ask for any, and memory.mjs refuses an ACTIVE learning without it,
+  // so every answered question was a 400 and none of the five rejection reasons fits "she answered
+  // it": one blocked assistant added one card that could never be cleared.
+  const posted = await req('POST', '/api/proposals', {
+    kind: 'question',
+    title: 'UK scope',
+    question: 'Are UK-based nurses in scope?',
+    why: 'The brief says Philippine nurses and half of the good ones are in the NHS.',
+    actor: 'scout-fb',
+  });
+  assert.equal(posted.status, 200);
+  assert.deepEqual(posted.body.evidence, [], 'a question card is proposed with no evidence');
+
+  const done = await req('POST', '/api/proposals/' + posted.body.id + '/accept', { actor: 'crystal', answer: 'Yes — UK is in scope.' });
+  assert.equal(done.status, 200, 'accepting an answered question: ' + JSON.stringify(done.body));
+  assert.equal(done.body.status, 'accepted');
+  assert.equal(done.body.effect, 'learning');
+
+  const learning = getLearning(posted.body.id);
+  assert.ok(learning, 'the answer must land in learnings/ — it is what stops her being asked again');
+  assert.equal(learning.status, 'active');
+  assert.equal(learning.claim, 'Yes — UK is in scope.');
+  assert.equal(learning.question, 'Are UK-based nurses in scope?');
+  // A human answering her own assistant IS the evidence, and the card is where that happened.
+  assert.equal(learning.evidence.length, 1);
+  assert.match(learning.evidence[0], /proposals\/.*UK|proposals\//);
+  assert.ok(fs.existsSync(path.join(R(), 'learnings', posted.body.id + '.md')));
+
+  // and evidence the card DOES carry is never replaced by the card itself
+  const withEvidence = propose({
+    kind: 'question', question: 'Which Maria?', why: 'Two accounts, same name.',
+    evidence: ['[[data/guests/maria-santos]]'],
+  }, { actor: 'scout-fb' });
+  await accept(withEvidence.id, { actor: 'crystal', answer: 'The one with 12k followers.' });
+  assert.deepEqual(getLearning(withEvidence.id).evidence, ['[[data/guests/maria-santos]]']);
+});
+
+test('a territory card names its ground as an id OR as the whole object, and never as [object Object]', async () => {
+  freshRoot();
+  // `saveTerritory(card.territory, …)` was handed the object, `safe(String(object))` produced
+  // `_object_Object_`, and accepting wrote `territory/_object_Object_.md` with `label: undefined`.
+  // A 200, a file, and nothing anybody asked for.
+  const obj = await req('POST', '/api/proposals', {
+    kind: 'territory',
+    territory: { id: 'ofw-uk', label: 'OFW nurses in the UK', kind: 'facebook-group', url: 'https://facebook.com/groups/ofw-uk' },
+    why: 'Three of the last six shortlists are members.',
+    evidence: ['[[data/guests/maria-santos]]'], actor: 'scout-fb',
+  });
+  assert.equal(obj.status, 200);
+  const done = await req('POST', '/api/proposals/' + obj.body.id + '/accept', { actor: 'crystal' });
+  assert.equal(done.status, 200);
+
+  assert.deepEqual(fs.readdirSync(path.join(R(), 'territory')).filter(f => f.endsWith('.md')), ['ofw-uk.md']);
+  const t = getTerritory('ofw-uk');
+  assert.equal(t.data.label, 'OFW nurses in the UK', 'everything the card knew about the ground must travel with it');
+  assert.equal(t.data.kind, 'facebook-group');
+  assert.equal(t.data.url, 'https://facebook.com/groups/ofw-uk');
+  assert.equal(t.access, 'requested', 'accepting means the agent MAY ASK to join');
+
+  // the plain-id form still works, and stays a plain id on disk — `{ id: x }` is the same fact
+  // spelled worse for the person who opens the file (Law 1)
+  const str = propose({ kind: 'territory', territory: 'ofw-stories', why: 'Named in three finds.' }, { actor: 'scout-fb' });
+  assert.equal(str.territory, 'ofw-stories');
+  await accept(str.id, { actor: 'crystal' });
+  assert.equal(getTerritory('ofw-stories').access, 'requested');
+
+  // and anything with no resolvable id is refused at propose time, with both legal shapes named
+  for (const bad of [{}, { label: 'no id' }, [], '   ']) {
+    const r = await req('POST', '/api/proposals', { kind: 'territory', territory: bad, why: 'x', actor: 'scout-fb' });
+    assert.equal(r.status, 400, 'accepted a territory card with no id: ' + JSON.stringify(bad));
+    assert.match(r.body.error, /territory card names its ground with an id/);
+  }
+});
+
+test('accepting the interview\'s collection card writes its view into the vault, then and there', async () => {
+  freshRoot();
+  // `settleWorkspace()` only ran on the next GET /api/intake, which nothing calls after she presses
+  // the button — so the collection landed and its view existed only as the thing listViews()
+  // regenerates on read: not a file, not travelling with the data, not readable by an agent.
+  const ANSWERS = {
+    name: 'Crystal',
+    work: 'I produce a Philippine podcast about work and family. Most of my week goes on finding people worth interviewing',
+    win: 'Someone replies and agrees to a call',
+    chasing: 'Six guests with a hazing story, by the end of August',
+    thing: 'People who might be good guests',
+    know: 'Their name, where I found them, an email address, and how strong their story is out of ten',
+    where: 'Facebook groups for nurses, and groups for overseas workers',
+  };
+  for (const q of QUESTIONS) saveAnswer(q.key, ANSWERS[q.key] ?? '', { actor: 'crystal' });
+  const built = buildWorkspace({ actor: 'crystal' });
+  const cid = built.card.schema.id;
+  assert.ok(!fs.existsSync(path.join(R(), '.scout', 'views', cid + '.json')), 'no view before the card is decided');
+
+  const card = propose({
+    kind: 'schema', change: 'collection', schema: built.card.schema,
+    title: 'New collection · ' + cid, why: built.card.why, evidence: built.card.evidence,
+  }, { actor: 'scout' });
+  const done = await accept(card.id, { actor: 'crystal' });
+  assert.equal(done.effect, 'collection');
+  assert.ok(getCollection(cid), 'the collection exists only after the card was accepted');
+  assert.ok(fs.existsSync(path.join(R(), '.scout', 'views', cid + '.json')),
+    'the view must be on disk the moment the collection is — nothing else calls settleWorkspace()');
 });

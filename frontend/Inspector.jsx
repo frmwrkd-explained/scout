@@ -17,10 +17,24 @@ import { GraphPreview } from './Whiteboard';
 import { sx } from './sx';
 import { MONO } from './tokens';
 import { Eyebrow } from './ui';
+import { resolveWikilink } from './DecideCards';
 import PropertyRows, { rowsFor } from './PropertyRows';
 
 export const INSPECTOR_W = 302;
 const mono = (extra = '') => ({ ...sx(extra), fontFamily: MONO });
+
+// docs/05_UI_SPEC.md §1 draws the inspector "(collapsible)" — it never was. The preference is
+// remembered per SCREEN, the same working-preference pattern Document.jsx uses for PROPERTIES
+// (`scout.props.open.<collection>`): collapsing it while reading a document should not also
+// collapse it on the collection table, and vice versa.
+const COLLAPSE_KEY = screen => 'scout.inspector.collapsed.' + (screen || '_default');
+function readCollapsed(screen) {
+  try { return window.localStorage.getItem(COLLAPSE_KEY(screen)) === '1'; } catch { return false; }
+}
+function writeCollapsed(screen, on) {
+  try { window.localStorage.setItem(COLLAPSE_KEY(screen), on ? '1' : '0'); } catch { /* private mode */ }
+}
+const RAIL_COLLAPSED_W = 28;
 
 function Section({ id, name, count, open, onToggle, children }) {
   return (
@@ -44,7 +58,10 @@ function Nothing({ children }) {
 
 // `onChange(key, value)` is optional and is the ONLY difference between this panel reading a
 // record and editing it. Pass it and every non-derived property row here becomes live.
-export default function Inspector({ collection, doc, referencedBy = [], open, onToggle, onOpen, onChange, onOpenPath, onOpenBoard}) {
+// `screen` names the working-preference scope for the collapse toggle — App.jsx's current screen
+// key ('collection' | 'document'). Omit it and the preference is shared, which is still correct
+// behaviour, just one scope instead of two.
+export default function Inspector({ collection, doc, referencedBy = [], open, onToggle, onOpen, onChange, onOpenPath, onOpenBoard, screen }) {
   // HISTORY is the event log filtered to this one file — who changed what, agent or human,
   // newest first (T05 §4). It is fetched per selection rather than carried in the row, because a
   // table of 150 rows must not pay for 150 histories nobody opened.
@@ -59,11 +76,34 @@ export default function Inspector({ collection, doc, referencedBy = [], open, on
     return () => { alive = false; };
   }, [docPath]);
 
+  const [collapsed, setCollapsed] = React.useState(() => readCollapsed(screen));
+  React.useEffect(() => { setCollapsed(readCollapsed(screen)); }, [screen]);
+  const toggleCollapsed = () => setCollapsed(v => { writeCollapsed(screen, !v); return !v; });
+
+  if (collapsed) {
+    return (
+      <aside style={{ ...sx('flex:none;background:var(--surface);border-left:1px solid var(--line);display:flex;flex-direction:column;align-items:center'), width: RAIL_COLLAPSED_W }}>
+        <button type="button" onClick={toggleCollapsed} title="Expand the inspector" className="hFg"
+          style={{ ...mono('flex:none;width:100%;height:40px;display:flex;align-items:center;justify-content:center;background:none;border:none;border-bottom:1px solid var(--line);cursor:pointer;font-size:11px'), color: 'var(--fg-faint)' }}>
+          ‹
+        </button>
+      </aside>
+    );
+  }
+
+  const collapseBtn = (
+    <button type="button" onClick={toggleCollapsed} title="Collapse the inspector" className="hFg"
+      style={{ ...mono('flex:none;width:18px;height:18px;display:flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;font-size:10px'), color: 'var(--fg-faint)' }}>
+      ›
+    </button>
+  );
+
   if (!doc) {
     return (
       <aside style={{ ...sx('flex:none;background:var(--surface);border-left:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden'), width: INSPECTOR_W }}>
-        <div style={sx('flex:none;height:40px;display:flex;align-items:center;padding:0 16px;border-bottom:1px solid var(--line)')}>
+        <div style={sx('flex:none;height:40px;display:flex;align-items:center;justify-content:space-between;padding:0 12px 0 16px;border-bottom:1px solid var(--line)')}>
           <Eyebrow style={sx('font-size:9px;font-weight:800;letter-spacing:.18em;color:var(--fg-muted)')}>INSPECTOR</Eyebrow>
+          {collapseBtn}
         </div>
         <div style={sx('flex:1;display:flex;align-items:center;justify-content:center;padding:16px')}>
           <Nothing>NOTHING SELECTED</Nothing>
@@ -88,12 +128,15 @@ export default function Inspector({ collection, doc, referencedBy = [], open, on
             rendered as dead text it printed the promise of two clicks without honouring it, and
             with the row's open gesture hidden behind a double-click this was the last exit from a
             selected record. Selecting a row and clicking its path is now the two clicks. */}
-        <button type="button" title={onOpenPath ? 'Open ' + doc.path : doc.path}
-          onClick={() => onOpenPath && onOpenPath(doc.path)}
-          className={onOpenPath ? 'hAccent' : ''}
-          style={{ ...mono('font-size:9.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:none;border:none;padding:0'), color: 'var(--fg-faint)', cursor: onOpenPath ? 'pointer' : 'default' }}>
-          {doc.path}
-        </button>
+        <span style={sx('flex:1;min-width:0;display:flex;justify-content:flex-end')}>
+          <button type="button" title={onOpenPath ? 'Open ' + doc.path : doc.path}
+            onClick={() => onOpenPath && onOpenPath(doc.path)}
+            className={onOpenPath ? 'hAccent' : ''}
+            style={{ ...mono('font-size:9.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:none;border:none;padding:0'), color: 'var(--fg-faint)', cursor: onOpenPath ? 'pointer' : 'default' }}>
+            {doc.path}
+          </button>
+        </span>
+        {collapseBtn}
       </div>
 
       <div style={sx('flex:1;min-height:0;overflow-y:auto')}>
@@ -127,7 +170,18 @@ export default function Inspector({ collection, doc, referencedBy = [], open, on
           {linksOut.length ? (
             <>
               <span style={{ ...mono('font-size:8.5px;font-weight:700;letter-spacing:.12em;display:block;padding:4px 0'), color: 'var(--fg-faint)' }}>OUT / WRITTEN HERE</span>
-              {linksOut.map((l, i) => <div key={i} style={sx('font-size:12px;color:var(--fg-soft);padding:3px 0')}>{l}</div>)}
+              {linksOut.map((l, i) => {
+                // The one resolver (DecideCards.resolveWikilink) — never a second `|label` stripper.
+                const p = resolveWikilink('[[' + l + ']]');
+                return p && onOpenPath ? (
+                  <button key={i} type="button" onClick={() => onOpenPath(p)} className="hAccent"
+                    style={sx('font-size:12px;padding:3px 0;background:none;border:none;text-align:left;cursor:pointer;color:var(--accent)')}>
+                    {l}
+                  </button>
+                ) : (
+                  <div key={i} style={sx('font-size:12px;color:var(--fg-soft);padding:3px 0')}>{l}</div>
+                );
+              })}
             </>
           ) : <Nothing>NO WIKILINKS IN THE BODY</Nothing>}
         </Section>
@@ -140,15 +194,12 @@ export default function Inspector({ collection, doc, referencedBy = [], open, on
 
         {/* A PREVIEW that opens INTO the whiteboard — never a second graph feature (T05 §5).
             `GraphPreview` is exported by Whiteboard.jsx, so there is one implementation of the
-            relation view and the big canvas is the same code as the small one. */}
+            relation view and the big canvas is the same code as the small one. Its own button
+            carries THIS document's path, so the board it opens onto already has this record (and
+            its relations) placed — there is no second, path-less "open the whiteboard" control
+            here any more; two buttons doing the same thing is the bug this replaces. */}
         <Section id="graph" name="GRAPH" count={null} open={open === 'graph'} onToggle={onToggle}>
-          <GraphPreview doc={doc} references={referencedBy} onOpen={onOpenPath} />
-          {onOpenBoard ? (
-            <button type="button" onClick={onOpenBoard}
-              style={{ ...mono('display:block;margin-top:10px;padding:0;background:none;border:none;cursor:pointer;font-size:9.5px;font-weight:700;letter-spacing:.12em'), color: 'var(--accent)' }}>
-              OPEN THE WHITEBOARD →
-            </button>
-          ) : null}
+          <GraphPreview doc={doc} references={referencedBy} onOpenBoard={onOpenBoard} />
         </Section>
       </div>
     </aside>

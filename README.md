@@ -2,6 +2,23 @@
 
 A desktop app where a non-technical person **orchestrates AI agents** that work all day on their behalf, and **curates the memory those agents run on**. Local-first. Plain markdown on disk. React + Express + Electron.
 
+## Quick start
+
+```bash
+npm ci
+find . -name "._*" -not -path "./node_modules/*" -delete   # exFAT sidecars, see HANDOVER.md §3
+npm test                     # the suite
+npm run demonstrate          # GOAL.md's ten gates, against a throwaway copy of the workspace
+npm run demo                 # workspace-demo/ → workspace/  (refuses to overwrite an existing one)
+npm start                    # build + serve the whole app on 5177 — then press D
+```
+
+`npm run demonstrate` uses your own `workspace/` when you have one and the checked-in
+`workspace-demo/` fixture when you do not; it prints which. `npm run demo` is what gives a fresh
+clone something to look at — Crystal, her guests, her ground and a queue of decisions.
+`workspace/` is gitignored, so it is yours from that moment on and nothing in this repo will
+overwrite it.
+
 ## Read in this order
 
 1. **`GOAL.md`** — the acceptance contract and the ten gates. It wins every conflict.

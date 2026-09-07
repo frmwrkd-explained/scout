@@ -845,6 +845,167 @@ because the person concludes the app cannot do it and stops asking.
 
 ---
 
+## 2026-09-06 · A checked-in demonstration workspace, and why `npm run demo` refuses
+
+### The gap
+`workspace/` is gitignored — a workspace is a user's data and never belongs in this repo — but
+`scripts/demonstrate.mjs` copied `workspace/` unconditionally and `HANDOVER.md` told a new person
+to run `npm run demonstrate` first and then `npm start` and press `D`. **On a fresh clone both were
+impossible:** demonstrate died on the missing folder before printing a single gate, and `npm start`
+landed on the first-run interview with nothing in it. GOAL.md gate 10 — *"a second person can run
+and extend the app from these docs alone"* — therefore failed on the one thing the docs open with,
+and no test could see it, because every test builds its own root in `/tmp`.
+
+### The decision: a fixture in the repo, not a generator
+`workspace-demo/` is checked in as plain markdown — Crystal, 22 guests, 8 groups, 7 pieces of
+ground, five playbook claims, four learnings, four assistants, a project with tasks, a DECIDE queue
+of six kinds, three runs and two days of event log. `demonstrate.mjs` copies `workspace/` when it
+exists and `workspace-demo/` when it does not, and **prints which one it used** — "10 of 10" over an
+unnamed workspace is a claim nobody can check.
+
+**Why a fixture and not a seed script.** Law 1 says the files are the truth. A generator would make
+the truth a program, and the first question anybody asks of demo data — *"what does a real record
+look like on disk?"* — would then be answered by reading code instead of by opening a file. It also
+makes the fixture editable by the person it is for: `workspace-demo/` opens in Obsidian like any
+other vault. The build script that produced it wrote every file through `store.mjs writeMd`, so the
+frontmatter is byte-for-byte the shape the pipeline writes, and then it was thrown away.
+
+### `npm run demo` refuses to overwrite `workspace/`
+It copies `workspace-demo/` → `workspace/`, sweeps `._*` on the way in, and **stops with one line
+and exit 1 if `workspace/` already exists.** Law 5 is not a rule about the app only. A convenience
+script that clobbers somebody's real vault to save them one `rm` is the same failure with a
+friendlier name, and it is worse than the app doing it, because nobody expects a setup command to
+destroy anything. Moving the existing workspace out of the way stays the person's decision.
+
+### Dates are frozen against 2026-09-06, so decay is visible rather than described
+The fixture is not "recent data": every date in it was chosen so the intended things read stale on
+the day it was written and the rest read fresh. `playbook/two-message-rule` and
+`playbook/screenshot-the-post` are past their 30-day window, so they are excluded from the hot cache
+and named in `excluded[]` while their files stay untouched. `territory/ofw-stories` is twelve days
+unswept against a seven-day interval, so it renders `← STALE`. `territory/manila-nurses` is
+`rejected 2026-07-30 · do not re-request`, `territory/health-workers` is `pending since 8d`, and
+`territory/frat-alumni-ph` is untried and attributed to the vetter. Both goals have deadlines in the
+future so "days left" is positive, and exactly one of them is behind. That is gate 7 demonstrated by
+data rather than asserted by a comment — and it is the reason the fixture should be re-dated, not
+"refreshed", if it ever stops reading the way it is meant to.
+
+### Two ids, two objects, on purpose
+A piece of ground is **both** a `#group` record under `data/groups/` and a memory object at
+`territory/<id>.md`, under the same id. The group carries the catalogue — members, platform, and the
+hand-counted `finds` / `booked` that `my-best` sorts on (seeding ambiguity 5, above). The territory
+carries the live scoreboard, whose `finds` / `wins` / `hit_rate` are rollups `backend/territory.mjs`
+computes and nobody types. `guest.found_in` points at the id, so it resolves as a relation chip to
+the group **and** scores the territory, with one value and no second source of truth.
+`manila-foodies` is deliberately a group with no territory file: 62 finds, 0 booked, dropped as
+working ground — it is why `my-best` sorts on `booked` and never on `finds`.
+
+### `guest.found_in` targets `#group`, not `#territory`
+`backend/collections.mjs` validates a relation's `target` against the collections that actually
+exist on disk, and `addField` re-validates the whole schema. A `found_in` pointing at `territory`
+would therefore need a third collection file whose only purpose is to satisfy the validator — and
+gate 8, which adds a field to `#guest` through the real route, would 400 without it. Pointing at
+`#group` is both true (that is where the person was found) and self-contained.
+
+---
+
+## 2026-09-06 · Finishing pass — what an end-to-end walk found, and the calls taken fixing it
+
+Context: three auditors walked the app the way a person and an agent do — one drove every
+route with the bodies the UI sends, one read every core screen against the spec, one read the
+memory and utility screens — and 45 findings came back, most reproduced with a curl. The fixes
+were built by three parallel implementers under strict file ownership (docs/08 §0's rule). The
+decisions each of them took where the docs were silent:
+
+### The DECIDE queue
+- **A human answering her own assistant is the evidence.** A `question` card could not be accepted
+  at all — the effect wrote an active learning and `saveLearning` refused it for having no
+  `evidence[]`, a word that appears nowhere on her screen. The answer now lands with the card's own
+  file as its evidence (`[[proposals/<id>]]`, the wikilink convention every other card uses), and the
+  hot cache renders it as `question — answer` rather than a bare "Yes." bullet competing for the
+  2,000-token budget with claims that carry proof.
+- **A blocked task's card is titled the way the screen titles it.** `pullIntoDecide` read the slug
+  id and never the `question` the agent was told to send. `humanName(task)` mirrors
+  `Assistants.jsx taskTitle()` — `label || (title ≠ id) || id` — so the card and the roster agree.
+- **A territory is one shape on the way in and one function on the way out.** `territoryOf()` accepts
+  a bare id or `{ id, label, kind, url }`; a card with no resolvable id is a 400, and
+  `territory/_object_Object_.md` cannot be written again. A bare id stays a bare id on disk (Law 1 —
+  `territory: ofw-uk` is what a person should read).
+- **`POST /api/territory/propose` writes nothing.** It made a memory object with `proposed: true`
+  and no card, and the cache then listed the unapproved group under NEVER TRIED. It now makes a
+  `territory` card through `propose()`; accepting the card is what writes the file, at
+  `access: requested`. `why` is mandatory, because a card nobody can judge is a chore.
+- **An agent's `store` is a decision.** Forty overnight finds showed `NEEDS YOU: 0`, because only
+  proposal cards count. `upsertRecord` now raises a `finding` card when the actor is an agent, the
+  verdict is `store`, and no open finding card already points at the record. `update`, `merge` and
+  `skip` raise nothing. The Index and the router skill say so, so an agent does not double-post.
+
+### Tasks
+- **A task id comes from one function.** `taskIdFrom({ id, title, label })`; a POST naming nothing is
+  a 400, and `saveTask` refuses the id `untitled` when the patch names nothing. Two label-only
+  POSTs used to become one file with the second label and the first task's territory (Laws 5 and 6).
+
+### Schemas
+- **`multiselect` may declare no options — it is then an open vocabulary.** "Seeding ambiguity 1"
+  resolved: a tag field whose options must be declared up front is not a tag field. `select` and
+  `status` still require a fixed set; declared options are still validated on all three.
+- **`addField` validates the incoming field and the invariants, not the neighbours.** A pre-existing
+  bad field is returned as `warnings[]` naming it, instead of a 400 naming a field the person never
+  touched — which is what made `+ Add property` fail on the shipped #guest for a whole build.
+- **A dangling `default_view` is said, not swallowed.** `listViews` returns `warnings[]`, the UI toasts
+  it, and the template ships the views its schemas name (`needs-review`, `pipeline`, `my-best`).
+
+### Memory and the cache
+- **Worked ground is `joined` OR `finds > 0`; blocked beats worked.** Territory the interview seeds is
+  `untried`, and it stayed so after finds and a win, so the agent was told the group it won on had
+  never been tried. A rejected group with old finds renders under BLOCKED only.
+- **`proposed: true` is invisible to the cache everywhere.** Belt and braces beside the route change.
+- **Regenerations are not activity.** SINCE YOUR LAST RUN spent one of its six lines on "regenerated
+  the cache", and rendered a card's `why` prose as a tally suffix. `cache` events are excluded before
+  the cut; `reason` (a closed vocabulary) is still tallied, `why` (prose) is not.
+- **Every memory writer schedules its own regeneration.** The hook used to be wired only when routes
+  were registered, so a write from the MCP process never invalidated the cache while
+  `cache/version` swore it was fresh. `flushCacheRegen()` exists for a process about to exit.
+- **`records.mjs` writes only under `data/`.** `PATCH /api/records` — the door the document surface
+  sends every `.md` through — had no scope guard: an agent refused at `PUT /api/me` could rewrite
+  `me.md` and a goal's target through it, to HTTP 200. Outside `data/` the route now 403s an agent
+  with the memory route's own string and delegates a human's edit to the owning writer.
+- **A goal can be created.** `POST /api/goals` (409 on an existing id), and the interview writes the
+  first one from the `chasing` answer — number words parsed, a date resolved forward, progress
+  counted over the new collection's gate. A goal with a label and no number beats no goal.
+- **The Index names the port that is bound.** `selfPort()` fell back to FrameForge's 5176;
+  `setSelfPort(server.address().port)` is called from the listen callback and from `demonstrate`.
+
+### The frontend half
+- **`frontend/ScoutSettings.jsx`, not `Settings.jsx`.** FrameForge's settings screen was 433 lines
+  nothing mounted; the theme radio and the key field were lifted into a Scout-native screen with a
+  name that cannot be confused with the deleted one. It also carries the storage root with Reveal
+  and the keyboard cheat sheet — the only place the app's keys are written where a person can read them.
+- **A toast clears itself unless it is a refusal.** Danger-toned toasts (a gate refusal is the one
+  that matters) wait for a click; everything else clears after 8s and on any navigation, so a stale
+  confirmation never sits over the next screen.
+- **`location.js` and `slashCommands.js` stay** although nothing in the running app imports them:
+  a test guards each, and the M0 decision recorded keeping `slashCommands` trimmed. Deleting a
+  guarded module is a decision for whoever removes the guard.
+- **A blocked task's card id is computed client-side** as `task-<project>-<id>`, mirroring
+  `tasks.mjs pullIntoDecide`, rather than adding a lookup route for one click.
+- **One "open in the whiteboard" control, not two.** The inspector's path-less "OPEN THE WHITEBOARD"
+  link and the GRAPH preview's button did the same job with different results; the button now
+  carries the path and places the document and its relations on the board (Law 10).
+- **Only a `status` field is a stage.** The collapsed row falls back to a `select` for display, and
+  the promote button borrowed that fallback — on `#group` it offered "instagram" as the next stage.
+  `nextStage` now requires `type: status`; a collection without one has no promote button.
+- **The territory node's HIT RATE is `hit_rate` as computed** (`territory.mjs` gives a percentage);
+  the node multiplied it by 100 and printed 2500%.
+
+### The fixture exec bits (a trap, now guarded)
+Four stub CLIs under `tests/fixtures/` were committed as `100644`. On a checkout that honours
+modes — every Linux clone, most macOS clones off exFAT — seven tests died with `spawn … EACCES`,
+which reads like a runner bug. They are `100755` now and `tests/_env.mjs` re-asserts the bit, so a
+zip download or a mode-stripping filesystem cannot bring the failure back. The CI workflow runs on
+ubuntu for exactly this class of defect.
+
+---
+
 ## Wiring the runner: the one button, and what it exposed (2026-08-26)
 
 The open item was the one visible on the app's first screen. TODAY has carried a `Send them out`
@@ -983,3 +1144,4 @@ Range requests are answered with 206 because Safari will not play a video at all
 `RenderTile` now falls back to its named plate on a media error — a path that escapes the workspace
 is refused server-side, and a NAMED PLATE says *"this file is not here"* where a broken-image glyph
 says *"this app is broken"*.
+

@@ -219,7 +219,27 @@ export function documentAt(relPath) {
   if (!fs.existsSync(abs)) return null;
   const { data, content } = readMd(abs);
   const rel = path.relative(root, abs).split(path.sep).join('/');
-  return { path: rel, slug: path.basename(abs, '.md'), data, content, summary: firstParagraph(content) };
+  return { path: rel, slug: path.basename(abs, '.md'), data, content, summary: firstParagraph(content), kind: kindOf(rel) };
+}
+
+// What KIND of object a path is, for the documents (`data/`) that match no collection at all —
+// a memory object (docs/02_DATA_MODEL.md §5). Item 1 of the wave-2 audit: the document surface
+// used to render such a file through whatever collection the RAIL happened to have active, because
+// "no collection" and "not loaded yet" looked identical. `kind` lets the surface label the header
+// truthfully ("IDENTITY · me.md") instead of silently borrowing a collection's schema. A record
+// under `data/<collection>/` already has its collection id for that (`documentsOf`/`readRecord`'s
+// `collection` field) — this only names the OTHER shapes on disk, so it stays `'other'` for those.
+export function kindOf(relPath) {
+  const p = String(relPath || '').replace(/^\.\//, '');
+  if (p === 'me.md') return 'identity';
+  if (p.startsWith('goals/')) return 'goal';
+  if (p.startsWith('territory/')) return 'territory';
+  if (p.startsWith('playbook/')) return 'playbook';
+  if (p.startsWith('learnings/')) return 'learning';
+  if (p.startsWith('assistants/')) return 'assistant';
+  if (/^projects\/[^/]+\/tasks\//.test(p)) return 'task';
+  if (/^projects\/[^/]+\/(project|brief|learned)\.md$/.test(p)) return 'project';
+  return 'other';
 }
 
 // The summary is the human sentence the document surface shows first (docs/05_UI_SPEC.md §2.1) —

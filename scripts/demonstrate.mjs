@@ -20,9 +20,22 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const KEEP = process.argv.includes('--keep');
 
+// The workspace to demonstrate against. `workspace/` is a real person's data and is gitignored, so
+// on a fresh clone it is simply not there — and a demonstration that cannot run on a fresh clone
+// fails gate 10 by itself. `workspace-demo/` is the checked-in fixture that stands in for it: the
+// same shape, none of anybody's real names. Which one was used is PRINTED, because "10 of 10" over
+// an unknown workspace is a claim nobody can check.
+const SOURCE = ['workspace', 'workspace-demo']
+  .map(name => ({ name, dir: path.join(ROOT, name) }))
+  .find(c => fs.existsSync(c.dir));
+if (!SOURCE) {
+  console.error('no workspace to demonstrate against: neither workspace/ nor workspace-demo/ exists in ' + ROOT);
+  process.exit(2);
+}
+
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'scout-demo-'));
 const ws = path.join(tmp, 'workspace');
-fs.cpSync(path.join(ROOT, 'workspace'), ws, { recursive: true });
+fs.cpSync(SOURCE.dir, ws, { recursive: true });
 for (const f of walk(ws)) if (path.basename(f).startsWith('._')) fs.rmSync(f, { force: true });
 
 // Claim BOTH: getStorageRoot() reads the config.md pointer first, so SCOUT_DATA alone can be
@@ -38,8 +51,10 @@ await new Promise(r => server.once('listening', r));
 const BASE = 'http://127.0.0.1:' + server.address().port;
 // The brief an assistant is handed renders its api base from this. index.mjs stamps it when it
 // binds for real; here the harness picked an ephemeral port, so stamp it ourselves or every
-// spawned assistant would be told to curl a port nothing is listening on.
-process.env.SCOUT_SELF_PORT = String(server.address().port);
+// spawned assistant would be told to curl a port nothing is listening on. setSelfPort() is the
+// one door — it sets SCOUT_SELF_PORT itself, so a spawned agent inherits the same answer.
+const { setSelfPort } = await import('../backend/agentHome.mjs');
+setSelfPort(server.address().port);
 
 // ── plumbing ────────────────────────────────────────────────────────────────────────────────
 const C = { dim: '\x1b[2m', red: '\x1b[31m', green: '\x1b[32m', yellow: '\x1b[33m', bold: '\x1b[1m', off: '\x1b[0m' };
@@ -96,6 +111,8 @@ const fmOf = (rel, key) => (read(rel).match(new RegExp('^' + key + ':\\s*(.+)$',
 
 // ════════════════════════════════════════════════════════════════════════════════════════════
 console.log(C.bold + '\nSCOUT — GOAL.md §4, the ten gates' + C.off);
+console.log(C.dim + 'source: ' + SOURCE.name + '/' +
+  (SOURCE.name === 'workspace-demo' ? ' (the checked-in fixture — `npm run demo` copies it to workspace/)' : ' (your own data)') + C.off);
 console.log(C.dim + 'workspace copy: ' + ws + C.off);
 
 // ── 1 ───────────────────────────────────────────────────────────────────────────────────────

@@ -14,6 +14,14 @@
 // `onOpen(row)` opens a record; `onFollow(collection, id)` follows a relation chip. They were
 // ONE prop called `onOpen` with two signatures, which made every relation chip in the app dead.
 //   + onMove — the board's drag handler. It is passed to every renderer and ignored by three.
+//   + quarantined  [{ path, slug, title }]  records under this collection's query that were
+//     written to `data/` without passing through records.mjs (docs/01_CANON.md Law 4 §3). Held OUT
+//     of `rows`/`counts` on purpose — never counted until a human accepts them — but Law 8 says
+//     nothing is hidden from a human who wants to look, so THIS file renders them (see
+//     QuarantineStrip below), rather than leaving the prop threaded in and drawn by nobody.
+//   + onAccept(path)  optional; present ⇒ the strip's Accept button calls it (`POST
+//     /api/records/accept` — a human-only route). Absent ⇒ the record is still LISTED — visibility
+//     does not depend on the write path existing — the button is simply not offered.
 
 import React from 'react';
 import { sx } from './sx';
@@ -61,6 +69,60 @@ export function QueryBar({ collection, view, total, path }) {
   );
 }
 
+// ── quarantined — visible, never counted, until a human says otherwise (Law 4 §3 / Law 8) ───────
+// `App` has threaded `quarantined` into this component since it landed (an audit found it "dropped
+// for the cap"), and no view type ever rendered it — capability with no affordance, HANDOVER §3's
+// exact pattern. A compact strip, not a row in the table: a quarantined record does not belong to
+// the collection yet (it is excluded from `rows`, `counts`, every rollup and every score), so it
+// must not read as though it does.
+function QuarantineStrip({ items, onAccept }) {
+  const [busy, setBusy] = React.useState(null);
+  const [error, setError] = React.useState(null);
+  if (!items || !items.length) return null;
+
+  const accept = async path => {
+    if (!onAccept || busy) return;
+    setBusy(path); setError(null);
+    try { await onAccept(path); }
+    catch (e) { setError(e.message || String(e)); }
+    finally { setBusy(null); }
+  };
+
+  return (
+    <div style={{ ...sx('flex:none;display:flex;flex-direction:column;gap:8px;padding:10px 20px'), background: 'var(--surface-2)', borderBottom: '1px solid var(--border)', borderLeft: '2px solid var(--warn)' }}>
+      <div style={sx('display:flex;align-items:center;gap:10px;flex-wrap:wrap')}>
+        <span style={{ ...mono('font-size:9px;font-weight:800;letter-spacing:.16em'), color: 'var(--warn)' }}>
+          HELD APART <span style={mono('font-variant-numeric:tabular-nums')}>{items.length}</span>
+        </span>
+        <span style={{ ...sx('font-size:11px'), color: 'var(--fg-faint)' }}>
+          Written into data/ without passing the pipeline — excluded from every count until accepted.
+        </span>
+      </div>
+      <div style={sx('display:flex;flex-direction:column;gap:5px')}>
+        {items.map(it => (
+          <div key={it.path} style={sx('display:flex;align-items:center;gap:12px')}>
+            <span style={{ ...sx('flex:1;min-width:0;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'), color: 'var(--fg-soft)' }}>
+              {it.title || it.slug}
+            </span>
+            <span style={{ ...mono('font-size:9.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px'), color: 'var(--fg-faint)' }}>
+              {it.path}
+            </span>
+            {onAccept ? (
+              <button type="button" onClick={() => accept(it.path)} disabled={busy === it.path} className="hAccent"
+                style={{ ...mono('flex:none;font-size:9.5px;font-weight:700;letter-spacing:.08em;padding:3px 9px;border-radius:5px;cursor:pointer'), background: 'none', border: '1px solid var(--warn)', color: 'var(--warn)' }}>
+                {busy === it.path ? 'ACCEPTING…' : 'ACCEPT'}
+              </button>
+            ) : null}
+          </div>
+        ))}
+      </div>
+      {error ? (
+        <span style={{ ...mono('font-size:9.5px;font-weight:600;letter-spacing:.04em'), color: 'var(--danger)' }}>{error}</span>
+      ) : null}
+    </div>
+  );
+}
+
 // ── the table ──────────────────────────────────────────────────────────────────────────────────
 // `chrome` says who draws the view strip and the query bar. All four take it now; the flag stays
 // because a future renderer (a calendar, a map) may legitimately want the whole pane. It is a
@@ -92,6 +154,7 @@ export default function CollectionView(props) {
         onPickView={onPickView} onSaveView={props.onSaveView} onDeleteView={props.onDeleteView}
       />
       <QueryBar collection={collection} view={view} total={(rows || []).length} path={collection.query?.path || '—'} />
+      <QuarantineStrip items={props.quarantined} onAccept={props.onAccept} />
       <Body {...props} />
     </div>
   );

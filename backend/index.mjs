@@ -27,7 +27,7 @@ import { currentRevision, bump, changedSince, subscribe, integrityReport, reconc
 import { listSessions, getSession, saveSession, deleteSession } from './sessions.mjs';
 import { registerChatRoutes, getSession as getChatSession } from './chat.mjs';
 import { registerDistillRoutes } from './distill.mjs';
-import { registerAgentHomeRoutes, chatSkillsSurface } from './agentHome.mjs';
+import { registerAgentHomeRoutes, chatSkillsSurface, setSelfPort } from './agentHome.mjs';
 import { testAgentPipeline } from './agentRunner.mjs';
 import { registerUserToolRoutes } from './userTools.mjs';
 import { search as structuredSearch } from './search.mjs';
@@ -1006,7 +1006,12 @@ if (IS_MAIN) {
   process.env.SCOUT_SELF_PORT = String(PORT); // ticket 10 — the agent home renders the Index's api base from this
   // Without an 'error' listener an occupied port kills the process with a raw unhandled
   // EADDRINUSE stack — the usual cause being a previous instance that never shut down.
-  const server = app.listen(PORT, HOST, () => console.log('[scout] api on ' + HOST + ':' + PORT + ' · storage root ' + getStorageRoot()));
+  const server = app.listen(PORT, HOST, () => {
+    // The BOUND port is the truth — an ephemeral bind (port 0) means the Index would otherwise
+    // hand every agent an api base nothing listens on.
+    setSelfPort(server.address().port);
+    console.log('[scout] api on ' + HOST + ':' + server.address().port + ' · storage root ' + getStorageRoot());
+  });
   server.on('error', e => {
     if (e.code === 'EADDRINUSE') {
       console.error('[scout] port ' + PORT + ' is already in use — another Scout is probably running.');

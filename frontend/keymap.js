@@ -1,54 +1,29 @@
-// Rebindable keyboard map — PURE module, no React.
-// Defaults live here; user overrides persist as settings.keys ({ actionId: key }).
-// Keys are stored as e.key.toLowerCase() values (' ' = Space). Escape, Enter, Tab,
-// arrows, digits 1–5 and anything with ⌘/⌃/⌥ are reserved and can't be bound.
-export const KEY_ACTIONS = [
-  { id: 'help',       def: '?', ctx: 'Global',        label: 'shortcut cheat sheet' },
-  { id: 'search',     def: '/', ctx: 'Global',        label: 'search & jump (same as ⌘K)' },
-  { id: 'inbox',      def: 'i', ctx: 'Global',        label: 'open / resume the review Inbox' },
-  { id: 'queue',      def: 'q', ctx: 'Global',        label: 'open the generation Queue' },
-  { id: 'undo',       def: 'u', ctx: 'Global',        label: 'undo last action' },
-  { id: 'goHome',     def: 'h', ctx: 'Global',        label: 'go to Home' },
-  { id: 'goTools',    def: 't', ctx: 'Global',        label: 'go to Tools' },
-  { id: 'goLibrary',  def: 'b', ctx: 'Global',        label: 'go to Library' },
-  { id: 'styleLocks', def: 's', ctx: 'Global',        label: 'open style lock picker' },
-  { id: 'projGenerate', def: 'g', ctx: 'Global',      label: 'jump to project Generate tab' },
-  { id: 'quickNote',  def: 'n', ctx: 'Global',        label: 'quick note → project memory' },
-  { id: 'openMemory', def: 'm', ctx: 'Global',        label: 'open References → Memory' },
-  { id: 'feedback',   def: 'f', ctx: 'Global',        label: 'send feedback' },
-  { id: 'review',     def: 'r', ctx: 'Project',       label: 'enter review mode (Generate → Review)' },
-  { id: 'reel',       def: 'a', ctx: 'Project',       label: 'open the Reel (animatic)' },
-  { id: 'reelExport', def: 'e', ctx: 'Reel',          label: 'write the animatic conform pack' },
-  { id: 'keep',       def: 'k', ctx: 'Review · Item', label: 'keep' },
-  { id: 'kill',       def: 'x', ctx: 'Review · Item', label: 'kill' },
-  { id: 'note',       def: 'n', ctx: 'Review · Item', label: 'note → re-roll' },
-  { id: 'play',       def: ' ', ctx: 'Review · Item', label: 'play / pause' },
-  { id: 'final',      def: 'l', ctx: 'Item',          label: 'mark final' },
-  { id: 'copyPrompt', def: 'p', ctx: 'Item',          label: 'copy prompt' },
-  { id: 'compare',    def: 'c', ctx: 'Item',          label: 'A/B compare versions' },
-  { id: 'reveal',     def: 'o', ctx: 'Item',          label: 'reveal in Finder' }
+// Scout's real keyboard bindings — PURE module, no React.
+//
+// This used to be FrameForge's whole rebindable action list (30-odd entries: Inbox, Queue, Home,
+// Library, Tools, Reel export, item review keep/kill…) for an app whose screens Scout never ported.
+// Only `keyLabel` had a live importer (Decide.jsx). Reduced to what is actually true here: Scout
+// has no settings.keys and no rebinding UI — every key below is fixed, the way Decide.jsx's own
+// header says it is ("the keys never move") — so this is a plain list, read by the Settings
+// screen's cheat sheet, not a resolver.
+export const KEYS = [
+  { key: 'D',    ctx: 'Global',   label: 'open the DECIDE queue' },
+  { key: '⌘K',   ctx: 'Global',   label: 'search & jump' },
+  { key: '⌥⌘L',  ctx: 'Global',   label: 'toggle light / dark' },
+  { key: 'Esc',  ctx: 'Global',   label: 'back / close' },
+  { key: 'A',    ctx: 'Decide',   label: 'accept the card' },
+  { key: 'R',    ctx: 'Decide',   label: 'reject → pick a reason, 1–5' },
+  { key: 'S',    ctx: 'Decide',   label: 'skip — comes back at the end (G)' },
+  { key: 'W',    ctx: 'Decide',   label: 'WHY — one paragraph of reasoning' },
+  { key: 'E',    ctx: 'Decide',   label: 'EVIDENCE — the record behind the card' },
+  { key: 'O',    ctx: 'Decide',   label: 'open the record on its own screen' },
+  { key: 'J / K',ctx: 'Decide',   label: 'next / previous card' },
+  { key: '⌘Z',   ctx: 'Decide',   label: 'undo the last decision' },
+  { key: 'P',    ctx: 'Document', label: 'toggle PROPERTIES open or collapsed' },
+  { key: '⌘S',   ctx: 'Document', label: 'force the pending save now' },
 ];
-
-// Not rebindable — shown for completeness in Settings.
-export const FIXED_KEYS = [
-  ['⌘K', 'command palette'],
-  ['1–5', 'fine rating (item)'],
-  ['← →', 'previous / next · scrub'],
-  ['Esc', 'exit / back']
-];
-
-export const RESERVED = new Set(['escape', 'enter', 'tab', 'backspace', 'delete',
-  'arrowleft', 'arrowright', 'arrowup', 'arrowdown', '1', '2', '3', '4', '5']);
-
-// action id → active key, with settings.keys overrides applied
-export function resolveKeys(settings) {
-  const o = (settings && settings.keys) || {};
-  const m = {};
-  KEY_ACTIONS.forEach(a => { m[a.id] = (typeof o[a.id] === 'string' && o[a.id]) ? o[a.id] : a.def; });
-  return m;
-}
 
 export function keyLabel(k) {
   if (k === ' ') return 'Space';
-  return k.length === 1 ? k.toUpperCase() : k;
+  return String(k).length === 1 ? String(k).toUpperCase() : k;
 }

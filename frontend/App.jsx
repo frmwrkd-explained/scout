@@ -23,6 +23,11 @@ import { initTheme } from './theme';
 import Rail from './Rail';
 import Inspector from './Inspector';
 import Activity from './Activity';
+import Palette from './Palette';
+// The new Scout-native settings screen — NOT frontend/Settings.jsx, which is FrameForge's and is
+// deleted (item D). Its theme radio and key input are ported here; the name is deliberately
+// different so a later cleanup pass can never confuse the two.
+import ScoutSettings from './ScoutSettings';
 import CollectionView from './CollectionView';
 import Document from './Document';
 import Today from './Today';
@@ -60,8 +65,8 @@ export default class App extends React.Component {
     referencedBy: [], refsFor: null, external: null,
     assistants: [], memoryCounts: {}, needsYou: 0, project: null, projects: [],
     activityOpen: false, nonce: 0, refreshKey: 0, findings: null,
-    firstRun: false,
-    loading: true, error: null, toast: null,
+    firstRun: false, paletteOpen: false,
+    loading: true, error: null, toast: null, toastDanger: false,
   };
 
   componentDidMount() {
@@ -73,9 +78,14 @@ export default class App extends React.Component {
     initTheme();
     this.boot();
     this.watchRuns();
+    window.addEventListener('keydown', this.onGlobalKey);
   }
 
-  componentWillUnmount() { clearInterval(this.runWatch); }
+  componentWillUnmount() {
+    clearInterval(this.runWatch);
+    window.removeEventListener('keydown', this.onGlobalKey);
+    clearTimeout(this._toastTimer);
+  }
 
   // ── while anybody is out ───────────────────────────────────────────────────────────────────
   // A run answers before it finishes — that is the design (backend/dispatch.mjs) — so the card that
@@ -97,6 +107,32 @@ export default class App extends React.Component {
       this.setState(s => ({ nonce: s.nonce + 1, refreshKey: s.refreshKey + 1 }));
     }, RUN_POLL_MS);
   };
+
+  // ⌘K everywhere — the palette is a screen-independent overlay, not a route.
+  onGlobalKey = e => {
+    if ((e.metaKey || e.ctrlKey) && String(e.key).toLowerCase() === 'k') {
+      e.preventDefault();
+      this.setState(s => ({ paletteOpen: !s.paletteOpen }));
+    }
+  };
+
+  // The app's one toast channel (item 9 — VoiceInput and Interview call this as `app.showToast`).
+  // `tone` is either a semantic word ('danger') or one of the CSS-var strings VoiceInput already
+  // sends ('var(--danger)', 'var(--warn)'); only danger sticks — a refusal is the important kind
+  // of toast and must not vanish while she is still reading it. Everything else clears itself
+  // after 8s AND whenever she navigates (go()/openPath()), so a stale confirmation does not sit
+  // over the next screen she opens.
+  showToast = (message, tone) => {
+    const danger = tone === 'danger' || tone === 'var(--danger)';
+    clearTimeout(this._toastTimer);
+    this.setState({ toast: message, toastDanger: danger });
+    if (!danger) {
+      this._toastTimer = setTimeout(() => {
+        this.setState(s => (s.toast === message ? { toast: null, toastDanger: false } : null));
+      }, 8000);
+    }
+  };
+  clearToast = () => { clearTimeout(this._toastTimer); this.setState({ toast: null, toastDanger: false }); };
 
   async boot() {
     // Law 9 — the workspace is built WITH the person. A brand-new install has no `me.md` and no
@@ -162,11 +198,15 @@ export default class App extends React.Component {
 
   // ── navigation ─────────────────────────────────────────────────────────────────────────────
   go = (screen, arg) => {
-    if (screen === 'newCollection') return this.setState({ screen: 'decide', toast: 'A new collection is a proposal — it arrives here as a card.' });
+    this.clearToast();
+    if (screen === 'newCollection') { this.showToast('A new collection is a proposal — it arrives here as a card.'); return this.setState({ screen: 'decide' }); }
     // Its OWN key. Putting an assistant id in `active` blanked the collection screen, because
     // `activeCollection` is looked up from the same field.
     if (screen === 'assistant') return this.setState({ screen: 'assistants', activeAssistant: arg });
-    this.setState({ screen, ...(arg ? { arg } : {}) });
+    // `arg` always lands, cleared or set — a stale one from the last screen otherwise rides along
+    // silently. `arg ?? null`, not `arg || null`: a falsy-but-real argument (an empty-string path,
+    // a 0) must still overwrite what was there, never fall through to the same default.
+    this.setState({ screen, arg: arg ?? null });
   };
 
   // A path is the app's one address for a thing on disk. Opening one always lands on the document
@@ -174,11 +214,14 @@ export default class App extends React.Component {
   // straight from their frontmatter. That is why Law 8 costs two clicks everywhere and not five.
   openPath = path => {
     if (!path) return;
+    this.clearToast();
     // A `.md` opens on the document surface — that is Law 8's two clicks, and it is the same
     // surface for a record, a territory and a playbook claim. Anything else (a screenshot, a PDF)
     // has no frontmatter to render, so it goes to the file browser instead of an empty editor.
     if (!String(path).endsWith('.md')) return this.setState({ screen: 'files', arg: path });
-    this.setState({ screen: 'document', docPath: path, selected: path, section: 'props' });
+    // `arg` cleared here too, not only in go() — a stale one from wherever she was standing
+    // (a re-brief target, a board placement) must not survive onto the document screen.
+    this.setState({ screen: 'document', docPath: path, selected: path, section: 'props', arg: null });
     this.loadReferences(path);
     this.loadExternal(path);
   };
@@ -194,8 +237,8 @@ export default class App extends React.Component {
       api.allDocuments(collection).then(r => {
         const hit = (r.rows || []).find(x => x.slug === id);
         if (hit) this.openPath(hit.path);
-        else this.setState({ toast: 'Nothing called "' + id + '" in #' + collection + ' yet.' });
-      }).catch(() => this.setState({ toast: 'Could not follow that link.' }));
+        else this.showToast('Nothing called "' + id + '" in #' + collection + ' yet.');
+      }).catch(() => this.showToast('Could not follow that link.'));
       return;
     }
     // No target collection named — look for the slug anywhere before giving up, because a memory
@@ -206,20 +249,30 @@ export default class App extends React.Component {
     )).then(hits => {
       const hit = hits.find(Boolean);
       if (hit) this.openPath(hit.path);
-      else this.setState({ toast: 'Nothing called "' + id + '" here yet.' });
-    }).catch(() => this.setState({ toast: 'Could not follow that link.' }));
+      else this.showToast('Nothing called "' + id + '" here yet.');
+    }).catch(() => this.showToast('Could not follow that link.'));
   };
 
   // ── collections ────────────────────────────────────────────────────────────────────────────
   // Every view's count is a real query, not an estimate — the rail and the view strip must never
   // disagree with the table they sit above.
-  async pickCollection(id, viewId = null, { navigate = true } = {}) {
+  //
+  // `keepSelection` is for an IN-PLACE refresh (reload(), a board drag) rather than a navigation —
+  // the inspector must not go blank because a refresh happened to run. The selection is then
+  // re-resolved against the rows that actually came back: still there → kept; gone (archived,
+  // filtered out by the view) → cleared, because showing a document the view no longer holds is
+  // worse than showing nothing.
+  async pickCollection(id, viewId = null, { navigate = true, keepSelection = false } = {}) {
     this.setState(s => ({
-      active: id, selected: null, referencedBy: [], refsFor: null, external: null,
+      active: id,
+      ...(keepSelection ? {} : { selected: null, referencedBy: [], refsFor: null, external: null }),
       screen: navigate ? 'collection' : s.screen,
     }));
     try {
-      const { views } = await api.views(id);
+      // `warnings` names a `default_view` that points at nothing — silently falling back to
+      // index 0 is how #guest opened as a board called "Everything" for a whole build.
+      const { views, warnings } = await api.views(id);
+      if (warnings && warnings.length) this.showToast(warnings[0]);
       const results = await Promise.all(views.map(v => api.documents(id, v.id).catch(() => null)));
       const viewCounts = {};
       views.forEach((v, i) => { if (results[i]) viewCounts[v.id] = results[i].rows.length; });
@@ -227,11 +280,15 @@ export default class App extends React.Component {
       const i = Math.max(0, views.findIndex(v => v.id === wanted));
       const chosen = results[i] || results.find(Boolean);
       if (!chosen) return;
-      this.setState(s => ({
-        views, view: chosen.view, rows: chosen.rows, viewCounts,
-        quarantined: chosen.quarantined || [],
-        counts: { ...s.counts, [id]: chosen.total },
-      }));
+      this.setState(s => {
+        const stillThere = keepSelection && s.selected && chosen.rows.some(r => r.path === s.selected);
+        return {
+          views, view: chosen.view, rows: chosen.rows, viewCounts,
+          quarantined: chosen.quarantined || [],
+          counts: { ...s.counts, [id]: chosen.total },
+          ...(keepSelection && !stillThere ? { selected: null, referencedBy: [], refsFor: null, external: null } : {}),
+        };
+      });
     } catch (e) { this.setState({ error: e.message }); }
   }
 
@@ -245,8 +302,8 @@ export default class App extends React.Component {
     if (!id) return;
     try {
       await api.saveView(id, v);
-      await this.pickCollection(id, v.id, { navigate: false });
-    } catch (e) { this.setState({ toast: e.message }); throw e; }
+      await this.pickCollection(id, v.id, { navigate: false, keepSelection: true });
+    } catch (e) { this.showToast(e.message, 'danger'); throw e; }
   };
 
   deleteView = async viewId => {
@@ -255,33 +312,35 @@ export default class App extends React.Component {
     try {
       const { views } = await api.deleteView(id, viewId);
       // Never leave the screen pointing at a view that no longer exists.
-      await this.pickCollection(id, (views[0] && views[0].id) || null, { navigate: false });
-      this.setState({ toast: 'View removed. The records are untouched — a view is only a saved query.' });
-    } catch (e) { this.setState({ toast: e.message }); }
+      await this.pickCollection(id, (views[0] && views[0].id) || null, { navigate: false, keepSelection: true });
+      this.showToast('View removed. The records are untouched — a view is only a saved query.');
+    } catch (e) { this.showToast(e.message, 'danger'); }
   };
 
-  // PROJECT's one solid accent fill. Scout does not own the agent process (04_AGENT_CONTRACT §1),
-  // so "put the team to work" means: open every task that is not claimed or done, and let whichever
-  // door the assistants come through pick them up. If nothing is waiting, say so rather than
-  // flashing a success state over a queue that was already empty.
+  // TODAY and PROJECT's one solid accent fill, and one honest label between them. Scout does not
+  // own the agent process (04_AGENT_CONTRACT §1) — there is no "runner" to dispatch — so this is
+  // exactly what it says: reopen every task that is not claimed or done, and let whichever door
+  // the assistants come through pick them up on their own schedule. If nothing is waiting, say so
+  // rather than flashing a success state over a queue that was already empty.
   putTeamToWork = async () => {
     const { tasks } = await api.tasks({ project: this.state.project || '' }).catch(() => ({ tasks: [] }));
     const blocked = (tasks || []).filter(t => t.status === 'blocked' && !t.needs_human);
     if (!blocked.length) {
       const open = (tasks || []).filter(t => t.status === 'open').length;
-      return this.setState({
-        toast: open
-          ? open + ' task' + (open === 1 ? '' : 's') + ' waiting. Your assistants pick them up on their own schedule — nothing to push.'
-          : 'The queue is empty. Add a task and whoever is free takes it.',
-      });
+      this.showToast(open
+        ? open + ' task' + (open === 1 ? '' : 's') + ' waiting. Your assistants pick them up on their own schedule — nothing to push.'
+        : 'The queue is empty. Add a task and whoever is free takes it.');
+      return;
     }
     await Promise.all(blocked.map(t => api.patchTask(t.id, { status: 'open' }, t.project, HUMAN).catch(() => null)));
-    this.setState({ toast: 'Put ' + blocked.length + ' back in the queue.' });
+    this.showToast('Put ' + blocked.length + ' back in the queue.');
     this.reload();
   };
 
+  // A refresh, never a navigation — the inspector stays put unless the row it is showing is
+  // actually gone (see pickCollection's `keepSelection`).
   reload = () => {
-    if (this.state.active) this.pickCollection(this.state.active, this.state.view && this.state.view.id, { navigate: false });
+    if (this.state.active) this.pickCollection(this.state.active, this.state.view && this.state.view.id, { navigate: false, keepSelection: true });
     this.loadSidebar();
     this.setState(s => ({ nonce: s.nonce + 1, refreshKey: s.refreshKey + 1 }));
   };
@@ -298,13 +357,11 @@ export default class App extends React.Component {
       const r = await api.sendOutAll(HUMAN);
       const out = (r.started || []).length;
       const held = (r.skipped || []).length;
-      this.setState({
-        toast: out
-          ? out + (out === 1 ? ' assistant is out.' : ' assistants are out.') + ' What they find lands in the queue.'
-          : held ? 'They are already out.' : 'Nobody is hired yet — hire an assistant first.',
-      });
+      this.showToast(out
+        ? out + (out === 1 ? ' assistant is out.' : ' assistants are out.') + ' What they find lands in the queue.'
+        : held ? 'They are already out.' : 'Nobody is hired yet — hire an assistant first.');
       this.reload();
-    } catch (e) { this.setState({ toast: setupToast(e) }); }
+    } catch (e) { this.showToast(setupToast(e), 'danger'); }
   };
 
   sendOutOne = async id => {
@@ -314,21 +371,65 @@ export default class App extends React.Component {
     const name = (who && who.name) || id;
     try {
       await api.sendOut(id, HUMAN);
-      this.setState({ toast: name + ' is out. What it finds lands in the queue.' });
+      this.showToast(name + ' is out. What it finds lands in the queue.');
       this.reload();
-    } catch (e) { this.setState({ toast: setupToast(e) }); }
+    } catch (e) { this.showToast(setupToast(e), 'danger'); }
   };
 
   // Dragging a card between board columns is a promotion, and a promotion goes through the gate
   // like every other one. The board does not re-bucket optimistically: if the route refuses, the
   // card must not have appeared to move.
+  // Accept a quarantined record — the one thing a human can do about a file an agent wrote around
+  // the pipeline (Law 4). No try/catch on purpose: a refusal propagates to the strip in
+  // CollectionView, which shows the server's own reason beside the specific record (Law 8).
+  onAccept = async path => {
+    await api.acceptRecord(path, HUMAN);
+    this.reload();
+  };
+
   onMove = async (row, to) => {
     try {
       await api.moveRecord(row.path, to, HUMAN);
       this.reload();
     } catch (e) {
-      this.setState({ toast: e.message });
+      // The important kind of toast (Law 4's gate, most of the time this fires) — click-to-dismiss,
+      // not a timer, so a refusal cannot vanish before she has read it.
+      this.showToast(e.message, 'danger');
     }
+  };
+
+  // The light path an autosave takes. Document.jsx's `onSaved` fires after every accepted PATCH
+  // with exactly the response it already has ({ path, data, content }) — there is no second read
+  // here. It patches the ONE row in `rows` (so the table she is not even looking at stays honest
+  // without a re-fetch) and the ONE external doc the inspector may be showing, and stops there:
+  // ~10 GETs on every keystroke-driven save was reload()'s whole cost, and nothing about typing in
+  // a field is structural. Archive, move, a schema change and a decision still call reload() —
+  // those really do change which rows exist or which view they belong to.
+  onDocSaved = ({ path, data, content }) => {
+    this.setState(s => {
+      const activeCollection = s.collections.find(c => c.id === s.active);
+      const primary = activeCollection && (activeCollection.fields || []).find(f => f.primary);
+      const title = (primary && data && data[primary.key]) || (data && data.name) || (data && data.title);
+      return {
+        rows: s.rows.map(r => (r.path === path ? { ...r, fields: data, ...(title ? { title } : {}) } : r)),
+        external: s.external && s.external.path === path ? { ...s.external, fields: data, body: content } : s.external,
+      };
+    });
+  };
+
+  // Both PROJECT and ASSISTANTS hand back the same subject shape from a blocked task or a blocked
+  // assistant's "Answer it" — `{ kind, id, path, question, task, assistant }` (frontend/Project.jsx
+  // and frontend/Assistants.jsx doc comments). Landing on 'decide' with no argument dropped it, so
+  // the button opened the queue at whatever card happened to be first rather than the question she
+  // clicked. `backend/tasks.mjs pullIntoDecide` names a blocked task's card deterministically —
+  // `'task-' + project + '-' + id` — so a task subject resolves to the real card id without a new
+  // route; an assistant with no specific task falls back to its own id, which at worst finds
+  // nothing and opens the queue at its first card, same as before this fix.
+  onDecideSubject = subject => {
+    const focus = subject && subject.kind === 'task' && subject.task
+      ? 'task-' + subject.task.project + '-' + subject.task.id
+      : (subject && subject.id) || null;
+    this.go('decide', focus);
   };
 
   select(path) {
@@ -370,7 +471,7 @@ export default class App extends React.Component {
   centre() {
     const {
       screen, collections, active, view, views, viewCounts, rows, quarantined, selected, docPath,
-      assistants, project, nonce, refreshKey, loading, error,
+      assistants, activeAssistant, project, nonce, refreshKey, loading, error, arg,
     } = this.state;
     const activeCollection = collections.find(c => c.id === active) || null;
     const pad = 'flex:1;display:flex;align-items:center;justify-content:center;padding:40px';
@@ -388,6 +489,7 @@ export default class App extends React.Component {
         return (
           <Decide
             actor={HUMAN}
+            focus={arg || null}
             onExit={() => this.go('today')}
             onOpenPath={this.openPath}
             onDecided={this.reload}
@@ -401,7 +503,7 @@ export default class App extends React.Component {
             project={project} actor={HUMAN}
             findings={this.state.findings}
             onRun={this.putTeamToWork}
-            onDecide={() => this.go('decide')}
+            onDecide={this.onDecideSubject}
             onOpenPath={this.openPath}
             onOpenCollection={id => this.pickCollection(id)}
             onOpenAssistants={() => this.go('assistants')}
@@ -418,9 +520,11 @@ export default class App extends React.Component {
         return (
           <Assistants
             assistants={assistants} nonce={nonce}
+            activeAssistant={activeAssistant}
             onHire={() => this.go('hire')}
             onSelect={id => this.setState({ activeAssistant: id })}
-            onDecide={() => this.go('decide')}
+            onRebrief={a => this.go('hire', a)}
+            onDecide={this.onDecideSubject}
             onOpenPath={this.openPath}
             onSendOut={this.sendOutOne}
             onSendOutAll={this.sendOutAll}
@@ -430,6 +534,7 @@ export default class App extends React.Component {
       case 'hire':
         return (
           <Hire
+            existing={arg && arg.id ? arg : null}
             assistants={assistants} actor={HUMAN}
             onHired={() => { this.loadSidebar(); this.go('assistants'); }}
             onCancel={() => this.go('assistants')}
@@ -437,18 +542,22 @@ export default class App extends React.Component {
           />
         );
 
-      case 'files':  return <Files path={this.state.arg || docPath || ''} onOpenPath={this.openPath} />;
+      case 'files':  return <Files path={arg || docPath || ''} onOpenPath={this.openPath} />;
+      case 'settings': return <ScoutSettings onToast={(m, tone) => this.showToast(m, tone)} />;
       case 'board':
         // Whiteboard's own PROPS block names `board` / `onOpenDocument` / `onToast` — it was being
         // handed `project` / `onOpenPath` / `onOpen`, so `board` was undefined and `boardId()` fell
         // back to 'main': EVERY project shared one board. `onOpenDocument` missing meant no card
         // had a way down to its record (Law 8), and `onToast` missing made the 409 "your move was
-        // not saved" a no-op — the drag was discarded in silence.
+        // not saved" a no-op — the drag was discarded in silence. `place` carries a path handed in
+        // from the inspector's GRAPH ("Open in the whiteboard") — Whiteboard places it (and its
+        // related nodes) on mount if it is not already on the board.
         return (
           <Whiteboard
             board={project || 'main'}
+            place={arg || null}
             onOpenDocument={this.openPath}
-            onToast={(message) => this.setState({ toast: message })}
+            onToast={(message, tone) => this.showToast(message, tone)}
           />
         );
 
@@ -461,11 +570,12 @@ export default class App extends React.Component {
             actor={HUMAN}
             onOpen={this.openRelation}
             onOpenPath={this.openPath}
-            onSaved={this.reload}
+            onSaved={this.onDocSaved}
+            onPromote={next => this.onMove({ path: docPath }, next)}
             onBack={() => this.go('collection')}
             // Presence says adding is allowed; the composer itself lives in the property list.
             onFieldAdded={activeCollection ? f => {
-              this.setState({ toast: '"' + f.key + '" is on every #' + activeCollection.id + ' from now on.' });
+              this.showToast('"' + f.key + '" is on every #' + activeCollection.id + ' from now on.');
               this.boot();
             } : undefined}
             // Law 5: archived, never deleted, and never without a reason — the surface collects
@@ -473,7 +583,8 @@ export default class App extends React.Component {
             // the record is no longer where the person is standing, so this leaves the surface
             // instead of holding them on a document that has moved.
             onArchived={({ reason }) => {
-              this.setState({ screen: 'collection', docPath: null, selected: null, toast: 'Archived as "' + reason + '". It is still on disk, with the reason attached.' });
+              this.setState({ screen: 'collection', docPath: null, selected: null });
+              this.showToast('Archived as "' + reason + '". It is still on disk, with the reason attached.');
               if (active) this.pickCollection(active, view?.id, { navigate: false });
               this.reload();
             }}
@@ -498,6 +609,7 @@ export default class App extends React.Component {
           <CollectionView
             collection={activeCollection} view={view} views={views} rows={rows} counts={viewCounts}
             quarantined={quarantined}
+            onAccept={this.onAccept}
             selected={selected}
             onSelect={r => this.select(r.path)}
             // Two different actions, two different names. `onOpen(row)` opens a record; `onFollow`
@@ -518,7 +630,7 @@ export default class App extends React.Component {
   render() {
     const {
       screen, collections, counts, active, rows, selected, section, referencedBy, external,
-      assistants, memoryCounts, needsYou, project, projects, activityOpen, toast,
+      assistants, memoryCounts, needsYou, project, projects, activityOpen, toast, toastDanger,
     } = this.state;
 
     const activeCollection = collections.find(c => c.id === active) || null;
@@ -527,7 +639,10 @@ export default class App extends React.Component {
     const outside = external && external.path === selected ? external : null;
     const doc = rows.find(r => r.path === selected) || outside;
     const collection = outside ? (collections.find(c => c.id === outside.collection) || null) : activeCollection;
-    const withInspector = screen === 'collection' || screen === 'document';
+    // On the collection screen with nothing selected, an inspector showing "NOTHING SELECTED" in a
+    // 302px column is not collapsible chrome, it is a narrower window — item 13. The document
+    // screen always has something to show (the document itself).
+    const withInspector = screen === 'document' || (screen === 'collection' && !!doc);
     const running = assistants.filter(a => a.status === 'running');
 
     if (this.state.firstRun) {
@@ -535,6 +650,7 @@ export default class App extends React.Component {
         <div style={sx('width:100%;height:100vh;background:var(--ink);overflow:auto')}>
           <Interview
             actor={HUMAN}
+            app={this}
             onOpenPath={this.openPath}
             onDone={() => this.setState({ firstRun: false, screen: 'decide' }, () => this.boot())}
           />
@@ -548,6 +664,7 @@ export default class App extends React.Component {
           <Rail
             screen={screen}
             onNavigate={this.go}
+            onSearch={() => this.setState({ paletteOpen: true })}
             collections={collections}
             counts={counts}
             activeCollection={active}
@@ -571,8 +688,13 @@ export default class App extends React.Component {
                 The composer used to be mounted HERE, as a dialog over a dimmed page. It is now a
                 row inside the property list it edits (Document.jsx → AddField.jsx). */}
             {toast ? (
-              <button type="button" onClick={() => this.setState({ toast: null })}
-                style={sx('position:absolute;left:50%;bottom:18px;transform:translateX(-50%);max-width:520px;padding:9px 14px;border-radius:8px;background:var(--surface-2);border:1px solid var(--border-3);color:var(--fg-soft);font-size:12px;cursor:pointer;text-align:left;box-shadow:0 12px 32px rgba(0,0,0,.45)')}>
+              <button type="button" onClick={this.clearToast}
+                style={{
+                  ...sx('position:absolute;left:50%;bottom:18px;transform:translateX(-50%);max-width:520px;padding:9px 14px;border-radius:8px;font-size:12px;cursor:pointer;text-align:left;box-shadow:0 12px 32px rgba(0,0,0,.45)'),
+                  background: 'var(--surface-2)',
+                  border: '1px solid ' + (toastDanger ? 'var(--danger)' : 'var(--border-3)'),
+                  color: toastDanger ? 'var(--danger)' : 'var(--fg-soft)',
+                }}>
                 {toast}
               </button>
             ) : null}
@@ -580,6 +702,7 @@ export default class App extends React.Component {
 
           {withInspector ? (
             <Inspector
+              screen={screen}
               collection={collection}
               doc={doc}
               referencedBy={referencedBy}
@@ -590,7 +713,7 @@ export default class App extends React.Component {
               // the id as a path sent `nurses-ph` to the file browser instead of the territory.
               onOpen={this.openRelation}
               onOpenPath={this.openPath}
-              onOpenBoard={() => this.go('board')}
+              onOpenBoard={path => this.go('board', path || null)}
             />
           ) : null}
         </div>
@@ -601,6 +724,18 @@ export default class App extends React.Component {
           onOpenPath={this.openPath}
           running={running}
         />
+
+        {/* ⌘K — a screen-independent overlay, never a route. It closes itself on Esc, on picking
+            a result, and on the same chord that opened it. */}
+        {this.state.paletteOpen ? (
+          <Palette
+            collections={collections}
+            onClose={() => this.setState({ paletteOpen: false })}
+            onGo={this.go}
+            onOpenPath={this.openPath}
+            onPickCollection={id => this.pickCollection(id)}
+          />
+        ) : null}
       </div>
     );
   }

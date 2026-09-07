@@ -1,0 +1,25 @@
+[
+  {
+    "id": "my-best",
+    "label": "My best",
+    "type": "table",
+    "filter": [],
+    "sort": [
+      {
+        "field": "booked",
+        "dir": "desc"
+      }
+    ],
+    "group": null,
+    "fields": [
+      "label",
+      "platform",
+      "members",
+      "finds",
+      "booked",
+      "joined"
+    ],
+    "card": null,
+    "density": "compact"
+  }
+]

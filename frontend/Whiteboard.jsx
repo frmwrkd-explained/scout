@@ -30,6 +30,11 @@
 //   onToast          (message, tone) => void — 'green' | 'amber' | 'red'. Optional.
 //   full             boolean — the shell has hidden its chrome for this surface.
 //   onToggleFull     () => void — F. When absent, F does nothing and the button is not drawn.
+//   place            a `.md` path, carried in from the inspector's GRAPH ("Open in the whiteboard",
+//                     docs/05_UI_SPEC.md §5). Placed on mount if it is not already a node on this
+//                     board, along with its REFERENCED BY relations — so the click that says
+//                     "show me how this connects" lands on a board that already shows it, not an
+//                     empty canvas with one card.
 import React from 'react';
 import { sx } from './sx';
 import { api } from './api';
@@ -79,6 +84,7 @@ export default class Whiteboard extends React.Component {
       collections: [],
       shelfCollection: null,
       shelfRows: [],
+      memoryRows: { territory: [], goal: [] },
       viewRows: {},              // 'collection/view' → { rows, total } for the collection-view cards
       q: '',
       busy: '', err: '',
@@ -95,7 +101,7 @@ export default class Whiteboard extends React.Component {
   toast(msg, tone) { if (this.props.onToast) this.props.onToast(msg, tone); }
 
   componentDidMount() {
-    this.load();
+    this.load().then(() => this.placeIncoming());
     this.loadCollections();
     window.addEventListener('keydown', this._key, true);
     window.addEventListener('keyup', this._key, true);
@@ -115,7 +121,10 @@ export default class Whiteboard extends React.Component {
     clearTimeout(this._saveT); clearTimeout(this._viewT);
     this.flush();
   }
-  componentDidUpdate(prev) { if (prev.board !== this.props.board) this.load(); }
+  componentDidUpdate(prev) {
+    if (prev.board !== this.props.board) { this.load().then(() => this.placeIncoming()); return; }
+    if (prev.place !== this.props.place && this.props.place) this.placeIncoming();
+  }
 
   // ── data ─────────────────────────────────────────────────────────────────────────────────────
   async load() {
@@ -132,6 +141,18 @@ export default class Whiteboard extends React.Component {
         if (collections.length) this.pickShelf(collections[0].id);
       });
     } catch { /* the shelf is an accelerator, not the surface */ }
+    // Territory and goals are memory objects, not collection records — item 17's "place a
+    // territory or a goal" needs its own two rows on the shelf, loaded once alongside the
+    // collections rather than refetched on every click into the tab.
+    Promise.all([
+      api.territory().catch(() => ({ territory: [] })),
+      api.goals().catch(() => ({ goals: [] })),
+    ]).then(([t, g]) => this.setState({
+      memoryRows: {
+        territory: (t.territory || []).map(x => ({ path: x.path, title: (x.data && x.data.name) || x.id })),
+        goal: (g.goals || []).map(x => ({ path: x.path, title: x.label || x.id })),
+      },
+    }));
   }
   async pickShelf(id) {
     this.setState({ shelfCollection: id, shelfRows: [] });
@@ -139,6 +160,43 @@ export default class Whiteboard extends React.Component {
       const { rows } = await api.documents(id, '');
       this.setState(s => (s.shelfCollection === id ? { shelfRows: rows || [] } : null));
     } catch (e) { this.setState({ err: e.message }); }
+  }
+  // The two MEMORY tabs on the shelf — sentinel ids so a collection a person happens to call
+  // "territory" or "goal" can never be shadowed by these. Rows are already in state (loadCollections
+  // above); nothing to fetch on the click itself.
+  pickMemoryShelf(kind) {
+    this.setState({ shelfCollection: kind === 'goal' ? '__goal__' : '__territory__', shelfRows: this.state.memoryRows[kind] || [] });
+  }
+
+  // A `.md` path handed in from the inspector's GRAPH (item 18). Places the document if it is not
+  // already on the board, and up to eight of its REFERENCED BY relations alongside it, so opening
+  // "the whole picture" is one action rather than one drag per related card.
+  async placeIncoming() {
+    const path = this.props.place;
+    const doc = this.state.doc;
+    if (!path || !doc || doc.foreign) return;
+    const onBoard = new Set(doc.nodes.map(n => n.path).filter(Boolean));
+    const additions = [];
+    if (!onBoard.has(path)) additions.push({ t: 'document', path });
+    try {
+      const { references } = await api.references(path);
+      for (const r of (references || [])) {
+        if (!r.path || onBoard.has(r.path) || additions.some(a => a.path === r.path)) continue;
+        additions.push({ t: 'document', path: r.path });
+        if (additions.length >= 8) break;   // a card wall is not a relationship diagram
+      }
+    } catch { /* the document itself still lands even if the reference walk fails */ }
+    if (!additions.length) return;
+    const c = this.centre();
+    const cols = Math.max(1, Math.ceil(Math.sqrt(additions.length)));
+    const stepX = SIZES.document.w + GRID * 3, stepY = SIZES.document.h + GRID * 3;
+    const startX = c.x - ((Math.min(cols, additions.length) - 1) * stepX) / 2;
+    const nodes = [...doc.nodes, ...additions.map((spec, i) => ({
+      ...SIZES.document, ...spec,
+      x: snap(startX + (i % cols) * stepX),
+      y: snap(c.y + Math.floor(i / cols) * stepY),
+    }))];
+    this.setNodes(nodes, 'placed ' + path + (additions.length > 1 ? ' and ' + (additions.length - 1) + ' related' : ''));
   }
   // A collection-view card is a LIVE query, so it reads the same route the table reads. One fetch
   // per distinct collection+view on the board, not one per card.
@@ -486,7 +544,11 @@ export default class Whiteboard extends React.Component {
       } catch { /* not one of ours */ }
     }
     if (e.dataTransfer.files && e.dataTransfer.files.length) {
-      this.toast('Files land on the board once the FILES browser exists — drag a document from the shelf for now', 'amber');
+      // The FILES browser exists now (item 15) and its rows carry the same `application/x-scout-
+      // node` payload the `if (raw)` branch above already handles — so a genuine drop FROM there
+      // lands as a document node, and only a native file dragged in from the OS (an image from
+      // Finder, say) ever reaches this branch.
+      this.toast('Drag a document from the shelf or from FILES ON DISK — a file from outside the workspace cannot be dropped here yet', 'amber');
     }
   }
   onPaste(e) {
@@ -507,6 +569,10 @@ export default class Whiteboard extends React.Component {
     const needle = q.trim().toLowerCase();
     const rows = shelfRows.filter(r => !needle || String(r.title + ' ' + r.path).toLowerCase().includes(needle)).slice(0, 200);
     const onBoard = new Set((this.state.doc ? this.state.doc.nodes : []).map(n => n.path).filter(Boolean));
+    // The node kind the drag/double-click payload carries — 'document' for a real collection's
+    // rows, 'territory'/'goal' for the two memory tabs (item 17). One shelf, one drag contract
+    // (`application/x-scout-node`), three sources.
+    const shelfNodeType = shelfCollection === '__territory__' ? 'territory' : shelfCollection === '__goal__' ? 'goal' : 'document';
     return (
       <div onPointerDown={e => e.stopPropagation()} onWheel={e => e.stopPropagation()}
         style={{
@@ -528,6 +594,18 @@ export default class Whiteboard extends React.Component {
               }}>#{c.id}</span>
           ))}
           {!collections.length ? <Eyebrow style={sx('padding:6px 2px')}>NO COLLECTIONS YET</Eyebrow> : null}
+          {/* the two memory tabs — territory and goals are placed on the board the same way any
+              document is, they just carry no collection (item 17) */}
+          {[['__territory__', 'TERRITORY'], ['__goal__', 'GOALS']].map(([kind, label]) => (
+            <span key={kind} onClick={() => this.pickMemoryShelf(kind === '__goal__' ? 'goal' : 'territory')}
+              className={shelfCollection === kind ? '' : 'hBd'}
+              style={{
+                ...mono('padding:4px 9px;border-radius:6px;cursor:pointer;font-size:9.5px;font-weight:700'),
+                color: shelfCollection === kind ? 'var(--fg)' : 'var(--fg-muted)',
+                background: shelfCollection === kind ? 'var(--raise)' : 'transparent',
+                border: '1px solid ' + (shelfCollection === kind ? 'var(--border-3)' : 'var(--border-2)'),
+              }}>{label}</span>
+          ))}
         </div>
         <div style={sx('flex:none;padding:8px 10px;border-bottom:1px solid var(--line)')}>
           <input value={q} onChange={e => this.setState({ q: e.target.value })} placeholder="Filter…"
@@ -542,8 +620,8 @@ export default class Whiteboard extends React.Component {
           ) : null}
           {rows.map(r => (
             <div key={r.path} draggable
-              onDragStart={e => { e.dataTransfer.setData('application/x-scout-node', JSON.stringify({ t: 'document', path: r.path })); e.dataTransfer.effectAllowed = 'copy'; }}
-              onDoubleClick={() => this.add({ t: 'document', path: r.path }, 'placed ' + r.path)}
+              onDragStart={e => { e.dataTransfer.setData('application/x-scout-node', JSON.stringify({ t: shelfNodeType, path: r.path })); e.dataTransfer.effectAllowed = 'copy'; }}
+              onDoubleClick={() => this.add({ t: shelfNodeType, path: r.path }, 'placed ' + r.path)}
               title={onBoard.has(r.path) ? 'already on the board — drag to place another card' : 'drag onto the board, or double-click to place'}
               className="hBg"
               style={{ ...sx('display:flex;flex-direction:column;gap:1px;padding:5px 7px;border-radius:7px;cursor:grab;margin-bottom:2px'), opacity: onBoard.has(r.path) ? 0.45 : 1 }}>
@@ -552,7 +630,9 @@ export default class Whiteboard extends React.Component {
             </div>
           ))}
         </div>
-        {shelfCollection ? (
+        {/* a saved-query card only means something for a REAL collection — the memory tabs have
+            no view to put on the board, only the objects themselves */}
+        {shelfCollection && collections.some(c => c.id === shelfCollection) ? (
           <div style={sx('flex:none;padding:8px;border-top:1px solid var(--line)')}>
             <Btn variant="ghost" size="sm" style={sx('width:100%;justify-content:center')}
               onClick={() => this.add({ t: 'collection-view', collection: shelfCollection }, 'placed the #' + shelfCollection + ' view')}>
@@ -882,31 +962,38 @@ export default class Whiteboard extends React.Component {
 // is a preview that opens INTO the whiteboard (docs/05_UI_SPEC.md §5), never a second graph
 // feature. It renders the same facts the board draws — the pointing field name, and whether that
 // field is a declared relation — because they come from the same derivation.
-export function GraphPreview({ doc, references = [], onOpen }) {
+// `onOpenBoard(path)` — NOT `onOpen`. The old prop name was the inspector's own "open a record"
+// callback, reused here by accident, so this button opened the DOCUMENT SURFACE — the screen it was
+// already sitting on — instead of the whiteboard its label promises. `onOpenBoard` navigates to the
+// board and Whiteboard.jsx's `place` prop puts this document (and its relations) on it, so the
+// button is offered whether or not any relation has been drawn yet — opening the (possibly empty)
+// board is still useful, and it is the one door in, never a second one competing with it.
+export function GraphPreview({ doc, references = [], onOpenBoard }) {
   const byField = [];
   for (const r of references) {
     const hit = byField.find(x => x.field === r.field);
     if (hit) hit.n += 1; else byField.push({ field: r.field, n: 1, declared: r.declared, collection: r.collection, source: r.source });
   }
-  if (!byField.length) {
-    return <span style={{ ...mono('font-size:9.5px;font-weight:500;letter-spacing:.08em'), color: 'var(--fg-faint)' }}>NO RELATIONS TO DRAW</span>;
-  }
   return (
     <div style={sx('display:flex;flex-direction:column;gap:8px')}>
-      <div style={sx('display:flex;flex-wrap:wrap;gap:5px')}>
-        {byField.map(f => (
-          <span key={f.field} title={f.declared ? 'a declared relation on #' + f.collection : 'a frontmatter pointer from ' + f.source}
-            style={{
-              ...mono('display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:6px;font-size:9.5px;font-weight:700'),
-              color: f.declared ? 'var(--fg-muted)' : 'var(--fg-faint)',
-              border: (f.declared ? '1px solid ' : '1px dashed ') + 'var(--border-2)',
-            }}>
-            {f.field}<span style={{ color: 'var(--fg-faint)' }}>{f.n}</span>
-          </span>
-        ))}
-      </div>
-      {onOpen && doc && doc.path ? (
-        <Btn variant="secondary" size="sm" style={sx('justify-content:center')} onClick={() => onOpen(doc.path)}>
+      {byField.length ? (
+        <div style={sx('display:flex;flex-wrap:wrap;gap:5px')}>
+          {byField.map(f => (
+            <span key={f.field} title={f.declared ? 'a declared relation on #' + f.collection : 'a frontmatter pointer from ' + f.source}
+              style={{
+                ...mono('display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:6px;font-size:9.5px;font-weight:700'),
+                color: f.declared ? 'var(--fg-muted)' : 'var(--fg-faint)',
+                border: (f.declared ? '1px solid ' : '1px dashed ') + 'var(--border-2)',
+              }}>
+              {f.field}<span style={{ color: 'var(--fg-faint)' }}>{f.n}</span>
+            </span>
+          ))}
+        </div>
+      ) : (
+        <span style={{ ...mono('font-size:9.5px;font-weight:500;letter-spacing:.08em'), color: 'var(--fg-faint)' }}>NO RELATIONS TO DRAW YET</span>
+      )}
+      {onOpenBoard && doc && doc.path ? (
+        <Btn variant="secondary" size="sm" style={sx('justify-content:center')} onClick={() => onOpenBoard(doc.path)}>
           Open in the whiteboard
         </Btn>
       ) : (
