@@ -14,6 +14,7 @@
     "test": "node --test",
     "bench": "node scripts/bench-store.mjs",
     "demonstrate": "node scripts/demonstrate.mjs",
+    "hub:push": "node scripts/hub-push.mjs",
     "demo": "node scripts/demo.mjs",
     "start": "npm run build && node backend/index.mjs",
     "app": "npm run build && electron .",

@@ -41,6 +41,7 @@ import { selfApiBase } from './agentHome.mjs';
 import { resolveBin } from './jobs.mjs';
 import { getSettings, listProjects } from './store.mjs';
 import { logEvent, readEvents } from './log.mjs';
+import { hubConfig, pushToHub } from './hub.mjs';
 
 // A sweep is not a chat turn. The chat timeout (5 minutes) is the wrong shape for an assistant
 // asked to work a group, so a run gets its own, overridable the same way chat's is.
@@ -295,7 +296,27 @@ async function perform({ a, run, brief, started, pid, command, actor, ac, deps }
     detail: { assistant: a.id, state: status, found: work.found, cost },
   });
 
+  hubPushAfterRun(deps);
+
   return finished;
+}
+
+// ── the hub link, after a run ──────────────────────────────────────────────────────────────────
+// OFF by default (`hubPushAfterRun: false` in settings.md) and deliberately so, exactly like
+// `autoRun`: an outbound request nobody pressed is a surprise, and `npm run hub:push` is the press.
+// When it IS on, it is fire-and-forget — a hub that is slow, down or wrong must never delay or fail
+// a run whose findings are already safely on disk. Failures land in the log and nowhere else.
+function hubPushAfterRun(deps = {}) {
+  let cfg;
+  try { cfg = hubConfig(); } catch { return false; }
+  if (!cfg.pushAfterRun || !cfg.canPush) return false;
+  pushToHub({}).then(
+    r => event(deps, { type: 'hub', actor: 'scout', target: 'hub/push', detail: r.pushed
+      ? { goalsUpdated: r.goalsUpdated, proposalsCreated: [].concat(r.proposalsCreated || []).length }
+      : { skipped: r.reason } }),
+    e => event(deps, { type: 'hub', actor: 'scout', target: 'hub/push', detail: { error: String(e && e.message || e) } }),
+  );
+  return true;
 }
 
 function noticeText(ev) {

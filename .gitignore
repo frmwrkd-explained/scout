@@ -27,3 +27,5 @@ workspace/
 # that sets only SCOUT_DATA reads the wrong folder. That is not theoretical: it turned five tests
 # red for an afternoon.
 config.md
+
+Claude outputs/

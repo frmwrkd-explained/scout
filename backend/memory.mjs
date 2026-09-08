@@ -203,6 +203,9 @@ import { listCollections, gateField } from './collections.mjs';
 import { staleness, isStale, ageDays, agoLabel, agoFrom, daysUntil, dayOf } from './decay.mjs';
 import { listTerritories, setTerritoryHooks, isRecord, BLOCKED_ACCESS } from './territory.mjs';
 import { logEvent as logEventDefault, readEvents as readEventsDefault } from './log.mjs';
+// The hub prefix (docs/HUB.md §10). `hubBundle.mjs` imports nothing but the store on purpose, so
+// this stays a plain one-way import — the push half lives in hub.mjs, which imports THIS file.
+import { readHubBundle, composeHub, HUB_TRIM_LEVELS } from './hubBundle.mjs';
 
 // ── the budget ─────────────────────────────────────────────────────────────────────────────────
 // The cap is the feature (GOAL.md §10, docs/01_CANON.md Law 7). An uncapped context file becomes
@@ -719,7 +722,14 @@ function gather({ project = null, now = Date.now(), docs = null } = {}) {
   // The log must never be able to take down the wake-up read.
   try { events = hooks.readEvents ? (hooks.readEvents({ since, limit: 300 }) || []) : []; } catch { events = []; }
 
-  return { now, me, pid, brief, collections, records, territory, goals, playbook, learnings, questions, tasksOpen, since, events, docs: all };
+  // The hub bundle, if one is configured and present. Read once per gather like everything else,
+  // and never fatal: `readHubBundle` returns null for an absent mirror, an unconfigured hub or a
+  // `.scout/` that was thrown away, and the cache then renders exactly as it did before the link
+  // existed. Scout never writes into the mirror folder.
+  let hub = null;
+  try { hub = readHubBundle({ person: me.data.person || null }); } catch { hub = null; }
+
+  return { now, me, pid, brief, collections, records, territory, goals, playbook, learnings, questions, tasksOpen, since, events, hub, docs: all };
 }
 
 // ── the sections ───────────────────────────────────────────────────────────────────────────────
@@ -877,11 +887,23 @@ function countsLine(m) {
 // ── the render ─────────────────────────────────────────────────────────────────────────────────
 // One function, one shape, six compression levels. Level 0 is everything; each level above drops
 // exactly one thing, in the fixed order of docs/03_MEMORY.md §2; level 6 is the last-resort trim.
-function compose(m, level, version) {
+function compose(m, level, version, hubLevel = 0) {
   const dropped = [];
   const L = [];
   L.push('<scout-context v="' + version + '" generated="' + nowStamp() + '"' + (m.pid ? ' project="' + m.pid + '"' : '') + '>');
   L.push('');
+
+  // THE HUB PREFIX, first thing after the envelope: what the operator's unit is trying to do, from
+  // OpsGraph, so an assistant knows the unit goal without anybody re-explaining it. Its own
+  // headings are demoted to `###` by composeHub, because `## ` is Scout's grammar for the eleven
+  // sections docs/08 §5 fixes. It is trimmed BEFORE any of Scout's own compression runs: Scout's
+  // memory of its own work is never the first thing to go to make room for someone else's summary.
+  if (m.hub && m.hub.text) {
+    const hb = composeHub(m.hub.text, hubLevel);
+    dropped.push(...hb.dropped);
+    L.push(...hb.lines);
+    L.push('');
+  }
 
   // Identity, in full. It is two pages and it is the whole reason the agent is not a stranger.
   L.push('## WHO I WORK FOR');
@@ -968,9 +990,23 @@ export function renderCache({ project = null, now = Date.now(), docs = null, ver
   const v = version != null ? version : readVersion(m.pid).v;
 
   let out = null;
-  for (let level = 0; level <= 5; level++) {
-    out = compose(m, level, v);
-    if (out.text.length <= CACHE_CHAR_BUDGET) break;
+  // Two ladders, hub first. Rungs 0..HUB_TRIM_LEVELS drop the hub bundle's own sections bottom-up
+  // (recent changes, then open items, then the SOP index) with Scout's own context untouched; only
+  // once the whole bundle is down to who-the-subject-is do Scout's six compression levels start.
+  // Every rung of either ladder names what it dropped, at every level.
+  let hubLevel = 0;
+  if (m.hub && m.hub.text) {
+    for (; hubLevel <= HUB_TRIM_LEVELS; hubLevel++) {
+      out = compose(m, 0, v, hubLevel);
+      if (out.text.length <= CACHE_CHAR_BUDGET) break;
+    }
+    hubLevel = Math.min(hubLevel, HUB_TRIM_LEVELS);
+  }
+  if (!out || out.text.length > CACHE_CHAR_BUDGET) {
+    for (let level = 0; level <= 5; level++) {
+      out = compose(m, level, v, hubLevel);
+      if (out.text.length <= CACHE_CHAR_BUDGET) break;
+    }
   }
   // Last resort. It is still not silent: the trim is named in `dropped` and logged like every
   // other drop, because a context that quietly loses its COUNTS is a context nobody can trust.
@@ -985,7 +1021,7 @@ export function renderCache({ project = null, now = Date.now(), docs = null, ver
   if (out.dropped.length || excluded.length) {
     hooks.logEvent({ type: 'cache', actor: String(actor || 'scout'), target: (m.pid ? 'projects/' + m.pid + '/.cache/context.md' : '.scout/cache/context.md'), detail: { tokens, dropped: out.dropped, excluded } });
   }
-  return { text: out.text, tokens, chars: out.text.length, version: v, project: m.pid, dropped: out.dropped, excluded, budget: CACHE_TOKEN_BUDGET };
+  return { text: out.text, tokens, chars: out.text.length, version: v, project: m.pid, dropped: out.dropped, excluded, budget: CACHE_TOKEN_BUDGET, hub: m.hub ? { source: m.hub.source, chars: m.hub.text.length } : null };
 }
 
 // Writes the file and increments `v`. An agent that cached a context asks GET /api/cache/version —

@@ -1,4 +1,5 @@
 ---
+step: flow/otr/episode-production#research
 id: librarian
 name: Librarian
 job: >-

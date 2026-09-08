@@ -1,4 +1,5 @@
 ---
+step: flow/otr/episode-production#outreach
 id: writer
 name: Writer
 job: >-

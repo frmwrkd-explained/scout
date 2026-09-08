@@ -1,4 +1,5 @@
 ---
+hub_goal: goal/otr/keep-the-shortlist-above-10
 type: goal
 id: keep-the-shortlist-above-10
 label: Keep the shortlist above 10

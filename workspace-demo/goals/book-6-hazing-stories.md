@@ -1,4 +1,5 @@
 ---
+hub_goal: goal/otr/book-6-hazing-stories
 type: goal
 id: book-6-hazing-stories
 label: Book 6 hazing stories

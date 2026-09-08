@@ -1,4 +1,5 @@
 ---
+step: flow/otr/episode-production#book-guest
 id: scout-fb
 name: Scout
 job: >-

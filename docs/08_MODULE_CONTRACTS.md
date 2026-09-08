@@ -217,6 +217,42 @@ Routes: `GET /api/context`, `GET /api/cache/version`, `POST /api/cache/regenerat
 > ~~`GET /api/context` currently 404s~~ — landed at M3. `PATCH /api/learnings/:id` exists too
 > (`frontend/api.js` calls it). `POST /api/learnings/propose` slugifies the claim into the id.
 
+## 5b · `backend/hub.mjs` + `backend/hubBundle.mjs` — the hub link (OpsGraph, `docs/HUB.md` §10)
+
+Three small additions, none of which change a Scout rule.
+
+```js
+// hubBundle.mjs — imports store.mjs ONLY, so memory.mjs can use it with no import cycle
+export function hubConfig(env = process.env)   // settings.md hubUrl/hubToken/hubFolder, env HUB_URL/HUB_TOKEN as fallback
+export function readHubBundle({ person })      // SYNCHRONOUS. mirror file → fetched copy → null
+export function composeHub(text, level)        // → { lines, dropped } ; headings demoted to ###
+export const HUB_DROP_ORDER                    // recent changes · open items · SOP index
+// hub.mjs — the push half; imports memory.mjs and territory.mjs
+export function buildPushPayload({ now })      // pure; the exact body, testable with no server
+export async function pushToHub({ ... })       // POST <hubUrl>/scout/push, Bearer <hubToken>
+export async function fetchHubBundle({ ... })  // GET <hubUrl>/mcp/bundle → .scout/hub/bundle.md
+```
+
+1. **Frontmatter ids.** `me.md` may declare `person` / `entity` / `unit` / `roles[]`,
+   `assistants/<id>.md` a `step`, `goals/<id>.md` a `hub_goal`. Optional, free-form, and **Scout
+   ignores them everywhere except the push** — no schema knows about them, nothing indexes them,
+   the cache never spends a token on them (`tests/phase-hub.test.mjs`).
+2. **Numbers push** — `scripts/hub-push.mjs`, `npm run hub:push` (`--dry-run` prints the body).
+   `{ operator, goals[{hubGoal,current,target,verifiedAt}], territory[{slug,finds,wins,hitRate}],
+   learnings[{slug,text,verifiedAt,step?}] }`. Every figure is one Scout **already counted** — the
+   goal rollup, territory.mjs's sole authorship, a learning a HUMAN made `active` and that is still
+   inside its decay window. Never a number an agent typed. `hitRate` is the fraction the hub states
+   (3/12 → `0.25`); Scout's own `hit_rate` is the same rollup as a percentage for a person to read.
+   No hub configured → one clear line, no request, exit 0. Optionally fired after a run by
+   `hubPushAfterRun` in settings.md, **off by default** for the same reason `autoRun` is.
+3. **Bundle in.** `renderCache` prefixes the operator's hub bundle under a `# Hub` heading, read
+   from `<hubFolder>/.opsgraph/bundle-<person-slug>.md` or from the copy `fetchHubBundle` left in
+   `.scout/hub/`. **Scout never writes into `hubFolder`.** The 2,000-token cap covers the whole
+   file and the **hub is trimmed FIRST** — its sections bottom up (recent changes, open items, SOP
+   index) before any of Scout's six levels run, so Scout's memory of its own work is never what
+   goes to make room for somebody else's summary. Each drop is named `hub bundle: <section>` in
+   `dropped`, in `## COMPRESSED`, and in the same `cache` log event as every other compression.
+
 ## 6 · `backend/inbox.mjs` — door 2 (M2)
 
 ```js

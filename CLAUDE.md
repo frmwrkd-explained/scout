@@ -28,6 +28,7 @@ FrameForge's own `CLAUDE.md`, `README.md` and `ISSUES.md` are preserved as `docs
 | Serving a file's bytes | `backend/files.mjs` `rawFile` | `GET /api/files/raw`. Media types are an allowlist served inline; everything else is an attachment, because the UI and the API share an origin. |
 | HTTP contract | `backend/index.mjs` route handlers | A field a route does not destructure does not exist |
 | The router skill | `skills/scout-router/` | **Canonical source.** The app copies it fresh into every agent session home on each run, so a tamper never persists. Edit it here, never in a mounted copy. |
+| The hub link (OpsGraph) | `backend/hub.mjs` + `backend/hubBundle.mjs` | The push is numbers Scout **already counted**, never one an agent typed. `renderCache` prefixes the hub bundle and **trims it first** under the cap. Scout never writes into `hubFolder`. |
 | Event log | `backend/log.mjs` | Append-only, one file per day. Every mutation lands here. |
 | Design tokens | `frontend/styles.css` `:root` | Machine truth. Light/dark are two token sets, one contract. |
 | UI primitives | `frontend/ui.jsx` | Import them. Never re-render their markup by hand. |

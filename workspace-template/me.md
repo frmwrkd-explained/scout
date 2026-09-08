@@ -1,4 +1,10 @@
 ---
+# Hub ids (OpsGraph). Optional — fill these in only if you are linked to a hub.
+# Scout ignores them everywhere except `npm run hub:push`.
+person:
+entity:
+unit:
+roles: []
 name: __NAME__
 active_project:
 updated:

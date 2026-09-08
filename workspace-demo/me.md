@@ -1,4 +1,11 @@
 ---
+# Hub ids (OpsGraph, docs/HUB.md §10). Scout ignores these everywhere except
+# scripts/hub-push.mjs — they exist so the hub can match this operator's records.
+person: person/crystal
+entity: entity/vonas-media
+unit: unit/otr
+roles:
+  - role/otr/producer
 type: identity
 name: Crystal
 active_project: 2026-08-hazing

@@ -165,6 +165,15 @@ const DEFAULT_SETTINGS = {
   // turns a closed session transcript into durable learnings. See docs/03_MEMORY.md.
   groqApiKey: '',
   groqTextModel: 'llama-3.3-70b-versatile',
+  // ── the hub link (backend/hub.mjs · docs/HUB.md §10) ──
+  // All three are empty by default and the link is OFF until one is filled: Scout is local-first
+  // and nothing leaves this machine without the person saying where to.
+  hubUrl: '',            // e.g. https://hub.example.com — `POST <hubUrl>/scout/push`
+  hubToken: '',          // the operator's agent token, sent as `Authorization: Bearer …`
+  hubFolder: '',         // the read-only mirror folder. Scout READS it and NEVER writes into it.
+  // Push the counted numbers at the end of every run. Off, like `autoRun` and for the same
+  // reason: an outbound request nobody pressed is a surprise, and `npm run hub:push` is the press.
+  hubPushAfterRun: false,
 };
 // Raw read: defaults + whatever is on disk, with NO migration side-effect. Both getSettings()
 // (which may persist a migration) and saveSettings() (which must not re-enter it) read through
@@ -214,7 +223,7 @@ export function getSettings() {
 // publicSettings(), which swaps each set key for REDACTED. saveSettings() drops
 // REDACTED values from incoming patches so a round-tripped settings object can't
 // clobber the real keys on disk.
-export const SECRET_SETTING_KEYS = ['groqApiKey'];
+export const SECRET_SETTING_KEYS = ['groqApiKey', 'hubToken'];
 export const REDACTED = '••••••••';
 export function publicSettings() {
   const s = getSettings();
