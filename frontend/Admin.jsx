@@ -250,7 +250,7 @@ export default function Admin({ actor = 'crystal', project: selectedProject, ref
           <span>Worker queue: {data.workers.config?.enabled ? 'scheduled wakes on' : 'scheduled wakes off'}</span>
           <span>{list(data.workers, 'wakes').filter(w => w.state === 'running').length} active worker runs</span>
         </div> : null}
-        <Card label="Paperclip" tone={data.paperclip?.config?.ready ? 'ok' : 'muted'} right={<Btn size="sm" onClick={() => onGo('settings')}>Configure</Btn>} style={sx('padding:18px')}>
+        <Card label="Paperclip" tone={data.paperclip?.config?.ready ? 'ok' : 'muted'} right={<Btn size="sm" onClick={() => onGo('paperclip')}>Open board</Btn>} style={sx('padding:18px')}>
           <div style={sx('font-size:13px;line-height:1.65')}>{!data.paperclip ? 'Connection status is unavailable.' : !data.paperclip.config?.enabled ? 'Paperclip is off.' : data.paperclip.config?.ready ? 'Paperclip is configured. Outbound work still needs your approval in Needs you.' : 'Paperclip needs a backend credential before it can receive work.'}</div>
           {data.paperclip?.config?.error ? <div style={sx('font-size:12px;color:var(--warn);margin-top:7px')}>{data.paperclip.config.error}</div> : null}
           {list(data.paperclip, 'receipts').filter(r => r.kind === 'issue').slice(-5).reverse().map(receipt => <div key={receipt.key || receipt.id} style={sx('display:flex;align-items:center;gap:12px;margin-top:11px;font-size:12px')}>

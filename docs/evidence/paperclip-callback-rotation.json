@@ -1,0 +1,25 @@
+{
+  "verifiedAt": "2026-10-02T18:53:06.344Z",
+  "agentId": "24441152-0d3a-4fe6-9296-098dae2c5999",
+  "callbackTokenRotated": true,
+  "tokenFile": "/private/tmp/scout-paperclip-DOUjmB/worker-token",
+  "tokenFileMode": "600",
+  "header": "X-Scout-Paperclip-Token",
+  "currentAgentContainsActiveCredential": false,
+  "revisionsContainActiveCredential": false,
+  "otherAdapterConfigUnchanged": true,
+  "runtimeConfigUnchanged": true,
+  "agentStatusUnchanged": true,
+  "nativeRunCountBefore": 1,
+  "nativeRunCountAfter": 1,
+  "revisionCount": 1,
+  "modelCalls": 0,
+  "taskMutations": 0,
+  "scoutRestartRequired": false,
+  "newTokenEmptyTaskStatus": 400,
+  "oldLegacyKeyEmptyTaskStatus": 401,
+  "historicalRecordsPreserved": true,
+  "nativeRunIds": [
+    "ce0be144-7d9e-408f-80f8-73ee8ce05fa3"
+  ]
+}

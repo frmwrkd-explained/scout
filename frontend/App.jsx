@@ -33,6 +33,7 @@ import CollectionView from './CollectionView';
 import Document from './Document';
 import Today from './Today';
 import Admin from './Admin';
+import Paperclip from './Paperclip';
 import Decide from './Decide';
 import Memory from './Memory';
 import Goals from './Goals';
@@ -531,6 +532,9 @@ export default class App extends React.Component {
           onGo={this.go} onOpenPath={this.openPath} onWrote={this.reload}
           onOpenProject={id => this.setState({ project: id, screen: 'project' })} />;
 
+      case 'paperclip':
+        return <Paperclip key={this.state.storageRoot || 'workspace'} onGo={this.go} />;
+
       case 'decide':
         return (
           <Decide
@@ -711,7 +715,7 @@ export default class App extends React.Component {
     return (
       <div style={sx('width:100%;height:100vh;display:flex;flex-direction:column;background:var(--ink);overflow:hidden')}>
         <div style={sx('flex:1;min-height:0;display:flex')}>
-          <Rail
+          {screen !== 'paperclip' ? <Rail
             screen={screen}
             onNavigate={this.go}
             onSearch={() => this.setState({ paletteOpen: true })}
@@ -726,7 +730,7 @@ export default class App extends React.Component {
             project={project}
             projects={projects}
             onPickProject={id => this.setState({ project: id, screen: 'project' })}
-          />
+          /> : null}
 
           <main style={sx('flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;position:relative')}>
             {this.centre()}

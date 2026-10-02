@@ -154,6 +154,31 @@ export function assertPaperclipWorkAvailable(workId) {
 export function paperclipStatus() {
   return { config: paperclipConfig(), receipts: receipts().map(publicReceipt) };
 }
+// Resolve the installed native UI, rather than constructing a second task board in Scout.
+// Board credentials stay on this server. The frame uses Paperclip's own browser session (or
+// local_trusted mode), and its origin is validated by the same connection configuration.
+export async function paperclipUi({ fetchImpl = globalThis.fetch } = {}) {
+  const root = getStorageRoot(), cfg = privateConfig(root);
+  const result = { configured: !!(cfg.url && cfg.companyId), appUrl: cfg.url || null, boardUrl: null, company: null };
+  if (!result.configured) return result;
+  let company, error;
+  try {
+    company = await request(cfg, '/companies/' + encodeURIComponent(cfg.companyId), { fetchImpl });
+    if (company?.id !== cfg.companyId || typeof company.issuePrefix !== 'string' || !ID.test(company.issuePrefix)
+      || safeText(company.issuePrefix, cfg) !== company.issuePrefix) {
+      throw new PaperclipError('Paperclip returned an unexpected company or board address', 502);
+    }
+  } catch (e) {
+    error = e instanceof PaperclipError ? e.message : 'The Paperclip board could not be reached';
+  }
+  assertRoot(root);
+  if (configIdentity(privateConfig(root)) !== configIdentity(cfg)) {
+    throw new PaperclipError('Paperclip connection changed; reload the board', 409);
+  }
+  if (error) return { ...result, error };
+  return { ...result, boardUrl: cfg.url + '/' + encodeURIComponent(company.issuePrefix) + '/issues',
+    company: { id: cfg.companyId, name: safeText(company.name || company.issuePrefix, cfg).slice(0, 200), prefix: company.issuePrefix } };
+}
 function source(workId) {
   const items = workItems();
   const item = items.find(it => it.id === workId || it.path === workId);
@@ -229,7 +254,7 @@ async function request(cfg, route, { method = 'GET', body, fetchImpl = globalThi
   if (guard) guard();
   const response = await fetchImpl(cfg.url + '/api' + route, {
     method, redirect: 'error', signal: AbortSignal.timeout(15000),
-    headers: { authorization: 'Bearer ' + cfg.token, accept: 'application/json', ...(body ? { 'content-type': 'application/json' } : {}) },
+    headers: { ...(cfg.token ? { authorization: 'Bearer ' + cfg.token } : {}), accept: 'application/json', ...(body ? { 'content-type': 'application/json' } : {}) },
     ...(body ? { body: JSON.stringify(body) } : {}),
   }).catch(() => { throw new PaperclipError('Paperclip request failed or timed out; check the connection and reconcile before retrying', 502); });
   if (root) {
@@ -494,6 +519,7 @@ export function registerPaperclipRoutes(app) {
     catch (e) { res.status(e.status || 400).json({ error: e instanceof PaperclipError || e instanceof TaskError ? e.message : 'Paperclip action failed; check the connection and metadata' }); }
   };
   app.get('/api/paperclip', wrap(() => paperclipStatus()));
+  app.get('/api/paperclip/ui', wrap(() => paperclipUi()));
   app.get('/api/paperclip/config', wrap(() => paperclipConfig()));
   app.put('/api/paperclip/config', wrap(req => {
     const { actor: _, ...patch } = req.body || {};

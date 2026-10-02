@@ -4,7 +4,7 @@ Scout can execute an explicitly approved work item through Paperclip's official 
 
 ## Configuration
 
-Register `registerPaperclipWorkerRoutes(app)` from `backend/paperclipWorker.mjs` after JSON parsing and Scout's worker identity guard. The callback is `POST /api/paperclip/worker`. Set a separate random server-side `PAPERCLIP_WORKER_TOKEN` of at least 32 characters. Paperclip's HTTP adapter sends it in `X-Scout-Paperclip-Key`; an Authorization bearer is deliberately not a substitute because that header identifies ordinary scoped Scout workers.
+Register `registerPaperclipWorkerRoutes(app)` from `backend/paperclipWorker.mjs` after JSON parsing and Scout's worker identity guard. The callback is `POST /api/paperclip/worker`. Set a separate random server-side `PAPERCLIP_WORKER_TOKEN` of at least 32 characters. Paperclip's HTTP adapter sends it in `X-Scout-Paperclip-Token`; an Authorization bearer is deliberately not a substitute because that header identifies ordinary scoped Scout workers. `X-Scout-Paperclip-Key` remains a legacy alias; a supplied Token header takes precedence, including when it is empty or invalid.
 
 The existing bridge must be enabled with a matching URL, company and HTTP worker ID. `PAPERCLIP_TOKEN` stays server-side and must authorize the configured company. Credentials are excluded from API replies, prompts, Markdown exports and worker result receipts. In Paperclip, create a dedicated worker with `adapterType: "http"` and:
 
@@ -13,7 +13,7 @@ The existing bridge must be enabled with a matching URL, company and HTTP worker
   "adapterConfig": {
     "url": "http://127.0.0.1:5190/api/paperclip/worker",
     "method": "POST",
-    "headers": { "X-Scout-Paperclip-Key": "<dedicated callback credential>" },
+    "headers": { "X-Scout-Paperclip-Token": "<dedicated callback credential>" },
     "timeoutMs": 240000
   },
   "runtimeConfig": {
@@ -26,6 +26,8 @@ The existing bridge must be enabled with a matching URL, company and HTTP worker
   }
 }
 ```
+
+Use the Token spelling for new configurations: this pinned Paperclip version redacts secret-bearing header names such as `X-Scout-Paperclip-Token` in its public agent configuration. The older custom name ending only in `Key` is not matched by its native redactor. A supported environment secret reference has shape `{ "type": "secret_ref", "secretId": "<UUID>", "version": "latest" }`, but this HTTP adapter reads its headers directly and does not expand environment bindings or nested header references; do not place a secret-reference object in its headers.
 
 Paperclip's HTTP adapter protects private network destinations. A loopback demo needs the exact server environment allowlist `PAPERCLIP_HTTP_ADAPTER_PRIVATE_ENDPOINT_ALLOWLIST=http://127.0.0.1:5190`. Keep the narrow origin; do not disable its network guard. A production callback should use the authenticated HTTPS deployment address and its normal outbound policy.
 
@@ -58,3 +60,7 @@ On 2026-10-02, the real Scout UI approved/exported `paperclip-continuity-experim
 See [the live proof](evidence/paperclip-worker-live-proof.md) and [sanitized machine evidence](evidence/paperclip-worker-live.json). The dedicated synthetic HTTP worker is `24441152-0d3a-4fe6-9296-098dae2c5999`; the earlier disabled worker is preserved. No additional real model calls were used for tests.
 
 Imported cards now use their approved task title and remove only the strict initial machine result marker before redaction. Full raw-source hash and native issue/comment/run IDs remain metadata. Goal/project/universe membership comes only from a canonical source Work whose revision still matches the approved receipt; changed or missing source leaves membership unassigned for owner review. Collection upgrades add missing typed fields through the existing field writer and preserve custom fields. This presentation does not grant the team access to an unreviewed external draft; its ordinary review/scope policy continues to apply.
+
+On the same day, the callback agent was changed only from `X-Scout-Paperclip-Key` to `X-Scout-Paperclip-Token`, preserving its credential and all other configuration. The running Scout handler authenticated the new header before rejecting an empty task payload with HTTP 400. Native public agent JSON masked the Token value, and the native run ledger stayed at its one existing run. No model or task action was triggered. See [header-redaction evidence](evidence/paperclip-header-redaction.json).
+
+The initial configuration history still contained its old header name/value, so the dedicated callback credential was then rotated without changing historical records or other settings. The temporary `worker-token` file was atomically replaced at mode 600 and Scout restarted. The fresh Token authenticated an empty task and returned HTTP 400; the historical legacy Key value returned HTTP 401. Neither current native agent JSON nor its configuration-revision JSON contains the new active credential. The native run ledger remained at its one existing succeeded run, with no model calls or task changes. See [rotation evidence](evidence/paperclip-callback-rotation.json). History may retain the inactive old value as an audit record; a header-name change alone is insufficient when migrating a formerly unredacted credential.

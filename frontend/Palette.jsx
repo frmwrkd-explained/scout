@@ -32,6 +32,7 @@ function fuzzy(hay, q) {
 // not a second one).
 const SCREENS = [
   ['Today', 'today'], ['Admin', 'admin'], ['Needs you', 'decide'], ['Project', 'project'],
+  ['Paperclip board', 'paperclip'],
   ['Goals', 'goals'], ['Territory', 'territory'], ['Playbook', 'playbook'],
   ['What they know', 'knows'], ['Assistants', 'assistants'], ['Hire an assistant', 'hire'],
   ['Whiteboard', 'board'], ['Files on disk', 'files'], ['Settings', 'settings'],

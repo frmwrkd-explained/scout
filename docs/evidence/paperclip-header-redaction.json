@@ -1,0 +1,20 @@
+{
+  "verifiedAt": "2026-10-02T18:49:19.635Z",
+  "companyId": "54d9fff2-3039-45b6-bb83-1951ec5feb58",
+  "agentId": "24441152-0d3a-4fe6-9296-098dae2c5999",
+  "callbackAuthProbeStatus": 400,
+  "header": "X-Scout-Paperclip-Token",
+  "legacyHeaderRemoved": true,
+  "callbackCredentialPreservedInRequest": true,
+  "nativePublicCredentialMasked": true,
+  "otherAdapterConfigUnchanged": true,
+  "runtimeConfigUnchanged": true,
+  "agentStatusUnchanged": true,
+  "nativeRunCountBefore": 1,
+  "nativeRunCountAfter": 1,
+  "nativeRunIds": [
+    "ce0be144-7d9e-408f-80f8-73ee8ce05fa3"
+  ],
+  "modelCalls": 0,
+  "taskMutations": 0
+}

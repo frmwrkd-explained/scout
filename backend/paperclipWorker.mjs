@@ -241,7 +241,8 @@ export async function executePaperclipWorker(body, { key, fetchImpl = globalThis
 
 export function registerPaperclipWorkerRoutes(app, dependencies = {}) {
   app.post('/api/paperclip/worker', async (req, res) => {
-    try { res.json(await executePaperclipWorker(req.body, { ...dependencies, key: req.get('X-Scout-Paperclip-Key') })); }
+    try { res.json(await executePaperclipWorker(req.body, { ...dependencies,
+      key: req.get('X-Scout-Paperclip-Token') ?? req.get('X-Scout-Paperclip-Key') })); }
     catch (error) { res.status(error.status || 502).json({ error: error instanceof PaperclipWorkerError ? error.message : 'Paperclip worker could not complete this approved task' }); }
   });
 }

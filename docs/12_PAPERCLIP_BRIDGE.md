@@ -7,7 +7,9 @@ existing worker. Its status never marks a Scout work item done or changes approv
 The bridge is off by default. It does not automatically install Paperclip or create workers.
 Integration tests use temporary HTTP mocks on loopback. A separately installed local Paperclip
 demo also passed the real REST flow with synthetic data and execution disabled; see the
-[live proof](evidence/paperclip-live-proof.md). A provider-backed worker run remains unverified.
+[live proof](evidence/paperclip-live-proof.md). A later dedicated HTTP worker completed a real
+GPT-6 Luna draft; see [execution proof](evidence/paperclip-worker-live-proof.md). The native
+Paperclip board is now accessible inside Scout; see [UI proof](evidence/paperclip-board-proof.md).
 
 ## Connect an existing instance
 
@@ -98,6 +100,7 @@ evidence. Paperclip and Scout completion remain separate facts.
 | --- | --- |
 | `GET /api/paperclip` | Redacted configuration and durable receipts |
 | `GET /api/paperclip/config` | `enabled`, `url`, `companyId`, `agentId`, `tokenConfigured`, `ready` |
+| `GET /api/paperclip/ui` | Validated native app/board URLs and configured company name/prefix; no credentials |
 | `PUT /api/paperclip/config` | Patch the four nonsecret settings; human actor only |
 | `POST /api/paperclip/preview` | `{ workId, actor }` → `payload`, `proposalId`, `fingerprint`; no network |
 | `POST /api/paperclip/push` | `{ workId, proposalId, actor }` → confirmed receipt, or duplicate receipt |
@@ -141,3 +144,23 @@ Official [installation](https://docs.paperclip.ing/reference/cli/installation/) 
 [common CLI options](https://docs.paperclip.ing/reference/cli/common-options/) describe the
 separate runtime and isolated `PAPERCLIP_HOME` / `--data-dir` state paths. No global installation,
 system package upgrade, background service or external provider authentication was performed.
+
+## Native board in Scout
+
+**Paperclip board** is a primary navigation entry and is also reachable from Admin → Open board.
+It embeds the separately running Paperclip application, including its native task board,
+agents, projects, audit and run history. Scout's rail is hidden in this screen to give the
+board the full width; Back to Scout returns to Today. Open Paperclip opens the same company
+in its full application, and Reload board rechecks the connection.
+
+The native List/Board toggle remembers the company's view on the Paperclip origin. Select
+Board view on a fresh browser; the verified local demo already has it selected. Scout does
+not invent a `?view=board` parameter or write Paperclip's browser storage. The company prefix
+is resolved by read-only `GET /api/paperclip/ui`, using Paperclip's actual company API. It
+works in local_trusted mode without an API token, even when the outbound worker bridge is off.
+
+Board/worker credentials are never injected into the frame or its URL. Browser authentication
+belongs to Paperclip. A deployment that requires login or disallows framing can use Open
+Paperclip in its own tab; Scout does not weaken its framing policy or proxy board credentials.
+The board shows native Paperclip work and workers. Scout's local team remains in Admin;
+only approved delegated work appears in both systems.

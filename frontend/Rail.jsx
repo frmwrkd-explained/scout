@@ -15,7 +15,7 @@
 // Props:
 //   screen            current screen key — 'today' 'decide' 'project' 'collection' 'document'
 //                     'goals' 'territory' 'playbook' 'memory' 'knows' 'assistants' 'assistant'
-//                     'files' 'board' 'settings' 'admin'
+//                     'files' 'board' 'settings' 'admin' 'paperclip'
 //   onNavigate(key, arg)  the one navigation callback
 //   onSearch()        opens the ⌘K palette (item 11) — the SEARCH row at the top of nav is the
 //                     visible way in; the chord works with or without it.
@@ -141,6 +141,7 @@ export default function Rail({
             countTone={needsYou > 0 ? 'var(--warn)' : 'var(--border-2)'} />
           <Row label="Today" on={screen === 'today'} onClick={go('today')} />
           <Row label="Admin" on={screen === 'admin'} onClick={go('admin')} />
+          <Row label="Paperclip board" on={screen === 'paperclip'} onClick={go('paperclip')} />
           <Row label="Project" on={screen === 'project'} onClick={go('project')} />
         </div>
 

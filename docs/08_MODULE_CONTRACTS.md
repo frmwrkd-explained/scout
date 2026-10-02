@@ -361,7 +361,13 @@ export function registerIndexRoutes(app, deps)   // GET /api/index
 ### Screens and their route key
 `App.jsx` holds one `screen` state key. Every screen is a component that takes props and
 renders inside `<main>`. Screen keys: `today · decide · project · collection · document ·
-goals · territory · playbook · memory · knows · assistants · assistant · files · board`.
+goals · territory · playbook · memory · knows · assistants · assistant · files · board · admin · paperclip`.
+
+`paperclip` embeds the installed Paperclip application at its own origin. Scout's rail is
+replaced by a small Back to Scout header while Paperclip supplies its native task board,
+agents, projects and run history. `GET /api/paperclip/ui` resolves the configured company's
+native route without returning the backend board token. Paperclip owns browser authentication
+and its remembered List/Board preference; Open Paperclip opens the full application separately.
 
 ### `frontend/api.js` additions (owned by the integrator — call them, do not add them)
 ```js

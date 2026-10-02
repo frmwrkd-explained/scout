@@ -213,7 +213,7 @@ test('workspace switch during generation cannot write or publish into the new wo
   assert.equal(f.workerReceipts()[0].data.state, 'generating');
 });
 
-test('route authenticates the dedicated callback header; Authorization alone never substitutes for it', async t => {
+test('route prefers the redacted Token header, retains legacy Key and rejects bearer or conflicting credentials', async t => {
   const f = await fixture(t); const app = express(); app.use(express.json());
   registerPaperclipWorkerRoutes(app, { thinkFn: async call => { f.modelCalls.push(call); return ANSWER; } });
   const server = app.listen(0, '127.0.0.1'); await new Promise(resolve => server.once('listening', resolve));
@@ -221,6 +221,14 @@ test('route authenticates the dedicated callback header; Authorization alone nev
   const url = 'http://127.0.0.1:' + server.address().port + '/api/paperclip/worker';
   const denied = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + KEY }, body: JSON.stringify(f.callback) });
   assert.equal(denied.status, 401);
-  const allowed = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', 'X-Scout-Paperclip-Key': KEY }, body: JSON.stringify(f.callback) });
+  const allowed = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', 'X-Scout-Paperclip-Token': KEY }, body: JSON.stringify(f.callback) });
   assert.equal(allowed.status, 200); assert.equal((await allowed.json()).completed, true); assert.equal(f.modelCalls.length, 1);
+  const legacy = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', 'X-Scout-Paperclip-Key': KEY }, body: JSON.stringify(f.callback) });
+  assert.equal(legacy.status, 200); assert.equal((await legacy.json()).duplicate, true);
+  for (const token of ['', 'invalid-token']) {
+    const conflict = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json',
+      'X-Scout-Paperclip-Token': token, 'X-Scout-Paperclip-Key': KEY }, body: JSON.stringify(f.callback) });
+    assert.equal(conflict.status, 401);
+  }
+  assert.equal(f.modelCalls.length, 1); assert.equal(f.comments.length, 1);
 });
