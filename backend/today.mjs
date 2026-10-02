@@ -428,7 +428,7 @@ async function fallbackPlan(day, carried, items, root = getStorageRoot()) {
   }
   const lines = picked.map((it, i) => (i + 1) + '. ' + it.title + ' (' + it.bucket + ', ~' + est(it) + 'm)' + (it.why ? ' — ' + it.why : ''));
   const message = [
-    'No light agent connected (Gemini/Devin) — planned deterministically: carryover first, then backlog in order.',
+    'No light agent connected (Gemini/Devin/GPT) — planned deterministically: carryover first, then backlog in order.',
     '',
     ...lines,
     picked.length ? '' : null,
@@ -1015,7 +1015,7 @@ async function todayExecutor({ session, history, userText, emit }) {
   if (!res.ok) {
     const text = res.provider
       ? 'The light agent (' + res.provider + ') did not answer \u2014 ' + res.reason + '. I can still track and plan.'
-      : 'No light agent connected (Gemini/Devin) \u2014 I can still track and plan, but not chat.';
+      : 'No light agent connected (Gemini/Devin/GPT) \u2014 I can still track and plan, but not chat.';
     emit({ type: 'text-delta', text });
     return { text, directives: [], cost: 0 };
   }

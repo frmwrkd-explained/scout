@@ -20,12 +20,12 @@ The existing `feat/today-loop` and `feat/tiptap-editor` worktrees remain intact.
 | G10 | Keep model costs and provider failures visible | Daily call caps cover concurrent calls; text-only requests use verified provider restrictions | Verified |
 | G11 | Evaluate Paperclip against actual source | Cited adapters, heartbeats, approvals, budgets and access model; concrete reuse decision | Verified |
 | G12 | Demonstrate the combined day loop in a copied fixture | Approval → implementation → future measurement, chat, time and reviews visible in the running app | Verified |
+| G13 | Connect a real provider | GPT-6 Luna returned a validated real plan and daily review in a fresh copied fixture, plus a chat reply in the running app; completed calls recorded model and budget tier | Verified |
 
 ## Work requiring a later product or account decision
 
 | ID | Task | Dependency / acceptance |
 | --- | --- | --- |
-| G13 | Connect a real provider | A working authenticated CLI returns a real plan and chat reply. A local binary or login file alone is insufficient evidence. |
 | G14 | Pull approved bets and key results from OpsGraph | OpsGraph goals/backlog/sprints must become real records. Read-only import with stable IDs and explicit provenance; Scout never writes into the hub folder. |
 | G15 | Execute in the actual destination | Each integration needs its destination account and explicit action authorization. Approval queues implementation; sends/publication/payment happen only through the approved connector. |
 | G16 | Enforce worker scope and finance isolation | Define worker identities and universe membership; filter reads/prompts and enforce writes server-side. A UI filter or prompt instruction is insufficient. |
@@ -58,3 +58,22 @@ a review. Screenshots: `docs/evidence/goal-loop-handoff.png`, `goal-loop-followu
 `markdown-source-preserved.png`, and `goal-loop-end-day.png`. The original server on port 5188 and
 both source worktrees were left intact. No account authentication, model quota, system install or
 external campaign action was exercised.
+
+## GPT-6 Luna follow-up verification on 2026-10-02
+
+The user requested a GPT backup and selected GPT-6 Luna. The existing desktop CLI 0.159.2
+answered through the user's subscription; the older Homebrew CLI rejected the GPT-6 name.
+A local mock request capture confirmed an empty tool inventory. Today's separate `gpt` descriptor
+pins that verified runtime/model and spends the light budget without enabling heavy fallback.
+
+With `SCOUT_TEST=0`, a new copy of the demo produced a real validated plan (`source: gpt`) and
+daily review, consuming two light attempts and no heavy attempts. In the running browser demo,
+"Hi — what should I do next?" received: "Finish the planned Markdown preservation check. It’s
+the only remaining planned item for today." Evidence: `docs/evidence/gpt6-luna-plan.json` and
+`docs/evidence/gpt6-luna-chat.png`. This closes G13. The seven later dependencies remain open.
+
+The final suite contains **897 tests: 895 passed, 2 skipped, 0 failed**. The production build
+passed with the existing large chunk warning. New regressions cover default light routing,
+instruction isolation, model locking, budget accounting and JSONL failure/tool rejection. No
+software installation, global configuration change, authentication change or external campaign
+action was needed; these verification calls did consume subscription model usage.

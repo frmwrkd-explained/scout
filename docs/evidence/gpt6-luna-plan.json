@@ -1,0 +1,37 @@
+{
+  "date": "2026-10-02",
+  "result": {
+    "planned": true,
+    "day": "2026-10-02",
+    "source": "gpt",
+    "count": 2
+  },
+  "events": [
+    {
+      "purpose": "plan",
+      "provider": "gpt",
+      "model": "gpt-6-luna",
+      "ok": true
+    },
+    {
+      "purpose": "review_daily",
+      "provider": "gpt",
+      "model": "gpt-6-luna",
+      "ok": true
+    }
+  ],
+  "budget": {
+    "day": "2026-10-02",
+    "light": {
+      "limit": 40,
+      "used": 2,
+      "remaining": 38
+    },
+    "heavy": {
+      "limit": 4,
+      "used": 0,
+      "remaining": 4
+    }
+  },
+  "context": "Fresh copied demo workspace; no external action."
+}

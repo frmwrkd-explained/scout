@@ -735,7 +735,7 @@ export default function Today({ onGo, onOpenPath, refreshKey, actor, onWorkClock
             ) : <span style={sx('flex:1')} />}
             <div style={sx('flex:none;border-top:1px solid var(--line);padding:9px 16px;display:flex;flex-direction:column;gap:5px')}>
               <span style={{ ...mono('font-size:9.5px;letter-spacing:.06em;color:var(--fg-faint)') }}>
-                AGENTS TODAY: {['gemini', 'devin', 'claude', 'codex', 'stub'].filter(p => usage[p]).map(p => p + ' ' + usage[p]).join(' · ') || 'none'}
+                AGENTS TODAY: {['gemini', 'devin', 'gpt', 'claude', 'codex', 'stub'].filter(p => usage[p]).map(p => (p === 'gpt' ? 'GPT-6 Luna' : p) + ' ' + usage[p]).join(' · ') || 'none'}
               </span>
               {data.budget ? <span style={{ ...mono('font-size:9px;color:var(--fg-faint)') }}>
                 Calls left: light {data.budget.light.remaining}/{data.budget.light.limit} · heavy {data.budget.heavy.remaining}/{data.budget.heavy.limit}

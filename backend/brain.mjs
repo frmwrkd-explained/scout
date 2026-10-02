@@ -10,8 +10,8 @@
 // closed here; the normal interactive assistant remains available independently.
 //
 // Two tiers, and they are a budget line, not a preference:
-//   light — gemini, then devin. Cheap/account-tier one-shots for the many small calls a day makes
-//           (plan, prep, chat, the daily review).
+//   light — gemini, then devin, then GPT-6 Luna through the existing Codex subscription.
+//           Bounded one-shots for plan, prep, chat and the daily review.
 //   heavy — claude, codex. The subscription CLIs, reserved for weekly review + automation
 //           narratives. A light purpose NEVER falls back to heavy unless settings
 //           `allowHeavyFallback` is true — a Max plan is not a cheap plan you forgot to cap.
@@ -30,7 +30,7 @@ import { resolveBin, runOnce } from './jobs.mjs';
 import { logEvent, readEvents } from './log.mjs';
 import { localDay, dayStartMs } from './daytime.mjs';
 
-export const TIERS = { light: ['gemini', 'devin'], heavy: ['claude', 'codex'] };
+export const TIERS = { light: ['gemini', 'devin', 'gpt'], heavy: ['claude', 'codex'] };
 
 // Which tier each purpose buys. Plan/prep/chat/daily-review are the many-cheap-calls tier; the
 // weekly review and its automation suggestions are the one-thoughtful-call tier.
@@ -62,17 +62,26 @@ async function defaultProbe(provider) {
   // Free help probe: older binaries must not silently lose a mandatory restriction. Never
   // launch a model to determine capability or auth. The same empty cwd is used for real calls.
   try {
-    const help = await runIsolated(bin, ['--help'], 20_000);
+    const help = await runIsolated(bin, provider.textOnly.helpArgs || ['--help'], 20_000);
     const missing = (provider.textOnly.requiredFlags || []).filter(f => !String(help.out).includes(f));
+    if (provider.textOnly.verifiedVersions) {
+      const version = await runIsolated(bin, ['--version'], 10_000);
+      if (version.code !== 0 || !provider.textOnly.verifiedVersions.includes(String(version.out).trim())) {
+        return { ...state, textOnlyAvailable: false, textOnlyReason: 'GPT-6 Luna requires a Codex CLI version with verified text-only restrictions (0.159.2). Scout prefers the installed desktop CLI.' };
+      }
+    }
     const available = help.code === 0 && !missing.length;
     return { ...state, textOnlyAvailable: available,
       textOnlyReason: available ? null : 'Installed CLI cannot verify required text-only flags' + (missing.length ? ': ' + missing.join(', ') : '.') };
   } catch { return { ...state, textOnlyAvailable: false, textOnlyReason: 'Could not verify the installed CLI text-only flags.' }; }
 }
 
-async function runIsolated(bin, argv, timeoutMs) {
+async function runIsolated(bin, argv, timeoutMs, prepare = null) {
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'scout-brain-'));
-  try { return await runOnce(bin, argv, timeoutMs, cwd); }
+  try {
+    const args = prepare ? [...prepare(cwd), ...argv] : argv;
+    return await runOnce(bin, args, timeoutMs, cwd);
+  }
   finally { fs.rmSync(cwd, { recursive: true, force: true }); }
 }
 
@@ -186,6 +195,10 @@ export async function think({ purpose, prompt, timeoutMs = 120_000, probe: probe
   for (const provider of providers) {
     if (getStorageRoot() !== root) return rootChanged();
     const model = settings.brainModels && settings.brainModels[provider.id];
+    if (provider.textOnly.lockedModel && model && model !== provider.textOnly.lockedModel) {
+      reasons.push(provider.id + ': the lightweight GPT backup is fixed to ' + provider.textOnly.lockedModel);
+      continue;
+    }
     const argv = [
       ...provider.textOnly.promptArgs(prompt),
       ...(model && typeof provider.sessionArgs === 'function' ? provider.sessionArgs({ model }) : []),
@@ -199,18 +212,19 @@ export async function think({ purpose, prompt, timeoutMs = 120_000, probe: probe
     if (!reservation.ok) { reasons.push(provider.id + ': ' + reservation.reason); continue; }
     lastProvider = provider.id;
     let out;
-    try { out = await runIsolated(resolveBin(provider.bin) || provider.bin, argv, timeoutMs); }
+    try { out = await runIsolated(resolveBin(provider.bin) || provider.bin, argv, timeoutMs, provider.textOnly.prepare); }
     catch (e) { out = { code: 1, out: '', err: String(e.message || e) }; }
     // The old root already owns its reservation. Never write its response or completion into
     // the newly selected workspace; the durable reservation still counts after a restart.
     if (getStorageRoot() !== root) return rootChanged();
     const ms = Date.now() - started;
-    const ok = out.code === 0 && String(out.out || '').trim().length > 0;
+    const reply = provider.textOnly.parseReply ? provider.textOnly.parseReply(out) : { ok: out.code === 0 && String(out.out || '').trim().length > 0, text: String(out.out || '').trim() };
+    const ok = reply.ok;
     logEvent({ type: 'run', actor: 'conductor', target: 'brain/' + purpose,
-      detail: { provider: provider.id, tier, budgetTier, purpose, ms, ok,
+      detail: { provider: provider.id, model: provider.textOnly.lockedModel || model || null, tier, budgetTier, purpose, ms, ok,
         phase: 'completed', attemptId: reservation.attemptId, day: reservation.day } });
-    if (ok) return { ok: true, text: String(out.out).trim(), provider: provider.id, tier, ms };
-    reasons.push(provider.id + ': exit ' + out.code + (out.err ? ' — ' + firstLine(out.err) : ''));
+    if (ok) return { ok: true, text: reply.text, provider: provider.id, model: provider.textOnly.lockedModel || model || null, tier, ms };
+    reasons.push(provider.id + ': ' + (reply.reason ? firstLine(reply.reason) : 'exit ' + out.code + (out.err ? ' — ' + firstLine(out.err) : '')));
   }
   if (!lastProvider) logEvent({ type: 'run', actor: 'conductor', target: 'brain/' + purpose,
     detail: { provider: null, tier, purpose, ms: Date.now() - started, ok: false, phase: 'blocked', reason: reasons.join(' · ') } });

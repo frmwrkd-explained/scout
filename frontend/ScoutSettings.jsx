@@ -197,7 +197,7 @@ export default function ScoutSettings({ onToast, onRootChanged }) {
         </Section>
 
         <Section eyebrow="TODAY" title="The day loop"
-          body="Set the day, planned time and daily model-call budgets. Failed attempts count too. Today uses only providers with verified text-only restrictions; installation and sign-in alone do not prove readiness. Heavy fallback is an explicit choice.">
+          body="GPT-6 Luna backs up Gemini and Devin using your Codex subscription. It uses the light call budget. Set the day, planned time and daily model-call budgets; failed attempts count too. Heavy fallback is an explicit choice.">
           <div style={sx('display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end')}>
             <Field label="DAY STARTS">
               <Input value={dayStart} type="time" style={mono('font-size:12px;width:110px')}
@@ -231,8 +231,8 @@ export default function ScoutSettings({ onToast, onRootChanged }) {
             <span style={sx('font-size:11px;color:var(--fg-faint)')}>{todayBusy ? 'saving…' : ''}</span>
           </div>
           <Card style={sx('padding:4px 0;background:var(--surface-2);border-color:var(--border)')}>
-            {(providers === null ? [{ id: 'gemini' }, { id: 'devin' }, { id: 'claude' }, { id: 'codex' }] : providers)
-              .filter(p => ['gemini', 'devin', 'claude', 'codex'].includes(p.id))
+            {(providers === null ? [{ id: 'gemini' }, { id: 'devin' }, { id: 'gpt', label: 'GPT-6 Luna' }, { id: 'claude' }, { id: 'codex' }] : providers)
+              .filter(p => ['gemini', 'devin', 'gpt', 'claude', 'codex'].includes(p.id))
               .map((p, i) => (
                 <div key={p.id} style={{ ...sx('display:flex;align-items:center;gap:10px;padding:7px 14px'), borderTop: i ? '1px solid var(--line)' : 'none' }}>
                   <span style={{ ...sx('flex:none;width:7px;height:7px;border-radius:9999px'), background: !p.installed ? 'var(--border-3)' : p.signedIn ? 'var(--ok)' : 'var(--warn)' }} />

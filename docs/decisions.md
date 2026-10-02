@@ -1155,7 +1155,7 @@ The Today screen was the "three lines + needs you + behind + running" morning su
 Decisions made where the spec left room:
 
 - **The clock is events, not fields.** `start|pause|resume|stop` land as `work` events in the append-only log; minutes are derived by replaying them (midnight-split per local day). Buckets freeze into event meta at start, so re-bucketing later does not rewrite history. No "started_at" column exists to lie.
-- **Code drives, models only write.** Ordering, timing, stats, nudges and the weekly automation rule are arithmetic. The brain (backend/brain.mjs) is the ONE place a model call is made; light tier = Gemini CLI → Devin CLI → none, and heavy providers are never a light fallback unless `allowHeavyFallback` is on. A no-brain day still plans — deterministically, and the plan message says so.
+- **Code drives, models only write.** Ordering, timing, stats, nudges and the weekly automation rule are arithmetic. The brain (backend/brain.mjs) is the ONE place a model call is made; light tier = Gemini CLI → Devin CLI → GPT-6 Luna → none, and heavy providers are never a light fallback unless `allowHeavyFallback` is on. A no-brain day still plans — deterministically, and the plan message says so.
 - **The overnight three lines did not die** — they became the first line of the morning plan message, computed server-side from the same sources (runs, event log, open queue, goals). `overnightLines` stays exported from Today.jsx because tests exercise it.
 - **Reviews' numbers are the rollup's, never the model's.** The daily review's table and the `minutes`/`done` fields are computed before the narrative is written; the model only narrates and proposes learnings (which land `status: proposed` — the DECIDE gate still applies).
 - **The day session is one chat per local day** (`chat/today-<day>.md`, kind `today`, executor `today`) — conductor lines are assistant messages tagged `meta.kind:'conductor'` with a dedupe key, so the 60s poll can re-check nudge rules without reposting.
@@ -1222,3 +1222,19 @@ resumed. Workspace switches invalidate pending clock callbacks. Scheduler closur
 cutoff even when the tick is late. Generic Work status edits are refused by the canonical writer
 unless they carry Today's internal transition token, keeping clock/evidence/follow-ups together.
 Ordinary planned ingestion and property/body edits remain available through the normal pipeline.
+
+## GPT-6 Luna is Today's subscription backup
+
+The user selected GPT-6 Luna for the light tier. The existing desktop CLI 0.159.2 supports it;
+the older Homebrew CLI does not. Scout prefers the installed desktop binary without upgrading
+anything or changing the global Codex configuration. Its dedicated `gpt` route fixes the model to
+`gpt-6-luna`, low reasoning effort and standard service, and spends the light attempt budget.
+The normal `codex` assistant and heavy route retain their existing contracts.
+
+A local request capture with the bundled GPT-6 Luna catalog established an empty tool list with
+code-mode host disabled. Calls use a fresh temporary directory and Scout's own base instructions,
+ignore user configuration/rules, and disable tool-bearing features. Eligibility requires the
+verified CLI version; unknown versions fail closed pending verification. JSONL output must contain
+a completed text answer without tool actions or turn failure. A real Today chat reply confirmed
+the full subscription route on the copied demo. A fresh copy also produced a validated real plan
+and daily review, closing G13 in the task list. This is not team-level filesystem isolation.

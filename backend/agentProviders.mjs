@@ -182,6 +182,61 @@ export const PROVIDERS = [
 
 export const DEFAULT_PROVIDER_ID = 'claude';
 
+// A separate Today route to the same subscription, with a fixed lightweight model. Prefer
+// the already-installed desktop CLI: older Homebrew versions reject GPT-6 model names.
+const desktopCodex = ['/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex',
+  '/Applications/Codex.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex'];
+export const GPT_TODAY_MODEL = 'gpt-6-luna';
+const gptDisabledFeatures = ['shell_tool', 'unified_exec', 'apps', 'plugins', 'remote_plugin',
+  'browser_use', 'browser_use_external', 'computer_use', 'code_mode_host', 'goals',
+  'image_generation', 'multi_agent', 'tool_suggest', 'hooks', 'memories',
+  'workspace_dependencies', 'skill_mcp_dependency_install'];
+const gptBaseInstructions = 'You are Scout’s Today conductor. Use only the supplied context. Return helpful concise text or the requested JSON. You have no tools. Never claim to have sent, published, installed or deployed anything.\n';
+
+export function parseGptReply({ out, err, code }) {
+  let text = '', completed = false, failure = '';
+  try {
+    for (const line of String(out || '').split('\n').filter(line => line.trim())) {
+      const event = JSON.parse(line);
+      if (event.type === 'turn.failed' || event.type === 'error') failure = event.error?.message || event.message || 'GPT turn failed';
+      if (event.type === 'item.completed' || event.type === 'item.started') {
+        const item = event.item || {};
+        if (!['agent_message', 'reasoning', 'error'].includes(item.type)) return { ok: false, reason: 'GPT attempted a tool action; Today accepts text only.' };
+        if (event.type === 'item.completed' && item.type === 'agent_message') text = item.text || '';
+      }
+      if (event.type === 'turn.completed') completed = true;
+    }
+  } catch { return { ok: false, reason: 'GPT returned an invalid CLI response.' }; }
+  if (code !== 0 || !completed || failure || !text.trim()) return { ok: false, reason: failure || String(err || '').split('\n').find(Boolean) || 'GPT did not complete its answer.' };
+  return { ok: true, text: text.trim() };
+}
+
+PROVIDERS.push({
+  ...PROVIDERS.find(provider => provider.id === 'codex'),
+  id: 'gpt', label: 'GPT-6 Luna',
+  bin: desktopCodex.find(file => fs.existsSync(file)) || 'codex',
+  models: [{ id: GPT_TODAY_MODEL, label: 'GPT-6 Luna' }],
+  textOnly: {
+    available: true, lockedModel: GPT_TODAY_MODEL,
+    helpArgs: ['exec', '--help'],
+    requiredFlags: ['--ignore-user-config', '--ignore-rules', '--ephemeral', '--json', '--disable'],
+    // Request capture on 0.159.2 proved tools:[] with code-mode host disabled. Other versions
+    // must be reviewed, rather than silently inheriting a new tool inventory.
+    verifiedVersions: ['codex-cli 0.159.2'],
+    prepare: cwd => {
+      const file = path.join(cwd, 'today-instructions.md');
+      fs.writeFileSync(file, gptBaseInstructions, { mode: 0o600 });
+      return ['-c', 'model_instructions_file=' + JSON.stringify(file)];
+    },
+    promptArgs: prompt => ['exec', '--ignore-user-config', '--ignore-rules', '--ephemeral',
+      '--skip-git-repo-check', '--sandbox', 'read-only', '--color', 'never', '--json',
+      '-m', GPT_TODAY_MODEL, '-c', 'model_reasoning_effort="low"', '-c', 'service_tier="default"',
+      '-c', 'project_doc_max_bytes=0', '-c', 'skills.max_context_tokens=1', '-c', 'web_search="disabled"',
+      ...gptDisabledFeatures.flatMap(feature => ['--disable', feature]), String(prompt ?? '')],
+    parseReply: parseGptReply,
+  },
+});
+
 // Lowest-common-denominator descriptor for a CLI the user pointed `agentCommand` at that we have
 // never heard of. No login/status story — it just has to accept `-p <prompt>`.
 const GENERIC = {

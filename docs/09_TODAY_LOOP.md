@@ -43,7 +43,7 @@ not invented. A reviewed day may still contain new evening work without repeated
 
 ## The brain (backend/brain.mjs)
 
-`TIERS = { light: ['gemini','devin'], heavy: ['claude','codex'] }` (settings `tiers` overrides).
+`TIERS = { light: ['gemini','devin','gpt'], heavy: ['claude','codex'] }` (settings `tiers` overrides).
 `PURPOSE_TIER`: plan/prep/chat/review_daily → light; review_weekly/automation → heavy.
 `pickProvider` requires installation, sign-in and verified text-only capability; light purposes
 never reach heavy unless `allowHeavyFallback`. Each CLI attempt logs a reservation and completion
@@ -91,11 +91,25 @@ safe mode, user hooks disabled and a fresh empty working directory. Required fla
 without a model call. Administrator-managed policy still applies; these flags are not an OS
 sandbox or team-level filesystem isolation.
 
-Gemini, Devin and Codex are unavailable for Today until a complete prompt-only invocation can be
-verified while preserving their authentication. Their normal assistant functionality is unaffected.
+The dedicated `gpt` route uses **GPT-6 Luna**, low reasoning effort and standard service through
+the existing Codex subscription. It prefers the already-installed desktop CLI over the older
+Homebrew CLI. On this machine, desktop CLI **0.159.2** answered successfully; the Homebrew CLI
+0.144.6 rejected the GPT-6 model name. No installation, global configuration change or API key
+was needed. The backup consumes the light call cap and does not enable heavy fallback.
+
+An outgoing request captured against a local mock endpoint had an empty `tools` array with the
+GPT-6 Luna catalog and code-mode host disabled. Each call ignores user configuration and rules,
+uses Scout's own base instructions in a disposable directory, and disables tool-bearing features.
+Scout requires the verified CLI version and rejects tool events, incomplete turns and failed
+turns when parsing JSONL output. Model overrides cannot turn this light route into a heavier model.
+A desktop CLI update needs another capability verification before this route is enabled again.
+
+Gemini, Devin and the normal `codex` route remain unavailable for Today until their complete
+prompt-only invocations are verified. Their normal assistant functionality is unaffected.
 A signed-in badge alone is not evidence a model can answer. Light work still cannot use a heavy
-provider without an explicit tier/fallback setting, and no working real answer has been established
-in this implementation session.
+provider without an explicit tier/fallback setting. A real GPT-6 Luna chat reply was verified in
+the running copied demo on 2026-10-02 (`docs/evidence/gpt6-luna-chat.png`). A fresh copied fixture
+also produced a validated plan and daily review (`docs/evidence/gpt6-luna-plan.json`).
 
 `brainDailyLimits` defaults to 40 light and 4 heavy attempts per local day; zero disables a tier.
 Attempts reserve a slot synchronously in the event log before a CLI launches. Failures and unfinished

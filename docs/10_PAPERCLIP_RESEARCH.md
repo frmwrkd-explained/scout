@@ -65,6 +65,19 @@ Claude's `--safe-mode` preserves authentication while suppressing customizations
 
 **Scout implementation in this task.** `agentProviders.mjs` now has a separate `textOnly` descriptor; interactive assistant argv remains independent. Gemini, Devin and Codex fail closed for Today. Claude requires installed help to expose every mandatory restriction before eligibility. `brain.mjs` persists a reservation before invoking each provider and records completion separately. Daily limits default to **40 light attempts and 4 heavy attempts**; failed and unfinished attempts count, and Claude fallback always spends the heavy cap. Concurrent calls share the synchronous event-log reservation gate; this governs one Scout backend, not multiple independent servers writing the same vault. Regression tests cover concurrent saturation, failure, restart/orphan receipts, fallback billing tier, old dates, high log volume and workspace switches. No real model response was obtained as part of this verification.
 
+**Later GPT-6 Luna verification, 2026-10-02.** The user requested a GPT backup and selected
+GPT-6 Luna. The installed desktop CLI 0.159.2 successfully answered through existing subscription
+authentication, while Homebrew CLI 0.144.6 rejected the model. A local request capture with the
+GPT-6 Luna model catalog proved an empty tool list when code-mode host and the other tool-bearing
+features were disabled. Scout now has a separate, version-checked `gpt` text-only descriptor,
+fixed to `gpt-6-luna`, ignoring global user configuration/rules and using its own instructions.
+JSONL parsing accepts only completed text answers and rejects tool actions or failed turns. This
+route is in the light tier and spends the light attempt cap. A real reply in Scout's Today chat
+was verified; the earlier no-response statement describes the initial audit. No Paperclip server
+was installed or connected. Sources: [OpenAI model guidance](https://developers.openai.com/codex/models),
+[CLI changelog](https://developers.openai.com/codex/changelog),
+[configuration reference](https://developers.openai.com/codex/config-reference/).
+
 ### Monetary budgets cannot protect every subscription limit
 
 The budget service enforces sums of `costEvents.costCents` for company/agent/project scopes, with monthly UTC or lifetime windows. The heartbeat ledger distinguishes unknown/unpriced receipts from reported prices and normalizes subscription-included usage to zero incremental billed cents. Therefore a subscription worker can consume substantial quota without approaching a billed-dollar cap. Budget enforcement depends on recorded usage; concurrent/in-flight calls can consume resources before the stop is observed. Add run count, concurrency, timeout and quota cooldown limits separately. Sources: [budget aggregation](https://github.com/paperclipai/paperclip/blob/c46e41e81c03cd3c8b64cf993615b604d7fe8c62/server/src/services/budgets.ts#L135), [ledger normalization](https://github.com/paperclipai/paperclip/blob/c46e41e81c03cd3c8b64cf993615b604d7fe8c62/server/src/services/heartbeat.ts#L5296), [README budget limitation](https://github.com/paperclipai/paperclip/blob/c46e41e81c03cd3c8b64cf993615b604d7fe8c62/README.md).
