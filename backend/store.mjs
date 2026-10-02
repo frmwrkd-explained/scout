@@ -202,6 +202,15 @@ const DEFAULT_SETTINGS = {
   tiers: null,
   allowHeavyFallback: false,
   brainDailyLimits: DEFAULT_BRAIN_DAILY_LIMITS,
+  deliveryDestinations: [],
+  workerSchedulerEnabled: false,
+  workerMaxConcurrent: 2,
+  workerLeaseMinutes: 25,
+  workerMaxAttempts: 3,
+  workerRetryMinutes: 5,
+  workerQuotaCooldownMinutes: 60,
+  workerOvernightEnabled: false,
+  workerOvernightHour: 6,
 };
 // Raw read: defaults + whatever is on disk, with NO migration side-effect. Both getSettings()
 // (which may persist a migration) and saveSettings() (which must not re-enter it) read through
@@ -270,6 +279,24 @@ export function saveSettings(patch) {
     throw e;
   }
   patch = { ...patch };
+  for (const key of ['workerSchedulerEnabled', 'workerOvernightEnabled']) {
+    if (Object.hasOwn(patch, key) && typeof patch[key] !== 'boolean') throw new Error(key + ' must be true or false');
+  }
+  for (const [key, min, max] of [['workerMaxConcurrent', 1, 8], ['workerLeaseMinutes', 1, 120], ['workerMaxAttempts', 1, 5], ['workerRetryMinutes', 1, 120], ['workerQuotaCooldownMinutes', 5, 1440], ['workerOvernightHour', 0, 23]]) {
+    if (Object.hasOwn(patch, key) && (!Number.isInteger(patch[key]) || patch[key] < min || patch[key] > max)) throw new Error(key + ' must be ' + min + '–' + max);
+  }
+  if (Object.hasOwn(patch, 'deliveryDestinations')) {
+    if (!Array.isArray(patch.deliveryDestinations) || patch.deliveryDestinations.length > 12) throw new Error('deliveryDestinations must contain at most 12 destinations');
+    const ids = new Set();
+    for (const destination of patch.deliveryDestinations) {
+      if (!destination || Object.keys(destination).some(key => !['id', 'label', 'kind', 'url', 'tokenEnv'].includes(key))) throw new Error('Delivery destinations use id, label, kind, url and tokenEnv only');
+      if (!/^[a-z][a-z0-9-]{0,60}$/.test(destination.id || '') || destination.id === 'local-artifact' || ids.has(destination.id) || destination.kind !== 'webhook') throw new Error('Invalid or duplicate delivery destination ID');
+      ids.add(destination.id);
+      const url = new URL(destination.url);
+      if (url.username || url.password || url.search || url.hash || !(url.protocol === 'https:' || (url.protocol === 'http:' && ['127.0.0.1', 'localhost'].includes(url.hostname)))) throw new Error('Use an HTTPS destination or local demo endpoint without URL credentials');
+      if (destination.tokenEnv && !/^[A-Z][A-Z0-9_]+$/.test(destination.tokenEnv)) throw new Error('tokenEnv must name a backend environment variable');
+    }
+  }
   if (Object.hasOwn(patch, 'brainDailyLimits')) patch.brainDailyLimits = brainDailyLimits(patch.brainDailyLimits);
   for (const k of SECRET_SETTING_KEYS) if (patch[k] === REDACTED) delete patch[k];
   // readSettings(), never getSettings() — the latter can persist a migration and would recurse

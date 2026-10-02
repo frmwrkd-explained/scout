@@ -27,6 +27,7 @@ const j = async r => {
 const opts = body => ({ headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
 export const api = {
+  integration: (path, method = 'GET', body) => fetch('/api/' + path, { method, ...(body === undefined ? {} : opts(body)) }).then(j),
   state: () => fetch('/api/state').then(j),
 
   // ── collections · documents · views (M1) ──────────────────────────────────────────────────

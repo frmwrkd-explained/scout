@@ -522,7 +522,7 @@ export default class App extends React.Component {
 
     switch (screen) {
       case 'today':
-        return <Today onGo={this.go} onOpenPath={this.openPath} refreshKey={refreshKey} actor={HUMAN} onSendOut={this.sendOutAll}
+        return <Today onGo={this.go} onOpenPath={this.openPath} onWrote={this.reload} refreshKey={refreshKey} actor={HUMAN} onSendOut={this.sendOutAll}
           {...this.getWorkClockCallbacks()} />;
 
       case 'decide':

@@ -1210,8 +1210,9 @@ Today records paused outcomes separately from time, freezes completion results, 
 outcomes to the actual completion segment, and keeps one Now item across concurrent requests.
 Plan and chat changes validate before applying. End day closes the clock before reviewing.
 
-Paperclip remains a research recommendation for orchestration contracts and an optional future
-bridge, preserving Scout's local-first files. No second database/server is installed. Gemini plan,
+At this integration milestone Paperclip was a research recommendation for orchestration contracts
+and an optional future bridge. The subsequent implementation below adds that opt-in bridge while
+preserving Scout's local-first files. Gemini plan,
 Devin auto and Codex read-only were not valid no-tools guarantees. Today uses only verified
 text-only invocations, with durable daily attempt limits and an explicit heavy fallback boundary.
 See `docs/10_PAPERCLIP_RESEARCH.md` for primary sources and installed-runtime qualifications.
@@ -1238,3 +1239,23 @@ verified CLI version; unknown versions fail closed pending verification. JSONL o
 a completed text answer without tool actions or turn failure. A real Today chat reply confirmed
 the full subscription route on the copied demo. A fresh copy also produced a validated real plan
 and daily review, closing G13 in the task list. This is not team-level filesystem isolation.
+
+## Remaining goal-loop integrations
+
+G14–G19 now use canonical writers for reviewed OpsGraph imports, exact approved delivery,
+restricted worker scope, durable capability routing, typed approved widgets and Paperclip
+delegation. A delivery receipt is separate from human completion and an observed goal outcome.
+Preparing a task is separate from executing an external action. Paperclip callbacks enter the
+existing proposal queue and cannot complete or promote work without the operator.
+
+Worker scope uses server-issued run identities and is enforced at API, prompt and writer
+boundaries. Restricted workers are limited to the verified no-tools brain. The legacy local
+owner routes are preserved; a malicious process on the same machine with filesystem access
+requires a different deployment security boundary.
+
+The user explicitly requested practical Paperclip work and a real human/agent role-play. The
+Paperclip verification package is pinned and installed only under `/private/tmp`, with isolated
+data, telemetry/update checks off and no operating-system service. It uses the already installed
+Node 26; Scout continues using Node 22. No global runtime, sign-in or system package was changed.
+The role-play uses a new goal-only vault and GPT-6 Luna, consumes subscription attempts, and
+must not be represented as real customer replies or second-person production acceptance.

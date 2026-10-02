@@ -50,6 +50,13 @@ import { registerProposalRoutes } from './proposals.mjs';
 import { registerInboxRoutes, startInboxWatch, ensureInbox, refreshAgentFiles } from './inbox.mjs';
 import { registerDispatchRoutes, startScheduler, stopScheduler, stopAll as stopAllRuns } from './dispatch.mjs';
 import { registerTodayRoutes } from './today.mjs';
+import { registerOpsgraphRoutes } from './opsgraphImport.mjs';
+import { registerDeliveryRoutes } from './delivery.mjs';
+import { registerWidgetRoutes } from './widgets.mjs';
+import { registerWorkerScope } from './workerScope.mjs';
+import { registerPaperclipRoutes } from './paperclip.mjs';
+import { registerWorkerRoutes, tickWorkers } from './workers.mjs';
+import { onSchedulerTick } from './dispatch.mjs';
 import { logEvent, readEvents } from './log.mjs';
 
 const APP_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -104,6 +111,7 @@ app.use((req, res, next) => {
 });
 
 app.use(express.json({ limit: '2mb' }));
+registerWorkerScope(app);
 
 // ── revision push (Phase 4): every successful app mutation bumps the app revision for its domain,
 // which is pushed to SSE subscribers so the client updates without a blind 2s poll. External agent
@@ -210,6 +218,12 @@ registerInboxRoutes(app, { logEvent });
 registerDispatchRoutes(app, { logEvent });
 // The Today loop — the chat+plan surface, the clock, the brain calls (docs/09_TODAY_LOOP.md).
 registerTodayRoutes(app, { logEvent });
+registerOpsgraphRoutes(app);
+registerDeliveryRoutes(app);
+registerWidgetRoutes(app);
+registerPaperclipRoutes(app);
+registerWorkerRoutes(app);
+onSchedulerTick(now => tickWorkers({ now }));
 
 // pid/scope route params become filesystem path segments — allow only slug charset
 // (project ids are kebab slugs; scope is 'library' or a project id). Blocks %2F traversal.

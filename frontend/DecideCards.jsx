@@ -40,7 +40,7 @@ import { MONO } from './tokens';
 import { Eyebrow, Input } from './ui';
 
 // ── the two fixed vocabularies (mirrors backend/proposals.mjs) ────────────────────────────────
-export const CARD_KINDS = ['finding', 'outbound', 'territory', 'learning', 'schema', 'question'];
+export const CARD_KINDS = ['finding', 'outbound', 'territory', 'learning', 'schema', 'question', 'widget'];
 
 // Law 5: the reason is the only labelled data this system ever gets, so it is mandatory and it is
 // ONE KEYSTROKE. Five, fixed, numbered 1–5 — the order IS the keymap, and it is the same list as
@@ -210,6 +210,7 @@ export function normalizeCard(raw) {
     scope: first(d.scope) || null,
     window: num(first(d.sweep_interval_days, d.window_days, d.review_days)),
     question: first(d.question) || null,
+    widget: d.widget || null,
     answer: first(d.answer, d.proposed_answer, d.default_answer) || '',
     // where an accepted answer lands. 'me' → me.md, anything else → learnings/.
     answerTo: String(first(d.target, '') || '') === 'me' ? 'me.md' : 'learnings/',
@@ -520,6 +521,11 @@ function UnknownBody({ card }) {
 // ONE line per kind. `effect` is printed under the buttons in mono uppercase, so "what does
 // accepting mean" is answered on the card rather than in a doc — T13's table, rendered.
 export const KIND = {
+  widget: {
+    label: 'TODAY LAYOUT', chip: { one: 'widget', many: 'widgets' },
+    yes: 'Add widget', no: 'Reject', effect: 'ADDS AN APPROVED CATALOG WIDGET TO TODAY',
+    Body: ({ card }) => <><h2>{card.title}</h2><p>{card.widget?.title || card.widget?.type}</p></>,
+  },
   finding: {
     label: 'SOMEONE FOUND', chip: { one: 'person', many: 'people' },
     yes: 'Shortlist', no: 'Reject', effect: 'MOVES THE RECORD TO SHORTLIST',

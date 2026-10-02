@@ -23,13 +23,16 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { getStorageRoot, readMd, writeMd, safe, byDate } from './store.mjs';
+import { isAgentActor } from './actors.mjs';
+import { currentWorkerIdentity } from './workerScope.mjs';
 
 const R = () => getStorageRoot();
 export const proposalsDir = () => path.join(R(), 'proposals');
 const proposalFile = id => path.join(proposalsDir(), safe(id) + '.md');
 
-export const CARD_KINDS = ['finding', 'outbound', 'territory', 'learning', 'schema', 'question'];
+export const CARD_KINDS = ['finding', 'outbound', 'territory', 'learning', 'schema', 'question', 'widget'];
 // The same five as records.mjs ARCHIVE_REASONS, and that is not a coincidence: rejecting a finding
 // archives the record with this reason, which is what makes a rejection move a territory's score
 // (GOAL §4 gate 5). If that list ever changes, these must change together.
@@ -41,6 +44,18 @@ export class ProposalError extends Error {
 }
 
 const nowIso = () => new Date().toISOString();
+// The acceptance binds the exact outbound content and its delivery identity. A later file
+// edit cannot inherit an approval of different words, work or destination.
+export function outboundApprovalFingerprint(card) {
+  const approved = {};
+  for (const key of ['kind', 'message', 'channel', 'subject', 'territory', 'work_id', 'destination_id', 'delivery_hash']) {
+    approved[key] = card[key] ?? null;
+  }
+  return crypto.createHash('sha256').update(JSON.stringify(approved)).digest('hex');
+}
+function requireHumanDecision(actor) {
+  if (currentWorkerIdentity() || isAgentActor(actor)) throw new ProposalError('Only a human may accept or reject a proposal.', 403);
+}
 // Module-level deps, set by registerProposalRoutes. Every effect resolves through resolve() below,
 // so a test can inject a fake and the app can run before the module the effect lives in has landed.
 let ROUTE_DEPS = {};
@@ -131,6 +146,7 @@ const REQUIRED = {
   learning: ['claim'],
   schema: ['change'],
   question: ['question'],
+  widget: ['widget'],
 };
 
 // A territory card names its ground either as an id — `territory: ofw-uk` — or as the whole object
@@ -207,7 +223,7 @@ function validate(card) {
     }
     if (card.change === 'collection' && !card.schema) throw new ProposalError('a collection card needs `schema`');
   }
-  if (card.kind === 'learning' && (!Array.isArray(card.evidence) || !card.evidence.length)) {
+  if (['learning', 'widget'].includes(card.kind) && (!Array.isArray(card.evidence) || !card.evidence.length)) {
     throw new ProposalError('a learning card must carry evidence[] — a claim with no evidence is a rumour');
   }
   return card;
@@ -282,6 +298,10 @@ async function settleAfterCollection(deps) {
 
 async function effectFor(card, actor, deps) {
   switch (card.kind) {
+    case 'widget': {
+      const approveWidget = needed(await resolve('approveWidget', './widgets.mjs', deps), 'approveWidget', 'backend/widgets.mjs');
+      return { effect: 'widget', result: await approveWidget(card.widget, { actor }) };
+    }
     case 'finding': {
       const moveRecord = needed(await resolve('moveRecord', './records.mjs', deps), 'moveRecord', 'backend/records.mjs');
       // AGENT_MAX_STAGE is `shortlist` — accepting a finding is exactly the move an agent may not
@@ -358,6 +378,7 @@ async function effectFor(card, actor, deps) {
 }
 
 export async function accept(id, { actor = 'crystal', answer = null, deps = null } = {}) {
+  requireHumanDecision(actor);
   const card = getProposal(id);
   if (!card) throw new ProposalError('no proposal "' + id + '"', 404);
   if (card.status !== 'open') throw new ProposalError('this card was already ' + card.status, 409);
@@ -373,7 +394,8 @@ export async function accept(id, { actor = 'crystal', answer = null, deps = null
     decided_at: nowIso(),
     decided_by: actor,
     effect,
-    ...(card.kind === 'outbound' ? { approved_at: result.approved_at, approved_by: actor } : {}),
+    ...(card.kind === 'outbound' ? { approved_at: result.approved_at, approved_by: actor,
+      approved_content_hash: outboundApprovalFingerprint(card) } : {}),
     notice: 'Accepted by ' + actor + '. ' + effect + '.',
   };
   writeMd(proposalFile(id), next, content);
@@ -386,6 +408,7 @@ export async function accept(id, { actor = 'crystal', answer = null, deps = null
 // scores, playbook claims and every improvement to the agent are computed from rejects.
 
 export async function reject(id, { reason, actor = 'crystal', deps = null } = {}) {
+  requireHumanDecision(actor);
   const card = getProposal(id);
   if (!card) throw new ProposalError('no proposal "' + id + '"', 404);
   if (card.status !== 'open') throw new ProposalError('this card was already ' + card.status, 409);

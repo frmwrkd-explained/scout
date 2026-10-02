@@ -14,6 +14,7 @@ import { isQuarantined as isQuarantinedRule, slugify } from './records.mjs';
 import { getStorageRoot, stamp, safeScope, dayMs } from './store.mjs';
 
 import { isAgentActor, isAgentForOwnedMemory } from './actors.mjs';
+import { currentWorkerIdentity, outsideWorkerIdentity, projectWorkerPrompt, assertWorkerMemoryAccess, assertWorkerMemoryMutation } from './workerScope.mjs';
 // safeScope is the one project-id sanitizer (store.mjs) — an allowlist, and the same one
 // contextDir() uses, so memory/_folders and the context boards always agree on the directory.
 const projDir = pid => path.join(getStorageRoot(), 'projects', safeScope(pid));
@@ -41,12 +42,14 @@ function writeAtomic(file, data, body) {
 
 // ── memory doc ──
 export function readMemory(pid) {
+  assertWorkerMemoryAccess('projects/' + safeScope(pid) + '/memory.md');
   try {
     const { data, content } = matter(fs.readFileSync(memoryPath(pid), 'utf8'));
     return { body: content.trim(), updated: data.updated || '' };
   } catch { return { body: '', updated: '' }; }
 }
 export function writeMemory(pid, body) {
+  assertWorkerMemoryAccess('projects/' + safeScope(pid) + '/memory.md', { operation: 'write' });
   const updated = stamp();
   writeAtomic(memoryPath(pid), { project: String(pid), updated }, (body || '').trim() + '\n');
   return { body: (body || '').trim(), updated };
@@ -328,6 +331,7 @@ function refuseAgent(actor, what) {
 
 // ── identity ───────────────────────────────────────────────────────────────────────────────────
 export function readMe() {
+  assertWorkerMemoryAccess('me.md');
   try {
     const { data, content } = readMd(scoutPaths.me());
     const d = { type: 'identity', ...data };
@@ -338,6 +342,7 @@ export function readMe() {
 }
 
 export function writeMe(body, data = {}, { actor = 'crystal' } = {}) {
+  assertWorkerMemoryMutation('me.md', data, { actor });
   ensureWired();
   refuseAgent(actor, 'me.md');
   const cur = readMe();
@@ -419,6 +424,7 @@ function shapeGoal(g, docs, now) {
 function isQuarantinedDoc(d) { return isQuarantinedRule(d?.data || {}, d?.path || ''); }
 
 export function listGoals({ docs = null, now = Date.now() } = {}) {
+  if (currentWorkerIdentity()) throw new MemoryError('scoped workers read goals through their projected context', 403);
   const all = docs || allDocuments();
   return listDir(scoutPaths.goalsDir(), 'goal').map(g => shapeGoal(g, all, now));
 }
@@ -429,6 +435,7 @@ export function getGoal(id, { docs = null, now = Date.now() } = {}) {
 // Human-owned like me.md: agents propose (docs/04_AGENT_CONTRACT.md §6). `current` is dropped when
 // the goal declares a count query — the rollup is the truth and a typed number would shadow it.
 export function saveGoal(id, patch = {}, { actor = 'crystal' } = {}) {
+  assertWorkerMemoryMutation('goals/' + safe(id) + '.md', patch, { actor });
   ensureWired();
   refuseAgent(actor, 'goals/' + safe(id) + '.md');
   const file = scoutPaths.goal(id);
@@ -483,9 +490,11 @@ function firstLine(body) {
 }
 
 export function listPlaybook({ now = Date.now() } = {}) {
+  if (currentWorkerIdentity()) throw new MemoryError('scoped workers read playbook through their projected context', 403);
   return listDir(scoutPaths.playbookDir(), 'playbook').map(p => shapePlaybook(p, now));
 }
 export function getPlaybook(id, { now = Date.now() } = {}) {
+  assertWorkerMemoryAccess('playbook/' + safe(id) + '.md');
   const file = scoutPaths.playbook(id);
   if (!fs.existsSync(file)) return null;
   try {
@@ -496,6 +505,7 @@ export function getPlaybook(id, { now = Date.now() } = {}) {
 }
 
 export function savePlaybook(id, patch = {}, { actor = 'crystal' } = {}) {
+  assertWorkerMemoryMutation('playbook/' + safe(id) + '.md', patch, { actor });
   ensureWired();
   const key = safe(String(id || '').trim());
   if (!key) throw new MemoryError('a playbook claim needs an id');
@@ -558,14 +568,23 @@ function shapeLearning(l, now) {
 }
 
 export function listLearnings({ now = Date.now(), status = null } = {}) {
+  if (currentWorkerIdentity()) throw new MemoryError('scoped workers read learnings through their projected context', 403);
   const all = listDir(scoutPaths.learningsDir(), 'learning').map(l => shapeLearning(l, now));
   return status ? all.filter(l => l.status === status) : all;
 }
 export function getLearning(id, { now = Date.now() } = {}) {
+  if (currentWorkerIdentity()) {
+    const file = scoutPaths.learning(id);
+    assertWorkerMemoryAccess('learnings/' + safe(id) + '.md');
+    if (!fs.existsSync(file)) return null;
+    const { data, content } = readMd(file);
+    return shapeLearning({ id: String(data.id || safe(id)), file, data: { type: 'learning', ...data }, body: String(content || '').trim() }, now);
+  }
   return listLearnings({ now }).find(l => l.id === safe(id) || l.id === id) || null;
 }
 
 export function saveLearning(id, patch = {}, { actor = 'crystal' } = {}) {
+  assertWorkerMemoryMutation('learnings/' + safe(id) + '.md', patch, { actor });
   ensureWired();
   const key = safe(String(id || '').trim());
   if (!key) throw new MemoryError('a learning needs an id');
@@ -983,6 +1002,10 @@ function compose(m, level, version, hubLevel = 0) {
 // majority of renders are the debounced regeneration nobody typed; a route passes its caller so a
 // person pressing Regenerate in WHAT THEY KNOW is not recorded in Activity as an agent's work.
 export function renderCache({ project = null, now = Date.now(), docs = null, version = null, actor = 'scout' } = {}) {
+  if (currentWorkerIdentity()) {
+    const text = projectWorkerPrompt({ project });
+    return { text, tokens: estimateTokens(text), chars: text.length, budget: CACHE_TOKEN_BUDGET, scoped: true };
+  }
   ensureWired();
   const m = gather({ project, now, docs });
   // No invented number: an un-generated cache renders v="0", which is exactly what
@@ -1027,6 +1050,7 @@ export function renderCache({ project = null, now = Date.now(), docs = null, ver
 // Writes the file and increments `v`. An agent that cached a context asks GET /api/cache/version —
 // one cheap call — to learn whether it must re-read.
 export function regenerateCache({ project = null, now = Date.now(), actor = 'scout' } = {}) {
+  if (currentWorkerIdentity()) throw new MemoryError('a scoped worker cannot regenerate the owner cache', 403);
   ensureWired();
   // The version counter is per scope, so read it from the scope this render will actually write.
   const pid = scopeOf(project);
@@ -1055,6 +1079,7 @@ export function regenerateCache({ project = null, now = Date.now(), actor = 'sco
 // polls are the same artefact. Missing (never generated, or `.scout/` deleted — it is disposable
 // by Law 1) → generate it once, now.
 export function readCache({ project = null } = {}) {
+  if (currentWorkerIdentity()) return renderCache({ project });
   ensureWired();
   const pid = scopeOf(project);
   const meta = readVersion(pid);
@@ -1073,6 +1098,7 @@ export function readCache({ project = null } = {}) {
 export const CACHE_DEBOUNCE_MS = 2000;
 const cacheTimers = new Map();
 export function scheduleCacheRegen({ project = null } = {}) {
+  if (currentWorkerIdentity()) return outsideWorkerIdentity(() => scheduleCacheRegen({ project }));
   const key = project || '';
   const prev = cacheTimers.get(key);
   if (prev) clearTimeout(prev);

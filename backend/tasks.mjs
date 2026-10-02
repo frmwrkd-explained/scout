@@ -15,7 +15,9 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { randomUUID, createHash } from 'node:crypto';
 import { getStorageRoot, readMd, writeMd, safe, safeScope, byDate } from './store.mjs';
+import { assertPaperclipWorkAvailable } from './paperclip.mjs';
 
 const R = () => getStorageRoot();
 
@@ -53,7 +55,7 @@ export function normalizeSchedule(v) {
 }
 // Written by claimTask and by nothing else. saveTask() refuses a patch that names either of them,
 // because a queue where any writer can stamp `assigned` has no claim protocol, only a convention.
-export const CLAIM_FIELDS = ['assigned', 'claimed_at'];
+export const CLAIM_FIELDS = ['assigned', 'claimed_at', 'lease_id', 'lease_expires_at', 'lease_heartbeat_at', 'lease_run'];
 
 export class TaskError extends Error {
   constructor(msg, status = 400) { super(msg); this.status = status; }
@@ -61,6 +63,22 @@ export class TaskError extends Error {
 
 const nowIso = () => new Date().toISOString();
 const ID_RE = /^[a-z0-9][a-z0-9_-]*$/i;
+
+// Skills describe what a worker can produce. They never grant access to collections or tools.
+export function normalizeCapabilities(value, name = 'capabilities') {
+  if (value == null) return [];
+  if (!Array.isArray(value) || value.length > 32 || value.some(v => typeof v !== 'string' || !/^[a-z][a-z0-9_-]{0,63}$/i.test(v))) {
+    throw new TaskError(name + ' must be an array of at most 32 skill names (letters, digits, - and _)');
+  }
+  return [...new Set(value.map(v => v.toLowerCase()))];
+}
+
+export function workerCanTask(assistant, task) {
+  try {
+    const skills = normalizeCapabilities(assistant?.capabilities);
+    return normalizeCapabilities(task?.requires, 'requires').every(skill => skills.includes(skill));
+  } catch { return false; } // malformed hand-edited declarations must not widen a worker's job
+}
 
 export function slugify(s) {
   return String(s || '').toLowerCase().trim()
@@ -144,6 +162,9 @@ export function saveAssistant(id, patch = {}, { actor = 'crystal' } = {}) {
   if (!ID_RE.test(clean)) throw new TaskError('assistant id must be a slug (letters, digits, - and _)');
   const existing = readIf(assistantFile(clean));
   const { body, ...fields } = patch;
+  if ('capabilities' in fields) fields.capabilities = normalizeCapabilities(fields.capabilities);
+  if ('worker_mode' in fields && !['prepare', 'tools'].includes(fields.worker_mode)) throw new TaskError('worker_mode must be prepare or tools');
+  if ('worker_enabled' in fields && typeof fields.worker_enabled !== 'boolean') throw new TaskError('worker_enabled must be true or false');
   if (fields.parent && safe(fields.parent) === safe(clean)) throw new TaskError('an assistant cannot be its own parent');
   const data = {
     ...(existing ? existing.data : { created: nowIso(), created_by: actor }),
@@ -222,7 +243,7 @@ export function listTasks({ project = null, status = null } = {}) {
   return out.sort(byDate('created'));
 }
 
-export function saveTask(project, id, patch = {}, { actor = 'crystal' } = {}) {
+export function saveTask(project, id, patch = {}, { actor = 'crystal', leaseId = null, now = Date.now() } = {}) {
   const pid = safeScope(project);
   if (!pid) throw new TaskError('a task belongs to a project — `project` is required');
   const clean = String(id || '').trim();
@@ -241,16 +262,27 @@ export function saveTask(project, id, patch = {}, { actor = 'crystal' } = {}) {
     if (k in patch) throw new TaskError('"' + k + '" is written by claiming only — POST /api/tasks/:id/claim');
   }
 
-  const existing = readIf(taskFile(pid, clean));
-  const { body, ...fields } = patch;
-  const prev = existing ? existing.data : { created: nowIso(), created_by: actor, status: 'open', needs_human: false };
-  const data = { ...prev, ...fields, id: clean, project: pid, updated: nowIso(), updated_by: actor };
-  // Re-opening a task hands it back to the queue; the claim has to go with it or the next claimer
-  // reads `open` and still loses the race to a name that is no longer working on it.
-  if (fields.status === 'open') { data.assigned = null; data.claimed_at = null; }
-  const content = body !== undefined ? String(body) : (existing ? existing.content : '');
-  writeMd(taskFile(pid, clean), data, content);
-  return getTask(pid, clean);
+  // Ordinary edits share the claim mutex too: merging an old snapshot after another process
+  // renews or releases a lease could otherwise resurrect the old assignment accidentally.
+  const lock = path.join(locksDir(), pid + '__' + clean + '.lock');
+  if (!acquire(lock)) throw new TaskError('task is busy; retry shortly', 409);
+  try {
+    const existing = readIf(taskFile(pid, clean));
+    if (existing?.data.lease_id && ('status' in patch || 'prepared_text' in patch) &&
+      (leaseId !== existing.data.lease_id || actor !== existing.data.assigned || !(Date.parse(existing.data.lease_expires_at) > Number(now)))) {
+      throw new TaskError('a leased task transition requires its current worker and unexpired leaseId', 409);
+    }
+    const { body, ...fields } = patch;
+    if ('requires' in fields) fields.requires = normalizeCapabilities(fields.requires, 'requires');
+    if ('worker_mode' in fields && !['prepare', 'tools'].includes(fields.worker_mode)) throw new TaskError('worker_mode must be prepare or tools');
+    const prev = existing ? existing.data : { created: nowIso(), created_by: actor, status: 'open', needs_human: false };
+    const data = { ...prev, ...fields, id: clean, project: pid, updated: nowIso(), updated_by: actor };
+    // Re-opening hands the claim back to the queue.
+    if (fields.status === 'open') for (const key of CLAIM_FIELDS) data[key] = null;
+    const content = body !== undefined ? String(body) : (existing ? existing.content : '');
+    writeMd(taskFile(pid, clean), data, content);
+    return getTask(pid, clean);
+  } finally { release(lock); }
 }
 
 // ── the claim ──────────────────────────────────────────────────────────────────────────────────
@@ -295,7 +327,24 @@ function acquire(lock) {
 }
 function release(lock) { try { fs.rmdirSync(lock); } catch { /* already gone */ } }
 
-export function claimTask(project, id, { actor = 'crystal' } = {}) {
+export function withWorkAssignmentLock(workId, fn) {
+  if (!workId) return fn();
+  const canonical = path.basename(String(workId).replaceAll('\\', '/')).replace(/\.md$/, '');
+  const key = createHash('sha256').update(canonical).digest('hex');
+  const lock = path.join(R(), '.scout', 'locks', 'work-assignment', key + '.lock');
+  if (!acquire(lock)) throw new TaskError('work assignment is busy; retry shortly', 409);
+  try { return fn(); } finally { release(lock); }
+}
+
+export function assertLocalWorkAvailable(workIdOrArray, { now = Date.now() } = {}) {
+  const ids = Array.isArray(workIdOrArray) ? workIdOrArray.map(String) : [String(workIdOrArray)];
+  const held = listTasks().find(task => ids.includes(String(task.work_id || '')) && task.status === 'claimed'
+    && (!task.lease_id || Date.parse(task.lease_expires_at) > Number(now)));
+  if (held) throw new TaskError('This work is already claimed by local worker ' + held.assigned + '.', 409);
+  return true;
+}
+
+export function claimTask(project, id, { actor = 'crystal', lease = null, now = Date.now() } = {}) {
   const pid = safeScope(project);
   const clean = safe(String(id || ''));
   const file = taskFile(pid, clean);
@@ -307,13 +356,27 @@ export function claimTask(project, id, { actor = 'crystal' } = {}) {
   let wrote = false;
   try {
     const { data, content } = readMd(file);          // inside the lock — this read is authoritative
-    const held = data.assigned || null;
-    const open = (!data.status || data.status === 'open') && !held;
-    if (!open && held !== actor) {
-      return { won: false, reason: held ? 'claimed' : 'not-open', assigned: held, task: getTask(pid, clean) };
-    }
-    writeMd(file, { ...data, status: 'claimed', assigned: actor, claimed_at: nowIso(), updated: nowIso(), updated_by: actor }, content);
-    wrote = true;
+    const denied = withWorkAssignmentLock(data.work_id, () => {
+      if (data.work_id) assertPaperclipWorkAvailable(data.work_id);
+      const held = data.assigned || null;
+      const open = (!data.status || data.status === 'open') && !held;
+      const own = data.status === 'claimed' && held === actor;
+      if (!open && !own) {
+        return { won: false, reason: held ? 'claimed' : 'not-open', assigned: held, task: getTask(pid, clean) };
+      }
+      if (data.lease_id && (data.lease_id !== lease?.id || Date.parse(data.lease_expires_at) <= Number(now))) {
+        return { won: false, reason: 'leased', assigned: held, task: getTask(pid, clean) };
+      }
+      const at = new Date(now).toISOString();
+      const extra = lease ? {
+        lease_id: lease.id || randomUUID(), lease_run: lease.run || null,
+        lease_heartbeat_at: at, lease_expires_at: new Date(Number(now) + validLeaseMs(lease.ms)).toISOString(),
+      } : {};
+      writeMd(file, { ...data, ...extra, status: 'claimed', assigned: actor, claimed_at: at, updated: at, updated_by: actor }, content);
+      wrote = true;
+      return null;
+    });
+    if (denied) return denied;
   } finally {
     release(lock);
   }
@@ -322,6 +385,70 @@ export function claimTask(project, id, { actor = 'crystal' } = {}) {
   const task = getTask(pid, clean);
   const won = wrote && task && task.assigned === actor;
   return won ? { won: true, task } : { won: false, reason: 'lost', assigned: task && task.assigned, task };
+}
+
+function validLeaseMs(ms) {
+  const n = Number(ms);
+  if (!Number.isFinite(n) || n < 1000 || n > 24 * 3600_000) throw new TaskError('a task lease lasts between 1 second and 24 hours');
+  return n;
+}
+
+// Heartbeats and release use the same cross-process mutex as the initial claim. A stale process
+// can neither renew somebody else's claim nor complete the replacement worker's task.
+export function heartbeatTaskLease(project, id, { actor, leaseId, now = Date.now(), leaseMs = 25 * 60_000, runId = null } = {}) {
+  const pid = safeScope(project), clean = safe(id);
+  const lock = path.join(locksDir(), pid + '__' + clean + '.lock');
+  if (!acquire(lock)) throw new TaskError('task lease is busy', 409);
+  try {
+    const file = taskFile(pid, clean), found = readIf(file);
+    if (!found) throw new TaskError('no task "' + clean + '"', 404);
+    const { data, content } = found;
+    if (!leaseId || data.lease_id !== leaseId || data.assigned !== actor || data.status !== 'claimed' || !(Date.parse(data.lease_expires_at) > Number(now))) {
+      throw new TaskError('task lease is expired or belongs to another worker', 409);
+    }
+    writeMd(file, { ...data, ...(runId ? { lease_run: String(runId) } : {}), lease_heartbeat_at: new Date(now).toISOString(),
+      lease_expires_at: new Date(Number(now) + validLeaseMs(leaseMs)).toISOString() }, content);
+    return getTask(pid, clean);
+  } finally { release(lock); }
+}
+
+export function releaseTaskLease(project, id, { actor, leaseId, now = Date.now(), status = 'open', patch = {} } = {}) {
+  if (!['open', 'done', 'blocked'].includes(status)) throw new TaskError('lease release status must be open, done or blocked');
+  for (const key of CLAIM_FIELDS) if (key in patch) throw new TaskError('lease patch cannot change claim fields');
+  const pid = safeScope(project), clean = safe(id);
+  const lock = path.join(locksDir(), pid + '__' + clean + '.lock');
+  if (!acquire(lock)) throw new TaskError('task lease is busy', 409);
+  try {
+    const file = taskFile(pid, clean), found = readIf(file);
+    if (!found) throw new TaskError('no task "' + clean + '"', 404);
+    const { data, content } = found;
+    if (!leaseId || data.lease_id !== leaseId || data.assigned !== actor || !(Date.parse(data.lease_expires_at) > Number(now))) {
+      throw new TaskError('task lease is expired or belongs to another worker', 409);
+    }
+    const next = { ...data, ...patch, status, updated: new Date(now).toISOString(), updated_by: actor };
+    for (const key of CLAIM_FIELDS) next[key] = null;
+    writeMd(file, next, content);
+    return getTask(pid, clean);
+  } finally { release(lock); }
+}
+
+export function recoverExpiredTaskLeases({ now = Date.now() } = {}) {
+  const recovered = [];
+  for (const task of listTasks()) {
+    if (!task.lease_id || Date.parse(task.lease_expires_at) > Number(now)) continue;
+    const lock = path.join(locksDir(), task.project + '__' + task.id + '.lock');
+    if (!acquire(lock)) continue;
+    try {
+      const file = taskFile(task.project, task.id), found = readIf(file);
+      if (!found || !found.data.lease_id || Date.parse(found.data.lease_expires_at) > Number(now)) continue;
+      const next = { ...found.data, updated: new Date(now).toISOString(), updated_by: 'worker-recovery' };
+      if (next.status === 'claimed') next.status = 'open';
+      for (const key of CLAIM_FIELDS) next[key] = null;
+      writeMd(file, next, found.content);
+      recovered.push({ project: task.project, id: task.id, leaseId: found.data.lease_id, run: found.data.lease_run });
+    } finally { release(lock); }
+  }
+  return recovered;
 }
 
 // ── findings ───────────────────────────────────────────────────────────────────────────────────
@@ -440,7 +567,7 @@ export function registerTaskRoutes(app, deps = {}) {
     try {
       const found = findTask(req.params.id, { project: req.body?.project });
       if (!found) return res.status(404).json({ error: 'no task "' + req.params.id + '"' });
-      const t = saveTask(found.project, found.id, patchOf(req, ['project']), { actor: actorOf(req) });
+      const t = saveTask(found.project, found.id, patchOf(req, ['project', 'leaseId']), { actor: actorOf(req), leaseId: req.body?.leaseId || null });
       await event(deps, { type: 'update', actor: actorOf(req), target: t.path, detail: { status: t.status } });
       if (t.needs_human) await pullIntoDecide(t, actorOf(req), deps);
       res.json(t);

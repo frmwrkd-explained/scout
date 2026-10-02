@@ -31,9 +31,19 @@ import { createSession, getSession, locate, postConductor, registerExecutor } fr
 import { think, parseJsonBlock, usageToday, providersStatus, brainBudgetToday } from './brain.mjs';
 import { onSchedulerTick } from './dispatch.mjs';
 import { ensureWorkflowFields, workReadiness, validateWorkflow, assertCompletion, scheduleFollowup } from './workflow.mjs';
+import { previewDelivery } from './delivery.mjs';
+import { proposeWidget } from './widgets.mjs';
+import { assertPaperclipWorkAvailable } from './paperclip.mjs';
 
 export class TodayError extends Error {
   constructor(msg, status = 400, extra = {}) { super(msg); this.status = status; Object.assign(this, extra); }
+}
+
+function localReadiness(item, items, day) {
+  const readiness = workReadiness(item, items, day);
+  if (!readiness.ready) return readiness;
+  try { assertPaperclipWorkAvailable(item.id); return readiness; }
+  catch (error) { return { ready: false, reason: error.message }; }
 }
 
 // Different windows and a chat turn can change the current item at the same time. Serialize the
@@ -525,6 +535,7 @@ export function setPreparedSection(body, text) {
 let prepRunning = 0;
 async function prepItem(item, now) {
   const root = getStorageRoot();
+  assertPaperclipWorkAvailable(item.id);
   prepRunning++;
   try {
     await patchRecord(item.path, { prep_state: 'preparing' }, { workTransition: WORK_TRANSITION, actor: 'conductor' });
@@ -540,6 +551,11 @@ async function prepItem(item, now) {
     ].filter(x => x !== '').join('\n');
     const res = await think({ purpose: 'prep', prompt, timeoutMs: 180_000 });
     if (getStorageRoot() !== root) return;
+    try { assertPaperclipWorkAvailable(item.id); }
+    catch {
+      await patchRecord(item.path, { prep_state: 'failed' }, { workTransition: WORK_TRANSITION, actor: 'conductor' });
+      return;
+    }
     if (res.ok) {
       // Preparation may take minutes. Preserve any notes the person added while it was running.
       const current = readRecord(item.path).content || '';
@@ -557,7 +573,7 @@ async function keepPrepAhead(day, now) {
   const items = allItems.filter(i => normDay(i.day) === day && !isDone(i)).sort(byOrder);
   const nowIx = items.findIndex(i => i.status === 'now');
   const ahead = items.slice(Math.max(0, nowIx)).filter(i => i.prep && i.prep_state !== 'ready' && i.prep_state !== 'preparing'
-    && workReadiness(i, allItems, day).ready);
+    && localReadiness(i, allItems, day).ready);
   for (const it of ahead.slice(0, Math.max(0, 2 - prepRunning))) {
     assertRoot(root);
     await prepItem(it, now);
@@ -618,13 +634,15 @@ export async function getToday(now = Date.now()) {
   ensureWorkCollections();
   const nowMs = now instanceof Date ? now.getTime() : Number(now);
   const day = localDay(nowMs);
+  // An empty or previously planned day still needs a working conversation.
+  ensureTodaySession(day);
   const items = workItems();
   const known = byId(items);
 
   const plan = items.filter(i => normDay(i.day) === day).sort(byOrder);
   const backlog = items.filter(i => !normDay(i.day) && !isDone(i)).sort(byOrder);
   for (const item of [...plan, ...backlog]) {
-    if (!isDone(item)) item.wait_reason = workReadiness(item, items, day).reason || '';
+    if (!isDone(item)) item.wait_reason = localReadiness(item, items, day).reason || '';
   }
 
   // One event read covers the whole window any rollup can need — the earliest of this week's
@@ -650,7 +668,7 @@ export async function getToday(now = Date.now()) {
   for (const it of plan) it.min_today = Math.round(minToday[it.id] || 0);
 
   const nowItem = (open && known[open.id]) || plan.find(i => i.status === 'now') || null;
-  const next = plan.find(i => i.status === 'planned' && workReadiness(i, items, day).ready) || null;
+  const next = plan.find(i => i.status === 'planned' && localReadiness(i, items, day).ready) || null;
 
   // Nudges wait for the plan: the morning plan message is the day's first word, and a nudge
   // posted before it lands both out of order and without a plan to nudge about. Until the day's
@@ -695,6 +713,7 @@ export async function getToday(now = Date.now()) {
 const clockSegs = nowMs => segmentsFromEvents(workEventsIn(dayStartMs(localDay(nowMs)) - 86400000, nowMs + 1), nowMs);
 
 async function startItem(id, { actor = DEFAULT_ACTOR } = {}) {
+  assertPaperclipWorkAvailable(id);
   ensureWorkCollections();
   const item = itemById(id);
   if (!item) throw new TodayError('no work item "' + id + '"', 404);
@@ -730,11 +749,13 @@ async function advance(actor) {
   const items = workItems();
   const running = items.find(i => i.status === 'now' && normDay(i.day) === day);
   if (running) return running;   // already advanced — a double-done is not two starts
-  const next = items.filter(i => normDay(i.day) === day && i.status === 'planned' && workReadiness(i, items, day).ready).sort(byOrder)[0]
-    || items.filter(i => !normDay(i.day) && !isDone(i) && workReadiness(i, items, day).ready).sort(byOrder)[0] || null;
+  const next = items.filter(i => normDay(i.day) === day && i.status === 'planned' && localReadiness(i, items, day).ready).sort(byOrder)[0]
+    || items.filter(i => !normDay(i.day) && !isDone(i) && localReadiness(i, items, day).ready).sort(byOrder)[0] || null;
   if (!next) {
     const session = ensureTodaySession(day);
-    postConductor(session.id, 'Plan\u2019s clear and the backlog is empty \u2014 tell me what today is for, or I can leave the clock off.', { key: 'empty-' + day });
+    const waiting = items.filter(item => !isDone(item) && !localReadiness(item, items, day).ready).length;
+    postConductor(session.id, waiting ? 'Nothing else is ready today — ' + waiting + ' item' + (waiting === 1 ? ' is' : 's are') + ' waiting. The clock is off.'
+      : 'Plan\u2019s clear and the backlog is empty \u2014 tell me what today is for, or I can leave the clock off.', { key: 'empty-' + day });
     return null;
   }
   await startItem(next.id, { actor });
@@ -886,8 +907,17 @@ function stripJson(text) {
   return String(text || '').replace(/```(?:json)?\s*\n?[\s\S]*?```/g, '').trim();
 }
 
-async function applyChatActions(actions, day) {
+function completionIntent(userText) {
+  const text = String(userText || '').trim();
+  const confirmation = /^(?:done|finished|completed|i(?:'ve| have)? (?:finished|completed)|yes[, ]+(?:it(?:'s| is) )?done)\b\s*[:—,-]?\s*/i.exec(text);
+  const statements = text.split(/[.!](?:\s|$)|\n/);
+  return { confirmed: !!confirmation && !statements[0].includes('?'),
+    evidence: confirmation ? [statements[0].slice(confirmation[0].length), ...statements.slice(1).filter(statement => !statement.includes('?'))].join(' ').trim() : '' };
+}
+
+async function applyChatActions(actions, day, { userText = '', completionId = null } = {}) {
   const receipts = [], dropped = [];
+  const originalNow = completionId || workItems().find(item => normDay(item.day) === day && item.status === 'now')?.id;
   const apply = async (a, label, fn) => { try { await fn(); receipts.push(label); } catch (e) { dropped.push(label + ' (' + e.message + ')'); } };
   for (const raw of actions.slice(0, 10)) {
     const a = raw || {};
@@ -899,6 +929,26 @@ async function applyChatActions(actions, day) {
       dropped.push(type + ' needs an unfinished item in this day\'s plan'); continue;
     }
     switch (type) {
+      case 'start_item':
+        if (!/\b(start|begin|ready|go ahead)\b/i.test(userText)) { dropped.push('Starting needs your go-ahead'); break; }
+        await apply(a, 'Started: ' + (it?.title || a.id), () => startItem(a.id, { actor: 'conductor' }));
+        break;
+      case 'complete_item': {
+        // A model's assertion is not completion evidence. Require an explicit human statement;
+        // questions such as "done?" cannot close the clock or invent a completed result.
+        const { confirmed, evidence } = completionIntent(userText);
+        if (!confirmed || !it || it.id !== originalNow || it.status !== 'now') { dropped.push('Completion needs an explicit done statement for the current item'); break; }
+        if (it.done_when && evidence.length < 8) { dropped.push('Completion needs the output or evidence of what you finished'); break; }
+        await apply(a, 'Completed: ' + it.title, () => doneItem(it.id, { actor: 'conductor', result_note: userText.trim() }));
+        break;
+      }
+      case 'propose_delivery':
+        await apply(a, 'Delivery preview is in Needs you', () => previewDelivery({ workId: a.id, destinationId: a.destination_id || 'local-artifact', message: a.message, actor: 'conductor' }));
+        break;
+      case 'propose_widget':
+        await apply(a, 'Widget suggestion is in Needs you', () => proposeWidget(a.widget, { actor: 'conductor', why: a.why,
+          evidence: ['Today has ' + workItems().filter(item => normDay(item.day) === day).length + ' work items in its plan.'] }));
+        break;
       case 'add_item': {
         if (!String(a.title || '').trim()) { dropped.push('add_item without a title'); break; }
         if (a.bucket && !WORK_BUCKETS.includes(a.bucket)) { dropped.push('add_item with unknown bucket "' + a.bucket + '"'); break; }
@@ -911,7 +961,7 @@ async function applyChatActions(actions, day) {
         for (const k of ACTION_FIELDS.update_item) if (a.fields && a.fields[k] !== undefined) fields[k] = a.fields[k];
         if (fields.bucket && !WORK_BUCKETS.includes(fields.bucket)) { dropped.push('update_item with unknown bucket "' + fields.bucket + '"'); break; }
         if (!Object.keys(fields).length) { dropped.push('update_item with nothing to change'); break; }
-        await apply(a, 'Updated: ' + it.title, async () => {
+        await apply(a, 'Updated: ' + (fields.title || it.title), async () => {
           if (fields.title !== undefined && !String(fields.title || '').trim()) throw new TodayError('an item needs a title');
           if (fields.bucket !== undefined && !WORK_BUCKETS.includes(fields.bucket)) throw new TodayError('unknown bucket');
           if (fields.estimate_min !== undefined && (!Number.isFinite(Number(fields.estimate_min)) || Number(fields.estimate_min) < 5 || Number(fields.estimate_min) > 240)) throw new TodayError('estimate_min is 5–240');
@@ -975,6 +1025,12 @@ async function todayExecutor({ session, history, userText, emit }) {
   const m = /^today-(\d{4}-\d{2}-\d{2})$/.exec(String(session.id || ''));
   const day = m ? m[1] : localDay();
   ensureWorkCollections();
+  const previousNow = workItems().find(item => normDay(item.day) === day && item.status === 'now');
+  // A clear human Done statement uses the same gate as the button, immediately. Model
+  // availability or an omitted action block cannot keep already finished work running.
+  const completion = previousNow && completionIntent(userText).confirmed
+    ? await serializeWork(() => applyChatActions([{ type: 'complete_item', id: previousNow.id }], day, { userText, completionId: previousNow.id }), root)
+    : { receipts: [], dropped: [] };
   const nowMs = Date.now();
   const items = workItems();
   const plan = items.filter(i => normDay(i.day) === day).sort(byOrder);
@@ -993,9 +1049,17 @@ async function todayExecutor({ session, history, userText, emit }) {
   }
   const cache = (() => { try { return renderCache({}); } catch { return ''; } })();
   const prompt = [
-    'You are the conductor inside Scout\u2019s Today screen \u2014 terse, concrete, action-first. The human wrote the last line.',
+    'You are the conductor inside Scout\u2019s Today screen. Work WITH the human toward their goal. Be concrete, warm and brief. The human wrote the last line.',
+    'If the goal or next step is unclear, ask ONE useful question. Once clarified, propose at most three small work items tied to an existing goal, with a destination and completion evidence. Draft useful material directly in the conversation when requested. When the human is blocked, offer one achievable alternative. Keep attention on one next action. Never repeat a question already answered in the recent thread.',
+    'Always include a short human-readable reply outside an action block. Respect constraints such as local-only output in both your reply and task titles. Creating a draft is not a customer reply or a measured result.',
+    'When the human changes how work will be delivered, update destination and done_when together with its title. Ask them to check a concrete detail of the output before completion.',
+    completion.receipts.length ? 'Scout has already handled the human completion: ' + completion.receipts.join('; ') + '. The plan below is the new state. Do not complete another item in this turn.' : '',
+    completion.dropped.length ? 'Completion was refused: ' + completion.dropped.join('; ') + '. Ask for the missing evidence; do not claim completion.' : '',
+    'Existing goals (use these exact IDs for goal_id): ' + JSON.stringify(listGoals().map(goal => ({ id: goal.id, label: goal.label, target: goal.target, current: goal.current, unit: goal.unit }))),
     'Today\u2019s plan (id · status · bucket · est · title):',
-    ...plan.map(i => '- ' + i.id + ' · ' + i.status + ' · ' + i.bucket + ' · ~' + est(i) + 'm · ' + i.title),
+    ...plan.map(i => '- ' + i.id + ' · ' + i.status + ' · ' + i.bucket + ' · ~' + est(i) + 'm · ' + i.title
+      + ' · handoff ' + JSON.stringify(Object.fromEntries(WORKFLOW_FIELDS.filter(k => i[k] !== undefined).map(k => [k, i[k]])))
+      + (localReadiness(i, items, day).ready ? '' : ' · WAITING: ' + localReadiness(i, items, day).reason)),
     'Now item: ' + (nowItem ? nowItem.title + ' (' + nowItem.id + ')' : 'none'),
     prepared ? 'Prepared material for the now item:\n' + prepared : '',
     nowItem ? 'Current handoff: ' + JSON.stringify(Object.fromEntries(WORKFLOW_FIELDS.filter(k => nowItem[k] !== undefined).map(k => [k, nowItem[k]]))) : '',
@@ -1003,32 +1067,37 @@ async function todayExecutor({ session, history, userText, emit }) {
     cache ? 'Hot cache:\n' + cache : '',
     'If the human asks for a change to the plan, include ONE ```json block with an actions array. Legal actions: {"type":"add_item","title":"…","bucket":"…","estimate_min":30,"why":"…"} · {"type":"update_item","id":"…","fields":{"title":"…"|"bucket":"…"|"estimate_min":30|"order":1|"why":"…"}} · {"type":"park_item","id":"…"} · {"type":"split_item","id":"…","into":[{"title":"…","bucket":"…","estimate_min":30}]} · {"type":"move_to_tomorrow","id":"…"}. Only use ids from the plan above; only buckets: ' + WORK_BUCKETS.join(', ') + '.',
     'Add and update may also set goal_id (an existing goal), key_result, destination (where the work goes), done_when (completion evidence), depends_on (existing work IDs), not_before (YYYY-MM-DD), follow_up_days (1-365), follow_up_title. Help the human implement the approved material and measure its result. Never claim that anything was sent or deployed from this chat: you only have these plan actions.',
+    'Additional actions: {"type":"start_item","id":"…"} when asked to start; {"type":"complete_item","id":"…"} ONLY when the human explicitly states the current item is done and gives evidence (a question like "done?" is not confirmation); {"type":"propose_delivery","id":"…","destination_id":"local-artifact","message":"the exact output"} to put a delivery preview in Needs you; {"type":"propose_widget","widget":{"type":"goal_progress"|"waiting_work"|"delivery_status","id":"…","title":"…"},"why":"…"} to suggest a catalog widget for human approval. Approving and executing a delivery are separate human actions. You cannot publish, approve or send yourself.',
     '',
     'Recent thread:',
-    ...history.slice(-12).map(h => h.role + ': ' + String(h.text || '').slice(0, 400)),
+    ...history.slice(-12).map(h => h.role + ': ' + String(h.text || '').slice(0, 1500)),
     'human: ' + String(userText || ''),
-    'conductor:',
+    'Return ONE JSON object with {"message":"your human-readable reply", "actions":[]}. Put requested plan changes in actions, rather than only describing them. Use an empty array when no change is requested. The message must never claim that an action already succeeded; Scout applies it and appends the receipt. Do not wrap the object in prose.',
   ].filter(x => x !== '').join('\n');
 
   const res = await think({ purpose: 'chat', prompt });
   assertRoot(root);
   if (!res.ok) {
-    const text = res.provider
+    let text = res.provider
       ? 'The light agent (' + res.provider + ') did not answer \u2014 ' + res.reason + '. I can still track and plan.'
       : 'No light agent connected (Gemini/Devin/GPT) \u2014 I can still track and plan, but not chat.';
+    if (completion.receipts.length) text += '\n\n' + completion.receipts.join(' · ') + '.';
+    if (completion.dropped.length) text += '\n\nCouldn’t apply: ' + completion.dropped.join('; ') + '.';
     emit({ type: 'text-delta', text });
     return { text, directives: [], cost: 0 };
   }
   const json = parseJsonBlock(res.text);
-  let shown = res.text, receipt = '', drops = [];
+  let shown = typeof json?.message === 'string' ? json.message.slice(0, 8000) : res.text;
+  let receipts = [...completion.receipts], drops = [...completion.dropped];
   if (json && Array.isArray(json.actions) && json.actions.length) {
-    const applied = await serializeWork(() => applyChatActions(json.actions, day), root);
-    receipt = applied.receipts.join(' · ');
-    drops = applied.dropped;
-    shown = stripJson(res.text);
+    const actions = completion.receipts.length || completion.dropped.length ? json.actions.filter(action => action?.type !== 'complete_item') : json.actions;
+    const applied = await serializeWork(() => applyChatActions(actions, day, { userText, completionId: previousNow?.id }), root);
+    receipts.push(...applied.receipts);
+    drops.push(...applied.dropped);
+    if (typeof json?.message !== 'string') shown = stripJson(res.text);
   }
   let final = shown.trim();
-  if (receipt) final += '\n\n' + receipt + '.';
+  if (receipts.length) final += '\n\n' + receipts.join(' · ') + '.';
   if (drops.length) final += '\n\nCouldn\u2019t apply: ' + drops.join('; ') + '.';
   emit({ type: 'text-delta', text: final });
   return { text: final, directives: [], cost: 0 };

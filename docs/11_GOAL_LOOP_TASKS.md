@@ -22,19 +22,21 @@ The existing `feat/today-loop` and `feat/tiptap-editor` worktrees remain intact.
 | G12 | Demonstrate the combined day loop in a copied fixture | Approval → implementation → future measurement, chat, time and reviews visible in the running app | Verified |
 | G13 | Connect a real provider | GPT-6 Luna returned a validated real plan and daily review in a fresh copied fixture, plus a chat reply in the running app; completed calls recorded model and budget tier | Verified |
 
-## Work requiring a later product or account decision
+## Remaining integration work
 
-| ID | Task | Dependency / acceptance |
-| --- | --- | --- |
-| G14 | Pull approved bets and key results from OpsGraph | OpsGraph goals/backlog/sprints must become real records. Read-only import with stable IDs and explicit provenance; Scout never writes into the hub folder. |
-| G15 | Execute in the actual destination | Each integration needs its destination account and explicit action authorization. Approval queues implementation; sends/publication/payment happen only through the approved connector. |
-| G16 | Enforce worker scope and finance isolation | Define worker identities and universe membership; filter reads/prompts and enforce writes server-side. A UI filter or prompt instruction is insufficient. |
-| G17 | Route work by skills and prepare overnight | Explicit worker capabilities, task leases, bounded concurrency, retry/backoff and durable wake-up receipts. |
-| G18 | Add approved adaptive widgets | A small typed widget catalog, persistent layout preferences, proposed changes reviewed by the worker; no model-generated executable UI. |
-| G19 | Bridge Paperclip if operationally useful | Opt-in mapping from Scout files to goals/issues; idempotent sync, cancellation and approved callbacks. Preserve Scout's local-first Markdown contract. |
-| G20 | Prove the original production gates with a real operator | First real finding within 15 minutes; two runs demonstrate cache reuse; packaging and second-person operation demonstrated. Automated stand-ins do not prove these gates. |
+| ID | Task | Evidence and practical limit | State |
+| --- | --- | --- | --- |
+| G14 | Pull approved bets and key results from OpsGraph | Reviewed mirror/JSON import, stable IDs, goal/KR links and repeat-import preservation. Source remains untouched. Browser-storage growth data needs an exported snapshot. | Implemented; integration tests pass |
+| G15 | Execute in the actual destination | Exact human approval → separate execution → durable receipt. Scout artifacts work in the real browser; configurable webhook transport and uncertain-send recovery are tested. External destination accounts still need setup. | Implemented; local destination verified |
+| G16 | Enforce worker scope and finance isolation | Server-issued identity, projected reads/prompts, canonical writes, actor forgery/finance/cross-universe refusal. Restricted workers use no-tools preparation. Host filesystem access is outside this boundary. | Implemented; enforcement tests pass |
+| G17 | Route work by skills and prepare overnight | Capability matching, cross-process leases, heartbeats, bounded concurrency/retries, cooldown and durable opt-in wake receipts. Result viewer shows actual prepared output. | Implemented; orchestration tests pass |
+| G18 | Add approved adaptive widgets | Typed catalog, evidence-backed proposal, human approval, persistent layout and canonical data. No executable model UI. | Implemented; approval/data tests pass |
+| G19 | Bridge Paperclip if operationally useful | Real isolated Paperclip 2026.1001.0 passed approved export, duplicate suppression, proposed-only import and cancellation. Its demo worker performed zero runs. | Implemented; real control plane verified |
+| G20 | Prove the original production gates with a real operator | Real role-play uses GPT-6 Luna. A second person, one-week cache proof, packaging and a real business finding remain separate acceptance work. | Open |
 
-These later dependencies are tracked as unfinished; no demo data or stand-in answer counts as a live provider, production access control, deployed campaign or measured revenue.
+See `15_GOAL_INTEGRATIONS.md` for operation and `16_GOAL_COLLABORATION.md` for the real-provider
+role-play. Demo evidence does not establish a deployed campaign, measured revenue or the original
+second-person production gates.
 
 
 ## Verification completed on 2026-10-02
@@ -77,3 +79,27 @@ passed with the existing large chunk warning. New regressions cover default ligh
 instruction isolation, model locking, budget accounting and JSONL failure/tool rejection. No
 software installation, global configuration change, authentication change or external campaign
 action was needed; these verification calls did consume subscription model usage.
+
+## Remaining integrations and collaboration verified on 2026-10-02
+
+Three subagents implemented Paperclip, worker access and worker orchestration; the root integrated
+OpsGraph import, delivery, widgets and the user-facing controls. Their review also closed agent
+approval forgery, generic control-file edits and receipt-reset paths. Final Node 22 suite:
+**962 tests, 960 passed, 2 skipped, 0 failed**. The production build and `git diff --check` pass;
+the existing large JavaScript chunk warning remains.
+
+The real GPT-6 Luna role-play is preserved in `16_GOAL_COLLABORATION.md`. It produced a local
+approved artifact, two evidence-backed completions, one future waiting item, a persistent approved
+goal widget, scoped worker material and a real daily review. The goal stayed at zero replies.
+Twelve light calls and no heavy calls were used. Bugs encountered during the conversation and
+their fixes are recorded with the full thread, rather than editing them out of the evidence.
+
+Paperclip's separate isolated local instance passed real REST verification, with zero worker
+heartbeat runs. The updated copied demo remains on port 5189 and is connected to that synthetic
+company; the goal-only collaboration demo remains on port 5190. The original port 5188 workspace
+and source feature worktrees are preserved. Temporary Paperclip dependencies and state stay under
+`/private/tmp`; no global packages, OS service or account sign-in was changed.
+
+G14–G19 are implemented with the limits in the table above. G20 remains open: role-play and local
+REST verification do not replace a second person, real customer outcomes, one-week cache reuse
+or production packaging.

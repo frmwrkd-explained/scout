@@ -28,6 +28,8 @@ import { getStorageRoot, readMd, writeMd, revOf } from './store.mjs';
 import { getCollection, listCollections, gateField, primaryField, AUTO_FIELDS } from './collections.mjs';
 import { allDocuments, documentsFor, matchesQuery, kindOf } from './documents.mjs';
 import { logEvent, readEvents, eventsFor, EVENT_TYPES } from './log.mjs';
+import { currentWorkerIdentity, outsideWorkerIdentity, assertWorkerCollectionAccess, assertWorkerRecordAccess,
+  workerCanReadDocument, projectWorkerDocument } from './workerScope.mjs';
 // proposals.mjs imports store.mjs and nothing else; it reaches back into this file only through a
 // runtime `await import()`, so this is not a load-time cycle. It is imported statically on purpose:
 // raising the DECIDE card has to happen inside the same synchronous `store` verdict, and making
@@ -55,9 +57,9 @@ let onMutation = () => {};
 // the one edge that would have to be resolved at load time. Fire-and-forget rather than awaited,
 // so a write never waits on a cache, and the regeneration is debounced 2s in memory.mjs anyway.
 function bumpCache() {
-  import('./memory.mjs')
+  outsideWorkerIdentity(() => import('./memory.mjs')
     .then(m => { try { m.scheduleCacheRegen({}); } catch { /* a cache that will not schedule is still only a cache */ } })
-    .catch(() => { /* memory.mjs is optional to a bare records import */ });
+    .catch(() => { /* memory.mjs is optional to a bare records import */ }));
 }
 const touched = () => {
   try { onMutation(); } catch { /* a stale _known.md never fails a write */ }
@@ -102,6 +104,17 @@ const INPUT_CONTROL_FIELDS = new Set(['collection', 'id', 'path', 'body', 'conte
 // module's public surface is unchanged.
 
 const R = () => getStorageRoot();
+function refuseDecisionControlWrite(relPath) {
+  if (String(relPath).startsWith('proposals/')) {
+    throw new RecordError('Proposal content and decisions are managed through Needs you; create a fresh proposal for changed content', 403);
+  }
+  if (String(relPath).startsWith('.scout/worker-policies/')) {
+    throw new RecordError('worker membership is configured through the owner membership settings', 403);
+  }
+  if (String(relPath).startsWith('.scout/')) {
+    throw new RecordError('Scout control files are managed through their dedicated APIs', 403);
+  }
+}
 
 // ── paths and slugs ────────────────────────────────────────────────────────────────────────────
 // `store.mjs safe()` is for filesystem safety, not for identity: safe('Maria Santos') is
@@ -374,6 +387,21 @@ function scorePair(candidate, row) {
 // file would make the finding disappear too, and merging into an archived one would silently
 // resurrect something a human rejected with a reason.
 function candidateRows(collectionId) {
+  assertWorkerCollectionAccess(collectionId);
+  // Scoped workers never invoke the owner's derived view resolver: a rollup can otherwise
+  // reveal a finance total even when the matching finance documents are filtered afterward.
+  if (currentWorkerIdentity()) {
+    const collection = getCollection(collectionId);
+    if (!collection) throw new RecordError('no collection "' + collectionId + '"', 404);
+    const rows = allDocuments().filter(d => matchesQuery(d, collection.query))
+      .filter(d => workerCanReadDocument(d, collection) && !d.data.archived && !isQuarantined(d.data, d.path))
+      .map(d => {
+        const projected = projectWorkerDocument(d, collection);
+        const title = projected.data[primaryField(collection)?.key || 'name'] || d.slug;
+        return { id: d.slug, path: d.path, title, __title: title, ...projected.data };
+      });
+    return { collection, rows };
+  }
   const found = documentsFor(collectionId);
   if (!found) throw new RecordError('no collection "' + collectionId + '"', 404);
   sweepQuarantine(found.documents.map(d => ({ path: d.path, data: d.fields })));
@@ -550,6 +578,13 @@ function upsertOne(input, { actor, via, rows, collection, openFindings = null, w
   const slug = slugify(input.id || title);
   const dir = dirForCollection(collection);
   const directPath = dir + '/' + slug + '.md';
+  refuseDecisionControlWrite(directPath);
+  assertWorkerRecordAccess({ actor, path: directPath, collection, data: fields, operation: 'write' });
+  // A hidden file with the same slug is not a new record and must never be overwritten.
+  if (currentWorkerIdentity() && fs.existsSync(absOf(directPath))) {
+    const existing = readMd(absOf(directPath));
+    assertWorkerRecordAccess({ actor, path: directPath, collection, data: existing.data, operation: 'write' });
+  }
   const now = new Date().toISOString().slice(0, 10);
 
   // Identity first, near-match second. A record submitted under the same name resolves to the same
@@ -559,10 +594,11 @@ function upsertOne(input, { actor, via, rows, collection, openFindings = null, w
   // Work and reviews are occurrences, not named entities: "Follow up: campaign" must not
   // merge back into "campaign", and two dated reviews may have almost identical titles.
   // Their explicit IDs are identity; they still pass through this writer and its gate/log.
-  const occurrence = input.id && ['work', 'review'].includes(collection.id);
+  const occurrence = input.id && ['work', 'review', 'delivery', 'paperclip-result'].includes(collection.id);
   const matches = direct || occurrence ? [] : matchAgainst({ ...fields, __title: title }, rows);
   const best = matches.length && matches[0].confidence >= MERGE_CONFIDENCE ? matches[0] : null;
   const target = direct || (best ? rows.find(r => r.path === best.path) : null);
+  if (target) refuseDecisionControlWrite(target.path);
   checkWorkTransition(collection, input.status, target?.status, workTransition);
 
   if (!target) {
@@ -593,6 +629,7 @@ function upsertOne(input, { actor, via, rows, collection, openFindings = null, w
 
   const abs = absOf(target.path);
   const { data: onDisk, content: bodyOnDisk } = readMd(abs);
+  assertWorkerRecordAccess({ actor, path: target.path, collection, data: onDisk, operation: 'write' });
   const { next, changed } = mergeInto(onDisk, fields);
   const merged = mergeBody(bodyOnDisk, input.body || input.content);
   const verdict = changed.length || merged.changed ? (direct ? 'update' : 'merge') : 'skip';
@@ -624,6 +661,7 @@ function upsertOne(input, { actor, via, rows, collection, openFindings = null, w
 export function upsertRecord(input = {}, { actor = DEFAULT_ACTOR, via = 'api', workTransition = null } = {}) {
   const collectionId = input.collection;
   if (!collectionId) throw new RecordError('upsert needs a collection', 400);
+  assertWorkerCollectionAccess(collectionId, { actor, operation: 'write' });
   const { collection, rows } = candidateRows(collectionId);
   return upsertOne(input, { actor, via, rows, collection, workTransition, openFindings: isAgentActor(actor) ? openFindingRecords() : null });
 }
@@ -644,6 +682,7 @@ export function batchUpsert(items = [], { actor = DEFAULT_ACTOR, via = 'api', wo
     const id = item && item.collection;
     try {
       if (!id) throw new RecordError('every item needs a collection', 400);
+      assertWorkerCollectionAccess(id, { actor, operation: 'write' });
       if (!byCollection.has(id)) byCollection.set(id, candidateRows(id));
       const { collection, rows } = byCollection.get(id);
       const r = upsertOne(item, { actor, via, rows, collection, openFindings, workTransition });
@@ -683,7 +722,9 @@ function refuseOutsideData(relPath, verb, actor) {
 
 export function moveRecord(relPath, { to, actor = DEFAULT_ACTOR, reason = null } = {}) {
   const doc = loadDoc(relPath);
+  refuseDecisionControlWrite(doc.path);
   const collection = collectionOf(doc.path, doc.data, doc.content);
+  assertWorkerRecordAccess({ actor, path: doc.path, collection, data: doc.data, operation: 'write' });
   const gate = gateInfo(collection);
   if (!gate) throw new RecordError('that record is in no collection with a gate field', 400);
   if (stageIndex(gate, to) < 0) throw new RecordError('"' + to + '" is not one of ' + gate.options.join(' · '), 400);
@@ -727,6 +768,7 @@ export function archiveRecord(relPath, { reason, actor = DEFAULT_ACTOR } = {}) {
   refuseOutsideData(doc.path, 'archived', actor);
   const collection = collectionOf(doc.path, doc.data, doc.content);
   const bucket = (collection && collection.id) || doc.path.split('/')[1] || 'record';
+  assertWorkerRecordAccess({ actor, path: doc.path, collection, data: doc.data, operation: 'write' });
   const dest = 'data/_archive/' + bucket + '/' + path.basename(doc.path);
   const destAbs = absOf(dest);
   if (fs.existsSync(destAbs)) throw new RecordError('an archived record already exists at ' + dest, 409);
@@ -840,6 +882,10 @@ async function patchDelegated(doc, patch, { actor, current, hit }) {
 // means it — and the rev check is what stops a concurrent agent write from being clobbered.
 export async function patchRecord(relPath, patch = {}, { actor = DEFAULT_ACTOR, rev = null, workTransition = null } = {}) {
   const doc = loadDoc(relPath);
+  refuseDecisionControlWrite(doc.path);
+  const guardedCollection = collectionOf(doc.path, doc.data, doc.content);
+  assertWorkerRecordAccess({ actor, path: doc.path, collection: guardedCollection, data: doc.data, operation: 'write' });
+  assertWorkerRecordAccess({ actor, path: doc.path, collection: guardedCollection, data: { ...doc.data, ...cleanInput(patch) }, operation: 'write' });
   const current = revOf(doc.data, doc.content);
   // The rev check happens HERE for every path, delegated or not: no memory writer takes a `rev`,
   // and the conflict UX (T04) is a property of this door, not of the module behind it.
@@ -909,6 +955,7 @@ import('./decay.mjs').then(m => { decayMod = m; }).catch(() => { /* M3 has not l
 export function readRecord(relPath) {
   const doc = loadDoc(relPath);
   const collection = collectionOf(doc.path, doc.data, doc.content);
+  assertWorkerRecordAccess({ path: doc.path, collection, data: doc.data });
   const gate = gateInfo(collection);
   const data = { ...doc.data };
   const flags = {
@@ -937,18 +984,28 @@ export function readRecord(relPath) {
   }
 
   return {
-    path: doc.path, data, content: doc.content, rev: revOf(doc.data, doc.content), flags,
+    path: doc.path, data: currentWorkerIdentity() ? projectWorkerDocument({ ...doc, data }, collection).data : data,
+    content: doc.content, rev: revOf(doc.data, doc.content), flags,
     collection: collection ? collection.id : null,
     // What KIND of file this is when it is not a record — identity, goal, territory… — so the
     // document surface can label it instead of borrowing the rail's collection (docs/05 §2.1).
     kind: kindOf(doc.path),
-    raw: flags.agentPromotion ? doc.data : undefined,
+    raw: flags.agentPromotion && !currentWorkerIdentity() ? doc.data : undefined,
   };
 }
 
 // The count surface records.mjs owns. `total` EXCLUDES quarantined records, which is the whole
 // point of §3.3 — they are listed separately so they are visible without being counted.
 export function listRecords(collectionId) {
+  assertWorkerCollectionAccess(collectionId);
+  if (currentWorkerIdentity()) {
+    const collection = getCollection(collectionId);
+    if (!collection) throw new RecordError('no collection "' + collectionId + '"', 404);
+    const rows = allDocuments().filter(d => matchesQuery(d, collection.query))
+      .filter(d => workerCanReadDocument(d, collection) && !d.data.archived && !isQuarantined(d.data, d.path))
+      .map(d => readRecord(d.path));
+    return { collection: { id: collection.id, label: collection.label }, total: rows.length, rows, quarantined: [], scoped: true };
+  }
   const found = documentsFor(collectionId);
   if (!found) throw new RecordError('no collection "' + collectionId + '"', 404);
   sweepQuarantine(found.documents.map(d => ({ path: d.path, data: d.fields })));
@@ -967,7 +1024,8 @@ export function resolveTarget(idOrPath) {
   const s = String(idOrPath || '');
   if (!s) throw new RecordError('a path is required', 400);
   if (s.endsWith('.md')) return s;
-  const doc = allDocuments().find(d => d.slug === s || String(d.data.id || '') === s);
+  const doc = allDocuments().find(d => (d.slug === s || String(d.data.id || '') === s)
+    && workerCanReadDocument(d, collectionOf(d.path, d.data, d.content)));
   if (!doc) throw new RecordError('no record "' + s + '"', 404);
   return doc.path;
 }
@@ -976,7 +1034,7 @@ export function registerRecordRoutes(app, deps = {}) {
   // Both deps are optional — inbox.mjs and proposals.mjs call the verbs directly, with none.
   if (typeof deps.logEvent === 'function') emit = deps.logEvent;
   if (typeof deps.refreshAgentFiles === 'function') onMutation = deps.refreshAgentFiles;
-  const actorOf = (req) => String((req.body && req.body.actor) || req.query.actor || DEFAULT_ACTOR);
+  const actorOf = (req) => String(currentWorkerIdentity()?.actor || (req.body && req.body.actor) || req.query.actor || DEFAULT_ACTOR);
   const send = (res, e) => res.status(e.status || 400).json({
     error: e.message, ...(e.reasons ? { reasons: e.reasons } : {}), ...(e.rev ? { rev: e.rev } : {}),
   });

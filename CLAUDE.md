@@ -27,6 +27,12 @@ FrameForge's own `CLAUDE.md`, `README.md` and `ISSUES.md` are preserved as `docs
 | Human work and reviews | `backend/today.mjs` | Plan, one Now item, event-derived time, nudges and review lifecycle. |
 | Work prerequisites and follow-ups | `backend/workflow.mjs` | Goal/destination/evidence fields, readiness, cycle validation and one dated follow-up per source. Uses the records writer. |
 | Text-only Today models and call budgets | `backend/brain.mjs` + `backend/agentProviders.mjs` | Verified invocation descriptors, tier boundary and durable daily attempt reservations. |
+| Reviewed OpsGraph import | `backend/opsgraphImport.mjs` | Stable local goal/work IDs and provenance; never writes the hub mirror. |
+| Approved delivery and receipts | `backend/delivery.mjs` | Exact outbound approval, destination validation, idempotency and uncertain-send reconciliation. |
+| Paperclip delegation | `backend/paperclip.mjs` | Opt-in approved issue mapping, durable sync receipts, result proposals and cancellation. |
+| Worker scope and identity | `backend/workerScope.mjs` | Server-issued run credentials and canonical read/write/prompt enforcement. |
+| Worker routing and wakes | `backend/workers.mjs` + `backend/tasks.mjs` | Skill matching, bounded preparation, task leases and durable wake receipts. |
+| Adaptive widgets | `shared/widgetCatalog.mjs` + `backend/widgets.mjs` | Typed catalog, approved persistent layout and data derived from canonical records. |
 | Idle work clock | `frontend/workClock.js` | App-lifetime activity/visibility controller; only server events count time. |
 | Sending an assistant out (the local-CLI door) | `backend/dispatch.mjs` | `sendOut` / `sendOutAll` / `stopRun`. Composes `agentRunner` + `agentHome` + `tasks`; it spawns nothing itself and writes no document. A run's figures are **counted from the log**, never taken from the agent's reply. |
 | Serving a file's bytes | `backend/files.mjs` `rawFile` | `GET /api/files/raw`. Media types are an allowlist served inline; everything else is an attachment, because the UI and the API share an origin. |

@@ -18,8 +18,9 @@
 // border (least privilege on an unknown actor) and the more generous of the two about the person
 // (their declared name is a human, not an agent).
 //
-// WHAT THIS IS NOT: authentication. There is no server and no session (GOAL.md §7) — the actor is
-// a string the caller sends. This decides POLICY, not identity, and the gate it feeds is a safety
+// Actor attribution alone is not authentication: the actor is a string the caller sends.
+// workerScope.mjs separately authorizes configured workers with server-issued run credentials.
+// This module decides the person/agent POLICY, not run authorization, and the gate it feeds is a safety
 // rail against an agent's mistake, not a boundary against a hostile one. HANDOVER §4 states the
 // same limit from the other side: you cannot stop an agent with folder access from writing, only
 // make the write have no effect and be visible.
@@ -111,5 +112,8 @@ export function isAgentForOwnedMemory(actor) {
 
 // `safe()` because this string arrives from a client and is about to become a path segment.
 function hasAssistantFile(id) {
-  try { return fs.existsSync(path.join(R(), 'assistants', safe(id) + '.md')); } catch { return false; }
+  try {
+    return fs.existsSync(path.join(R(), 'assistants', safe(id) + '.md'))
+      || fs.existsSync(path.join(R(), '.scout', 'worker-policies', safe(id) + '.md'));
+  } catch { return false; }
 }

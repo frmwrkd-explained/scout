@@ -40,9 +40,10 @@ import { cliExecutor } from './agentRunner.mjs';
 import { selfApiBase } from './agentHome.mjs';
 import { resolveBin } from './jobs.mjs';
 import { providerById } from './agentProviders.mjs';
-import { getSettings, listProjects } from './store.mjs';
+import { getSettings, getStorageRoot, listProjects } from './store.mjs';
 import { logEvent, readEvents } from './log.mjs';
 import { hubConfig, pushToHub } from './hub.mjs';
+import { assertWorkerDispatchAllowed } from './workerScope.mjs';
 
 // A sweep is not a chat turn. The chat timeout (5 minutes) is the wrong shape for an assistant
 // asked to work a group, so a run gets its own, overridable the same way chat's is.
@@ -67,12 +68,13 @@ export class DispatchError extends Error {
 // and the map IS the atomic guard. tasks.mjs's mkdir-lock protocol exists because SEVERAL agents
 // claim tasks; only one process ever presses this button.
 const inFlight = new Map();
+const flightKey = (runId, root = getStorageRoot()) => root + '\0' + String(runId);
 
 export function runningNow() {
-  return [...inFlight.entries()].map(([runId, v]) => ({ run: runId, assistant: v.assistant }));
+  return [...inFlight.values()].filter(v => v.root === getStorageRoot()).map(v => ({ run: v.runId, assistant: v.assistant }));
 }
 export function isRunning(assistantId) {
-  for (const v of inFlight.values()) if (v.assistant === String(assistantId)) return true;
+  for (const v of inFlight.values()) if (v.root === getStorageRoot() && v.assistant === String(assistantId)) return true;
   return false;
 }
 
@@ -86,13 +88,14 @@ const arr = v => (Array.isArray(v) ? v : v == null || v === '' ? [] : [v]);
 //
 // The one thing it DOES restate is the actor, three times, because every score in this app is
 // computed from who signed the write. An unsigned finding is invisible to territory.mjs.
-export function buildBrief(assistant, { tasks = [], apiBase = selfApiBase(), project = null } = {}) {
+export function buildBrief(assistant, { tasks = [], apiBase = selfApiBase(), project = null, authorization = null } = {}) {
   const a = assistant || {};
   const id = String(a.id || 'assistant');
   const name = String(a.name || id);
   const collections = arr(a.scope && a.scope.collections);
   const ground = arr(a.scope && a.scope.territory);
   const L = [];
+  const auth = authorization ? ' -H "Authorization: Bearer ' + authorization + '"' : '';
 
   L.push('You are ' + name + ', one of the assistants in Scout.');
   L.push('');
@@ -108,11 +111,11 @@ export function buildBrief(assistant, { tasks = [], apiBase = selfApiBase(), pro
   if (project) L.push('You are working the project "' + project + '".');
   L.push('');
   L.push('WAKE UP FIRST — ONE READ');
-  L.push('  curl -s ' + apiBase + '/api/context');
+  L.push('  curl -s' + auth + ' ' + apiBase + '/api/context');
   L.push('That is who they are, what they are chasing, where you have already looked, what has been');
   L.push('proven to work, and what changed since the last run. Do not re-derive any of it.');
   L.push('Everything you are able to do is listed here, one line each:');
-  L.push('  curl -s ' + apiBase + '/api/index');
+  L.push('  curl -s' + auth + ' ' + apiBase + '/api/index');
   L.push('Anything not in that list does not exist. Never read data/ in bulk.');
   L.push('');
   L.push('SIGN EVERY WRITE AS YOURSELF');
@@ -123,8 +126,13 @@ export function buildBrief(assistant, { tasks = [], apiBase = selfApiBase(), pro
   if (tasks.length) {
     for (const t of tasks) {
       L.push('  · ' + t.id + ' — ' + (t.title || t.id));
+      if (t.lease_id && t.assigned === id) {
+        L.push('    Scout has already leased this task to you. Work only this task and stop when its lease expires at ' + t.lease_expires_at + '.');
+        L.push('    Complete through PATCH /api/tasks/' + encodeURIComponent(t.id) + ' with project "' + t.project + '", actor "' + id + '", leaseId "' + t.lease_id + '" and status "done".');
+        continue;
+      }
       L.push('    claim it before you work it:');
-      L.push('      curl -sX POST ' + apiBase + '/api/tasks/' + encodeURIComponent(t.id) + '/claim -d \'{"actor":"' + id + '"}\'');
+      L.push('      curl -sX POST' + auth + ' ' + apiBase + '/api/tasks/' + encodeURIComponent(t.id) + '/claim -d \'{"actor":"' + id + '"}\'');
     }
     L.push('  A 409 means somebody beat you to it. Take another one; never work a task you did not win.');
   } else {
@@ -137,7 +145,7 @@ export function buildBrief(assistant, { tasks = [], apiBase = selfApiBase(), pro
   L.push('a person who was asleep, not for a log.');
   L.push('Do NOT post to /api/runs. This run is already being recorded for you.');
   L.push('Then ask ONE question, and record what you learned:');
-  L.push('  curl -sX POST ' + apiBase + '/api/learnings/propose \\');
+  L.push('  curl -sX POST' + auth + ' ' + apiBase + '/api/learnings/propose \\');
   L.push('    -d \'{"claim":"...","evidence":["..."],"scope":"project","actor":"' + id + '"}\'');
   L.push('One question. Not five.');
   return L.join('\n');
@@ -217,9 +225,11 @@ export function commandFor(assistant = {}, override = null) {
 
 // ── send one out ───────────────────────────────────────────────────────────────────────────────
 // Returns { run, done } as soon as the run record exists. `done` resolves with the finished run.
-export function sendOut(id, { project = null, actor = 'crystal', agentCommand = null, deps = {} } = {}) {
+export function sendOut(id, { project = null, actor = 'crystal', agentCommand = null, taskIds = null, deps = {} } = {}) {
+  const root = getStorageRoot();
   const a = getAssistant(id);
   if (!a) throw new DispatchError('no assistant "' + id + '"', 404);
+  assertWorkerDispatchAllowed(a);
   if (isRunning(a.id)) throw new DispatchError((a.name || a.id) + ' is already out', 409);
 
   // The one pre-flight check. Done HERE rather than inside the executor so that a workspace with no
@@ -234,7 +244,8 @@ export function sendOut(id, { project = null, actor = 'crystal', agentCommand = 
   }
 
   const pid = projectFor(a, project);
-  const tasks = tasksForBrief(a.id, pid);
+  const tasks = taskIds ? listTasks({ project: pid }).filter(t => taskIds.includes(t.id) &&
+    (t.status === 'open' || (t.status === 'claimed' && t.assigned === a.id))) : tasksForBrief(a.id, pid);
   const brief = buildBrief(a, { tasks, apiBase: selfApiBase(), project: pid });
 
   const started = nowIso();
@@ -248,9 +259,10 @@ export function sendOut(id, { project = null, actor = 'crystal', agentCommand = 
   event(deps, { type: 'run', actor, target: 'runs/' + run.id + '.md', detail: { assistant: a.id, state: 'sent-out', tasks: tasks.length } });
 
   const ac = new AbortController();
-  const done = perform({ a, run, brief, started, pid, command, actor, ac, deps })
-    .finally(() => { inFlight.delete(run.id); });
-  inFlight.set(run.id, { assistant: a.id, ac, done });
+  const key = flightKey(run.id, root);
+  const done = perform({ a, run, brief, started, pid, command, actor, ac, deps, root })
+    .finally(() => { inFlight.delete(key); });
+  inFlight.set(key, { assistant: a.id, ac, done, root, runId: run.id });
   // `perform` swallows everything the AGENT can do wrong; this covers what the DISK can — a run
   // that cannot write its own record must not become an unhandled rejection and take the app down
   // with it. Registering a handler here does not consume the rejection: a caller awaiting `done`
@@ -260,7 +272,7 @@ export function sendOut(id, { project = null, actor = 'crystal', agentCommand = 
   return { run, done, brief };
 }
 
-async function perform({ a, run, brief, started, pid, command, actor, ac, deps }) {
+async function perform({ a, run, brief, started, pid, command, actor, ac, deps, root }) {
   const notices = [];
   const s = getSettings();
   const session = {
@@ -278,7 +290,7 @@ async function perform({ a, run, brief, started, pid, command, actor, ac, deps }
 
   let text = '', cost = 0, failure = null, cancelled = false, setup = false;
   try {
-    const res = await cliExecutor({
+    const res = await (deps.execute || cliExecutor)({
       session, history: [], userText: brief, signal: ac.signal, timeoutMs: RUN_TIMEOUT_MS,
       emit: ev => { if (ev && (ev.type === 'notice' || ev.type === 'setup')) notices.push(noticeText(ev)); },
     });
@@ -291,6 +303,9 @@ async function perform({ a, run, brief, started, pid, command, actor, ac, deps }
   }
 
   const ended = nowIso();
+  if (getStorageRoot() !== root) {
+    return { ...run, ended, status: 'blocked', summary: 'Workspace changed during this run. Its original durable task lease will recover; no completion was written into the new workspace.' };
+  }
   const work = countWork(a.id, started, ended);
   const status = failure ? 'failed' : cancelled ? 'stopped' : setup ? 'blocked' : 'done';
 
@@ -467,6 +482,7 @@ export function schedulerTick({ actor = 'schedule', deps = {}, now = new Date() 
   if (!getSettings().autoRun) return [];
   const sent = [];
   for (const a of dueAssistants(now)) {
+    if (a.worker_enabled === true) continue; // the leased worker scheduler owns opted-in workers
     try { sendOut(a.id, { actor, deps }); sent.push(a.id); }
     catch (e) {
       // 503 means no CLI is connected, which is true for EVERY assistant — stop the sweep rather
@@ -489,16 +505,16 @@ export function schedulerRunning() { return !!timer; }
 
 // ── stopping ───────────────────────────────────────────────────────────────────────────────────
 export function stopRun(runId) {
-  const entry = inFlight.get(String(runId));
-  if (!entry) throw new DispatchError('run "' + runId + '" is not running', 404);
+  const entry = inFlight.get(flightKey(runId));
+  if (!entry || entry.root !== getStorageRoot()) throw new DispatchError('run "' + runId + '" is not running', 404);
   entry.ac.abort();
   return { run: String(runId), assistant: entry.assistant, stopping: true };
 }
 
 export function stopAll() {
-  const ids = [...inFlight.keys()];
-  for (const id of ids) { try { inFlight.get(id).ac.abort(); } catch { /* already gone */ } }
-  return { stopped: ids };
+  const entries = [...inFlight.values()];
+  for (const entry of entries) { try { entry.ac.abort(); } catch { /* already gone */ } }
+  return { stopped: entries.map(entry => entry.runId) };
 }
 
 // The log is another module's contract and must never be able to fail a run.
@@ -552,7 +568,7 @@ export function registerDispatchRoutes(app, deps = {}) {
   app.get('/api/runs/:id', (req, res) => {
     const found = listRuns({ limit: 500 }).find(r => String(r.id) === String(req.params.id));
     if (!found) return res.status(404).json({ error: 'no run "' + req.params.id + '"' });
-    res.json({ run: found, running: inFlight.has(String(req.params.id)) });
+    res.json({ run: found, running: inFlight.has(flightKey(req.params.id)) });
   });
 
   app.post('/api/runs/:id/stop', (req, res) => {

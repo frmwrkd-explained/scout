@@ -29,6 +29,7 @@ import { MONO } from './tokens';
 import { api } from './api';
 import { Btn, Chip, Empty, Eyebrow, Input } from './ui';
 import { Markdown } from './Markdown';
+import { TodayExtras } from './Integrations';
 
 const mono = (extra = '') => ({ ...sx('font-variant-numeric:tabular-nums;' + extra), fontFamily: MONO });
 
@@ -266,7 +267,7 @@ function ChatMsg({ m }) {
   );
 }
 
-export default function Today({ onGo, onOpenPath, refreshKey, actor, onWorkClockState, onWorkClockBusy, onWorkClockIntent }) {
+export default function Today({ onGo, onOpenPath, onWrote, refreshKey, actor, onWorkClockState, onWorkClockBusy, onWorkClockIntent }) {
   const [data, setData] = React.useState(null);
   const [loadErr, setLoadErr] = React.useState(null);
   const [chat, setChat] = React.useState(null);
@@ -333,23 +334,23 @@ export default function Today({ onGo, onOpenPath, refreshKey, actor, onWorkClock
       try { const d = JSON.parse(ev.data); setStream(s => s + (d.text || '')); } catch { /* partial frame */ }
     });
     es.addEventListener('turn-started', () => { setStream(''); setTurnBusy(true); });
-    es.addEventListener('turn-done', () => { setStream(''); setTurnBusy(false); reload(); load(); });
+    es.addEventListener('turn-done', () => { setStream(''); setTurnBusy(false); reload(); load(); onWrote?.(); });
     es.addEventListener('turn-cancelled', () => { setStream(''); setTurnBusy(false); reload(); });
     es.addEventListener('error', () => { setTurnBusy(false); reload(); });
     es.addEventListener('system-event', () => { reload(); });
     return () => es.close();
-  }, [chatId, load]);
+  }, [chatId, load, onWrote]);
 
   const act = React.useCallback(async fn => {
     if (busyRef.current) return;
     busyRef.current = true; setBusy(true);
     onWorkClockBusy?.(true);
     setActionError('');
-    try { await fn(); } catch (error) { setActionError(String(error.message || error)); }
+    try { await fn(); onWrote?.(); } catch (error) { setActionError(String(error.message || error)); }
     busyRef.current = false; setBusy(false);
     await load();
     onWorkClockBusy?.(false);
-  }, [load, onWorkClockBusy]);
+  }, [load, onWorkClockBusy, onWrote]);
 
   const start = it => act(() => { onWorkClockIntent?.('start'); return api.todayStart(it.id); });
   const move = (it, dir) => act(() => {
@@ -647,6 +648,7 @@ export default function Today({ onGo, onOpenPath, refreshKey, actor, onWorkClock
               <div style={sx('display:flex;align-items:center;gap:12px')}>
                 <span style={sx('flex:1;font-size:12.5px;color:var(--fg-muted)')}>
                   {data.planned === false ? 'The day isn’t planned yet — the first poll plans it.'
+                    : data.plan.some(item => item.status !== 'done' && item.wait_reason) ? 'Nothing ready right now — your waiting work stays in the plan.'
                     : 'Nothing planned — ask me to plan, or add an item on the left.'}
                 </span>
               </div>
@@ -685,6 +687,7 @@ export default function Today({ onGo, onOpenPath, refreshKey, actor, onWorkClock
 
         {/* ── right: time ── */}
         <div style={sx('flex:none;width:320px;min-height:0;display:flex;flex-direction:column;gap:12px')}>
+          <TodayExtras work={data.now || data.next} plannedWork={data.next} onGo={onGo} onOpenPath={onOpenPath} onWrote={onWrote} refreshKey={refreshKey} />
           <Section label="TIME" grow>
             <div style={sx('flex:none;display:flex;gap:6px;padding:10px 16px 0')}>
               {[['today', 'Today'], ['week', 'Week'], ['month', 'Month']].map(([k, l]) => (

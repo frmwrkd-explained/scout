@@ -1,0 +1,303 @@
+{
+  "verifiedAt": "2026-10-02T16:26:45.559Z",
+  "model": "gpt-6-luna",
+  "simulatedHuman": "Ana",
+  "goal": {
+    "id": "activation-demo",
+    "path": "goals/activation-demo.md",
+    "data": {
+      "type": "goal",
+      "id": "activation-demo",
+      "label": "Get three useful beta tester replies",
+      "target": 3,
+      "current": 0,
+      "unit": "replies",
+      "universe": "unit/growth",
+      "created": "2026-10-02",
+      "created_by": "crystal",
+      "updated": "2026-10-02",
+      "updated_by": "crystal"
+    },
+    "body": "Simulation goal. Prepare a short invitation, review it with the human, save the approved output in Scout and schedule a two-day follow-up. A saved draft is not a reply: keep observed results at zero until actual reply evidence exists.",
+    "label": "Get three useful beta tester replies",
+    "current": 0,
+    "target": 3,
+    "unit": "replies",
+    "computed": false,
+    "daysLeft": null,
+    "behind": false,
+    "staleness": null
+  },
+  "plan": [
+    {
+      "id": "2026-10-02-draft-a-short-beta-feedback-email",
+      "title": "Draft a short beta feedback email",
+      "status": "done",
+      "destination": "Local draft",
+      "done_when": "A concise email asks one specific question about first-run setup and is saved locally",
+      "result_note": "Done — the reviewed one-question draft is saved in data/delivery/delivery-5c26f9f93d7291c18dbb4712.md. What should I do next?",
+      "path": "data/work/2026-10-02-draft-a-short-beta-feedback-email.md"
+    },
+    {
+      "id": "2026-10-02-send-the-email-to-beta-testers",
+      "title": "Review and save the invitation",
+      "status": "done",
+      "destination": "Scout artifact",
+      "done_when": "The reviewed invitation is saved locally",
+      "result_note": "Done — I checked that the saved Scout artifact matches the approved one-question invitation and is signed Ana. It is at data/delivery/delivery-5c26f9f93d7291c18dbb4712.md. Zero people contacted, zero replies. What is left for today?",
+      "path": "data/work/2026-10-02-send-the-email-to-beta-testers.md"
+    },
+    {
+      "id": "2026-10-02-track-replies-and-follow-up",
+      "title": "Track replies and follow up",
+      "status": "planned",
+      "destination": "Local reply tracker",
+      "done_when": "Replies are logged and any needed follow-ups are noted",
+      "not_before": "2026-10-04",
+      "wait_reason": "Follow up on 2026-10-04",
+      "path": "data/work/2026-10-02-track-replies-and-follow-up.md"
+    }
+  ],
+  "now": null,
+  "next": null,
+  "stats": {
+    "today": {
+      "total_min": 12,
+      "by_bucket": [
+        {
+          "bucket": "email",
+          "minutes": 12,
+          "done": 2,
+          "results": 0
+        }
+      ],
+      "by_day": [
+        {
+          "day": "2026-10-02",
+          "minutes": 12,
+          "by_bucket": [
+            {
+              "bucket": "email",
+              "minutes": 12
+            }
+          ]
+        }
+      ]
+    },
+    "week": {
+      "total_min": 12,
+      "by_bucket": [
+        {
+          "bucket": "email",
+          "minutes": 12,
+          "done": 2,
+          "results": 0
+        }
+      ],
+      "by_day": [
+        {
+          "day": "2026-10-02",
+          "minutes": 12,
+          "by_bucket": [
+            {
+              "bucket": "email",
+              "minutes": 12
+            }
+          ]
+        }
+      ]
+    },
+    "month": {
+      "total_min": 12,
+      "by_bucket": [
+        {
+          "bucket": "email",
+          "minutes": 12,
+          "done": 2,
+          "results": 0
+        }
+      ],
+      "by_day": [
+        {
+          "day": "2026-10-02",
+          "minutes": 12,
+          "by_bucket": [
+            {
+              "bucket": "email",
+              "minutes": 12
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "widgets": [
+    {
+      "id": "activation-demo",
+      "type": "goal_progress",
+      "title": "Beta tester replies",
+      "rows": [
+        {
+          "id": "activation-demo",
+          "label": "Get three useful beta tester replies",
+          "detail": "0 / 3 replies",
+          "path": "goals/activation-demo.md"
+        }
+      ]
+    }
+  ],
+  "delivery": {
+    "id": "delivery-5c26f9f93d7291c18dbb4712",
+    "proposalId": "delivery-5c26f9f93d7291c18dbb4712",
+    "workId": "2026-10-02-draft-a-short-beta-feedback-email",
+    "title": "Draft a short beta feedback email",
+    "destination": "local-artifact",
+    "actor": "crystal",
+    "hash": "5c26f9f93d7291c18dbb47129f7bd904bf8ceda8e98fcf6e61b81138908e2934",
+    "status": "delivered",
+    "started": "2026-10-02T16:10:56.139Z",
+    "completed": "2026-10-02T16:10:56.147Z",
+    "result": {
+      "verdict": "store",
+      "id": "delivery-5c26f9f93d7291c18dbb4712",
+      "path": "data/delivery/delivery-5c26f9f93d7291c18dbb4712.md",
+      "confidence": 0
+    }
+  },
+  "duplicateExecutionSuppressed": true,
+  "preparations": [
+    {
+      "id": "prep-21d17b0a-cc62-4763-b991-b7f2a10c4e71",
+      "title": "Prepare the two-day beta feedback follow-up",
+      "status": "done",
+      "prepared_text": "Hi, thanks again for giving the beta a try—if you have a moment, what nearly made you stop during the first-run setup? Even a quick note would help us make it smoother for busy freelancers. —Ana",
+      "prepared_by": "copy-helper",
+      "prep_provider": "gpt",
+      "prep_model": "gpt-6-luna"
+    }
+  ],
+  "workerWakes": [
+    {
+      "id": "wake-9cf29ce2207c3335738050aa73fd63e2",
+      "state": "done",
+      "attempts": 1,
+      "provider": "gpt",
+      "model": "gpt-6-luna",
+      "summary": "Prepared: Prepare the two-day beta feedback follow-up"
+    }
+  ],
+  "reviews": [
+    {
+      "id": "daily-2026-10-02",
+      "path": "data/reviews/daily-2026-10-02.md",
+      "title": "Daily review · 2026-10-02",
+      "fields": {
+        "title": "Daily review · 2026-10-02",
+        "kind": "daily",
+        "period": "2026-10-02",
+        "minutes": 12,
+        "done": 2,
+        "tags": [
+          "review"
+        ],
+        "created": "2026-10-02",
+        "updated": "2026-10-02",
+        "created_by": "conductor",
+        "updated_by": "conductor",
+        "verified_at": "2026-10-02",
+        "proposed": true,
+        "provenance": "pipeline"
+      }
+    }
+  ],
+  "transcript": [
+    {
+      "role": "user",
+      "text": "I want three useful replies from beta testers this week. Help me get started."
+    },
+    {
+      "role": "assistant",
+      "text": "Let’s draft a short beta tester message that asks one easy, specific question and makes replying simple. Where will you ask them: email, a community, or somewhere else?"
+    },
+    {
+      "role": "user",
+      "text": "Email. They are busy freelancers who tried our beta, and I want feedback on the first-run setup. I have 45 minutes today. Please make a small plan. This is a simulation, so keep the output local."
+    },
+    {
+      "role": "assistant",
+      "text": "\n\nAdded: Draft a short beta feedback email · Added: Send the email to beta testers · Added: Track replies and follow up."
+    },
+    {
+      "role": "user",
+      "text": "That is too much like a campaign. I am keeping this local: please rename the send step to review and save the invitation, make the reply-check step wait until 4 October, and start the draft now. I am stuck on what to ask—please draft one short, friendly email."
+    },
+    {
+      "role": "assistant",
+      "text": "Here’s a short draft:\n\n**Subject:** Quick question about beta setup\n\nHi [Name],\n\nThanks for trying the beta. Was anything confusing or harder than expected when you first set it up? A sentence or two would be really helpful.\n\nThanks,  \n[Your name]\n\nUpdated: Send the email to beta testers · Updated: Track replies and follow up · Started: Draft a short beta feedback email."
+    },
+    {
+      "role": "user",
+      "text": "The two questions feel like homework. Make it warmer and ask only what nearly made them stop during setup. Sign it Ana. Then put that exact draft into Needs you as a Scout artifact preview; I will review it."
+    },
+    {
+      "role": "assistant",
+      "text": "Hi [Name],\n\nThanks for giving the beta a try! Was there a moment during setup when you nearly stopped? Even a quick reply would help.\n\nThanks,  \nAna\n\nDelivery preview is in Needs you."
+    },
+    {
+      "role": "user",
+      "text": "Done — I reviewed the one-question invitation and saved the approved version in data/delivery/delivery-5c26f9f93d7291c18dbb4712.md. Nobody was contacted and we have zero replies. What should I do next? Please also suggest a small goal-progress widget for review."
+    },
+    {
+      "role": "assistant",
+      "text": "The approved invitation is saved locally, and nobody has been contacted. Next, review and save the invitation for beta testers; then you can decide whether to send it. The reply check is set for 4 October.\n\nWidget suggestion is in Needs you.\n\nCouldn’t apply: Completion needs an explicit done statement for the current item."
+    },
+    {
+      "role": "user",
+      "text": "Done — the reviewed draft is saved in data/delivery/delivery-5c26f9f93d7291c18dbb4712.md. What should I do next?"
+    },
+    {
+      "role": "assistant",
+      "text": "The draft is saved. Next, review and save the invitation for beta testers; the reply check is scheduled for 4 October. You can decide separately whether to send it."
+    },
+    {
+      "role": "user",
+      "text": "Done — the reviewed one-question draft is saved in data/delivery/delivery-5c26f9f93d7291c18dbb4712.md. What should I do next?"
+    },
+    {
+      "role": "assistant",
+      "text": "The reviewed invitation is saved locally. Next, review and save the invitation for beta testers; you can decide separately whether to send it.\n\nCompleted: Draft a short beta feedback email."
+    },
+    {
+      "role": "user",
+      "text": "The next item still says its destination is email and done means sent. Please change both: destination Scout artifact, done means I have reviewed and saved the local invitation. Nobody will be contacted in this simulation. What do you need me to check before I call it done?"
+    },
+    {
+      "role": "assistant",
+      "text": "Check that the invitation in Needs you matches the approved one-question draft and is saved at the local path you expect. Once you confirm that, you can mark the review-and-save item done; nobody needs to be contacted."
+    },
+    {
+      "role": "user",
+      "text": "Please actually update the current item now: destination Scout artifact; done when the reviewed invitation is saved locally. Keep the goal at zero replies."
+    },
+    {
+      "role": "assistant",
+      "text": "I’ll update the current item to point to the Scout artifact and define completion as saving the reviewed invitation locally. The goal stays at zero replies. Please check that the saved artifact matches the approved one-question draft before marking the item done.\n\nUpdated: Review and save the invitation."
+    },
+    {
+      "role": "user",
+      "text": "Done — I checked that the saved Scout artifact matches the approved one-question invitation and is signed Ana. It is at data/delivery/delivery-5c26f9f93d7291c18dbb4712.md. Zero people contacted, zero replies. What is left for today?"
+    },
+    {
+      "role": "assistant",
+      "text": "Plan’s clear and the backlog is empty — tell me what today is for, or I can leave the clock off."
+    },
+    {
+      "role": "assistant",
+      "text": "Nothing else is due today. Reply tracking is waiting until 2026-10-04; the goal remains at zero replies, and nobody was contacted.\n\nCompleted: Review and save the invitation."
+    },
+    {
+      "role": "assistant",
+      "text": "Daily review is in: 12 min tracked, 2 done, 0 results. Tomorrow: No further work is due; reply tracking is scheduled for 4 October."
+    }
+  ]
+}

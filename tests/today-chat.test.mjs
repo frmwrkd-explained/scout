@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { freshRoot, writeMd, getStorageRoot } from './helpers.mjs';
 import { localDay, addDays } from '../backend/daytime.mjs';
 import { getSession, runTurn } from '../backend/chat.mjs';
-import { ensureWorkCollections, ensureTodaySession, todaySessionId, workItems, normDay } from '../backend/today.mjs';
+import { ensureWorkCollections, ensureTodaySession, todaySessionId, getToday, workItems, normDay } from '../backend/today.mjs';
 import { parseJsonBlock } from '../backend/brain.mjs';
 
 const STUB = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'stub-brain.mjs');
@@ -140,4 +140,28 @@ test('the today session is created standalone, kind today, executor today', () =
   assert.equal(s.executor, 'today');
   const again = ensureTodaySession(DAY());
   assert.equal(again.id, s.id, 'one session per day');
+});
+
+test('opening an empty day exposes an existing, usable chat session', async () => {
+  freshRoot(); ensureWorkCollections();
+  const today = await getToday();
+  assert.equal(today.plan.length, 0);
+  assert.equal(getSession(today.chat).executor, 'today');
+  await withBrain('Who are the beta testers?', () => runTurn(today.chat, 'Help me get started.'));
+  assert.equal(getSession(today.chat).messages.at(-1).text, 'Who are the beta testers?');
+});
+
+test('structured replies keep the useful message and apply requested handoff changes', async () => {
+  freshRoot(); ensureWorkCollections();
+  seedWork(DAY() + '-draft', { title: 'Send invitation', day: DAY(), destination: 'Email', done_when: 'Message sent' });
+  await withBrain(JSON.stringify({ message: 'Check the name and question before saving the local draft.',
+    actions: [{ type: 'update_item', id: DAY() + '-draft', fields: { title: 'Review invitation', destination: 'Scout artifact', done_when: 'Reviewed invitation saved locally' } }] }), async () => {
+    const session = ensureTodaySession(DAY());
+    await runTurn(session.id, 'Change this to a reviewed local artifact');
+    const item = workItems()[0];
+    assert.equal(item.destination, 'Scout artifact');
+    assert.equal(item.done_when, 'Reviewed invitation saved locally');
+    assert.match(getSession(session.id).messages.at(-1).text, /^Check the name/);
+    assert.doesNotMatch(getSession(session.id).messages.at(-1).text, /"actions"/);
+  });
 });

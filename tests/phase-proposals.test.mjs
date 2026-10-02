@@ -86,6 +86,8 @@ function sixCards() {
       why: '14 of your last 20 shortlists post video. Worth filtering on.' },
     { kind: 'question', title: 'Which Maria?', question: 'Two accounts, same name — which one do you mean?',
       why: 'I cannot tell them apart and guessing would poison the dedupe.' },
+    { kind: 'widget', title: 'Goal progress', widget: { type: 'goal_progress', id: 'goals' },
+      why: 'Keep the active goal visible during work.', evidence: ['One active goal needs a visible progress check.'] },
   ];
 }
 
@@ -95,8 +97,8 @@ test('a card of every kind lands in one queue, as one file each', () => {
   freshRoot();
   for (const c of sixCards()) propose(c, { actor: 'scout-fb' });
   const open = listProposals({ status: 'open' });
-  assert.deepEqual(open.map(c => c.kind).sort(), [...CARD_KINDS].sort(), 'all six kinds, one queue');
-  assert.equal(fs.readdirSync(path.join(R(), 'proposals')).length, 6, 'one file per card (Law 6)');
+  assert.deepEqual(open.map(c => c.kind).sort(), [...CARD_KINDS].sort(), 'every kind, one queue');
+  assert.equal(fs.readdirSync(path.join(R(), 'proposals')).length, CARD_KINDS.length, 'one file per card (Law 6)');
   assert.equal(open[0].created_by, 'scout-fb');
   assert.deepEqual(listProposals({ kind: 'schema' }).map(c => c.change), ['field']);
 });

@@ -20,6 +20,7 @@ import { api } from './api';
 import { Btn, Card, Chip, Eyebrow, Field, Input } from './ui';
 import { THEMES, getTheme, applyTheme, onThemeChange } from './theme';
 import { KEYS } from './keymap';
+import { IntegrationSettings } from './Integrations';
 
 const mono = (extra = '') => ({ ...sx(extra), fontFamily: MONO });
 const THEME_LABEL = { system: 'System', dark: 'Dark', light: 'Light' };
@@ -244,6 +245,8 @@ export default function ScoutSettings({ onToast, onRootChanged }) {
               ))}
           </Card>
         </Section>
+
+        <IntegrationSettings onToast={onToast} />
 
         <Section eyebrow="VOICE" title="Transcription key"
           body="Groq speech-to-text — every microphone button in the app (the first-run interview, and anywhere else VoiceInput appears) goes through this one key. No key, no mic: the button disables itself with a reason rather than recording into a failure.">

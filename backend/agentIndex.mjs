@@ -36,6 +36,10 @@ export const ROUTE_REFERENCE = 'skills/scout-router/references/api-mode.md';
 // ONE LINE PER CAPABILITY. `route` is what keeps it honest; `what` is written for the agent, in the
 // second person, and says what the capability is FOR rather than what it returns.
 export const INDEX_CAPABILITIES = [
+  { route: 'POST /api/widgets/propose', what: 'suggest a catalog Today widget with evidence; the operator approves it in Needs you.' },
+  { route: 'POST /api/deliveries/preview', what: 'propose exact output for a configured destination; approval and execution remain human actions.' },
+  { route: 'GET /api/workers', what: 'inspect skill matches, worker leases and durable wake receipts (owner surface).' },
+  { route: 'GET /api/paperclip', what: 'inspect optional Paperclip delegation receipts; local Markdown remains canonical.' },
   { route: 'GET /api/context', what: 'wake up — identity, goals, territory, what changed. One read, under 2000 tokens.' },
   { route: 'GET /api/cache/version', what: 'cheap check: unchanged since your last run means your cached context is still good.' },
   { route: 'GET /api/index', what: 'this list.' },
