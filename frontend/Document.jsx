@@ -2,17 +2,11 @@
 //
 // Law 2 is the entire design of this file. A record opens at ONE HUMAN SENTENCE:
 //
-//   altitude 1   the title, the summary, and a collapsed property row carrying the three fields
-//                that decide anything — the gate status, the primary number, freshness.
-//   altitude 2   ▸ PROPERTIES (click or `P`) and ▸ READ THE FULL NOTE — the reasoning.
-//   altitude 3   Raw — the actual bytes on disk — and the path, which is clickable (Law 8).
-//
-// docs/05_UI_SPEC.md §2.1 is explicit that this INVERTS the design prototype, which draws the
-// property table first: "Opening a record today shows nine property rows before a single human
-// sentence." Everything else here is `design/Scout.dc.html` verbatim through sx().
-//
-// The property-open preference is remembered PER COLLECTION, not per document (§2.1: "It is a
-// working preference, not a per-record state"), in localStorage — see PROPS_KEY below.
+//   altitude 1   the title, author, status, freshness and first paragraph.
+//   altitude 2   Read note, or an explicit Open full from an inline document. The summary is
+//                replaced by the body rather than repeated above it. Editing is deliberate.
+//   altitude 3   Raw bytes and the one Details inspector (also opened with P).
+// Details always starts closed. A technical panel is not a second copy of the note.
 //
 // PROPS — the integrator mounts this; nothing here reaches into App.jsx.
 //   path          string, required. The document's path in the store, e.g.
@@ -53,27 +47,18 @@ import React from 'react';
 import { sx } from './sx';
 import { MONO } from './tokens';
 import { api } from './api';
-import { Btn, Empty, Eyebrow, InlineEdit } from './ui';
+import { Btn, Empty, InlineEdit } from './ui';
 import { Cell } from './cells';
 import PropertyRows from './PropertyRows';
 import { Freshness } from './Freshness';
 import RichEditor, { MarkdownSourceEditor } from './RichEditor';
 import { ConflictNotification } from './Conflict';
 import AddField from './AddField';
+import Inspector from './Inspector';
+import { Markdown } from './Markdown';
 import { REJECT_REASONS } from './DecideCards';
 
 const mono = (extra = '') => ({ ...sx(extra), fontFamily: MONO });
-
-// Per COLLECTION, not per document — §2.1. localStorage is deliberate and sufficient: this is a
-// working preference, it is worthless on another machine, and putting it in the vault would make
-// a UI toggle part of the data the agent reads.
-const PROPS_KEY = c => 'scout.props.open.' + (c || '_none');
-function readPref(c) {
-  try { return window.localStorage.getItem(PROPS_KEY(c)) === '1'; } catch { return false; }
-}
-function writePref(c, on) {
-  try { window.localStorage.setItem(PROPS_KEY(c), on ? '1' : '0'); } catch { /* private mode */ }
-}
 
 // ── which three fields ride the collapsed row ─────────────────────────────────────────────────
 // "the gate status, the primary number, and freshness" (§2.1). Picked from the schema, never
@@ -112,27 +97,6 @@ function firstParagraph(content) {
   return (para || '').trim().replace(/\s+/g, ' ');
 }
 
-const SEG = sx('height:24px;padding:0 12px;border-radius:6px;font-size:11px;cursor:pointer');
-
-function Segmented({ value, options, onPick }) {
-  return (
-    <div style={{ ...sx('display:flex;gap:3px;padding:3px;border-radius:8px'), background: 'var(--sunk)', border: '1px solid var(--border)' }}>
-      {options.map(o => {
-        const on = o.id === value;
-        return (
-          <button key={o.id} type="button" onClick={() => onPick(o.id)}
-            style={{
-              ...SEG, ...sx('transition:background 130ms ease,color 130ms ease'),
-              background: on ? 'var(--raise)' : 'transparent',
-              border: '1px solid ' + (on ? 'var(--border-3)' : 'transparent'),
-              color: on ? 'var(--fg)' : 'var(--fg-muted)', fontWeight: on ? 600 : 500,
-            }}>{o.label}</button>
-        );
-      })}
-    </div>
-  );
-}
-
 const SAVE_LOOK = {
   saved: { text: 'SAVED', colour: 'var(--fg-faint)' },
   saving: { text: 'SAVING…', colour: 'var(--fg-muted)' },
@@ -153,7 +117,7 @@ function seedOf(doc) {
 }
 
 export default function Document({
-  path, collection, collections, doc, actor = 'crystal',
+  path, collection, collections, doc, actor = 'crystal', assistants = [], referencedBy = [], onOpenBoard, startExpanded = false,
   onOpen, onOpenPath, onPromote, onFieldAdded, onBack, onDirty, onSaved, onArchived,
 }) {
   const seed = seedOf(doc);
@@ -214,11 +178,12 @@ export default function Document({
   }, [schema, data, onPromote]);
 
   const [mode, setMode] = React.useState('editor');
-  const [propsOpen, setPropsOpen] = React.useState(() => readPref(collection?.id));
-  const [bodyOpen, setBodyOpen] = React.useState(false);
+  const [propsOpen, setPropsOpen] = React.useState(false);
+  const [detailSection, setDetailSection] = React.useState('props');
+  const [editing, setEditing] = React.useState(false);
+  const [bodyOpen, setBodyOpen] = React.useState(startExpanded);
   const [save, setSave] = React.useState('saved');
   const [saveError, setSaveError] = React.useState(null);
-  const [savedAt, setSavedAt] = React.useState(null);
   const [conflict, setConflict] = React.useState(null);
   const [raw, setRaw] = React.useState(null);
   const [options, setOptions] = React.useState({});
@@ -294,7 +259,7 @@ export default function Document({
     let cancelled = false;
     setLoadError(null); setConflict(null); setRaw(null); setOwnCollection(null);
     setCollectionKnown(false); setKind(null);
-    setSave('saved'); setSaveError(null); setBodyOpen(false);
+    setSave('saved'); setSaveError(null); setBodyOpen(startExpanded); setPropsOpen(false); setEditing(false); setMode('editor');
     pendingRef.current = {}; bodyDirtyRef.current = false;
     // Switching documents re-seeds synchronously, so the surface never shows the PREVIOUS
     // record's fields under the new record's path for a frame.
@@ -325,10 +290,6 @@ export default function Document({
       aliveRef.current = false;
     };
   }, [path, readDisk]);
-
-  // The preference is per collection, so switching collections re-reads it; switching DOCUMENTS
-  // inside one collection deliberately does not.
-  React.useEffect(() => { setPropsOpen(readPref(schema?.id)); }, [schema?.id]);
 
   // Closing the window is the other way to lose a pending edit. Electron and the browser both fire
   // this; `flush()` is idempotent, so a save already in flight is not duplicated.
@@ -370,7 +331,6 @@ export default function Document({
       if (res.rev !== undefined) revRef.current = res.rev;
       if (res.data) { dataRef.current = res.data; setData(res.data); }
       if (res.content !== undefined && !bodyChangedDuringSave) { bodyRef.current = res.content; setBody(res.content); setSummary(firstParagraph(res.content)); }
-      setSavedAt(new Date());
       const stillDirty = Object.keys(pendingRef.current).length || bodyDirtyRef.current;
       setSave(stillDirty ? 'unsaved' : 'saved');
       if (stillDirty) timerRef.current = setTimeout(() => flush(), 700);
@@ -432,7 +392,7 @@ export default function Document({
     pendingRef.current = {}; bodyDirtyRef.current = false;
     dataRef.current = d.data; bodyRef.current = d.content; revRef.current = d.rev;
     setData(d.data); setBody(d.content); setSummary(d.summary != null ? d.summary : firstParagraph(d.content));
-    setConflict(null); setSave('saved'); setSavedAt(new Date());
+    setConflict(null); setSave('saved');
   };
 
   const keepMine = () => {
@@ -485,7 +445,7 @@ export default function Document({
       if (!cancelled && Object.keys(next).length) setOptions(o => ({ ...o, ...next }));
     })();
     return () => { cancelled = true; };
-  }, [propsOpen, collection, actor]);
+  }, [propsOpen, schema, actor]);
 
   // ── raw ─────────────────────────────────────────────────────────────────────────────────────
   React.useEffect(() => {
@@ -511,7 +471,7 @@ export default function Document({
       if (editable(e.target)) return;
       if (e.key === 'p' || e.key === 'P') {
         e.preventDefault();
-        setPropsOpen(v => { writePref(schema?.id, !v); return !v; });
+        setPropsOpen(v => !v);
         return;
       }
       if ((e.key === 'a' || e.key === 'A') && nextStage) {
@@ -527,7 +487,7 @@ export default function Document({
     return () => window.removeEventListener('keydown', onKey);
   }, [schema?.id, flush, nextStage, promote]);
 
-  const toggleProps = () => setPropsOpen(v => { writePref(schema?.id, !v); return !v; });
+  const toggleProps = () => setPropsOpen(v => !v);
 
   // Opening another record must not leave the previous one's reason strip armed over it.
   React.useEffect(() => { setArchiving(null); setArchiveError(null); setAddingProperty(false); }, [path]);
@@ -564,101 +524,36 @@ export default function Document({
     );
   }
 
-  const { gate, num, date, fallbackDate } = collapsedFields(schema, data);
-  const rowCount = (schema?.fields || []).length || Object.keys(data).length;
+  const { gate, num } = collapsedFields(schema, data);
   const look = SAVE_LOOK[save] || SAVE_LOOK.saved;
-  const saveText = save === 'saved' && savedAt
-    ? 'SAVED ' + savedAt.toTimeString().slice(0, 5)
-    : look.text;
+  const saveText = save === 'saved' ? 'Saved' : look.text;
   const gateValue = gate ? data[gate.key] : null;
-  // `nextStage` itself is the memo above — computed once, shared with the `A` key.
-  const writer = String(data.updated_by || data.created_by || '').toUpperCase();
-  const when = String(data.updated || data.created || '');
-  // Item 11 — Archive was offered on every open document, including memory objects (me.md,
-  // goals/, territory/…), where `POST /api/records/archive` now refuses with "only records under
-  // data/ can be archived — …" (`records.mjs RECORD_ROOT`/`isRecordPath`). An affordance whose
-  // capability always refuses is the pattern HANDOVER §3 warns about, so the button is offered
-  // only where the write could ever succeed.
+  const writerId = data.assistant || data.prepared_by || data.updated_by || data.created_by || '';
+  const writer = assistants.find(a => a.id === writerId)?.name || writerId;
+  const when = data.verified_at || data.updated || data.created;
   const canArchive = String(path || '').startsWith('data/');
+  const technicalKeys = String(path || '').startsWith('data/artifacts/')
+    ? ['source_task', 'source_cycle', 'result_hash', 'assistant', 'goal_id', 'project', 'universe']
+    : ['source_task', 'source_cycle', 'result_hash'];
+
+  const beginEdit = () => { setEditing(true); setBodyOpen(true); };
+  const finishEdit = async () => { await flush(); setEditing(false); };
 
   return (
-    <div style={sx('flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden')}>
-
-      {/* ── header ─────────────────────────────────────────────────────────────────────────── */}
-      <div style={{ ...sx('flex:none;padding:12px 22px 10px;display:flex;align-items:center;justify-content:space-between;gap:16px'), borderBottom: '1px solid var(--line)' }}>
-        <div style={sx('display:flex;align-items:center;gap:12px;min-width:0')}>
-          {onBack ? (
-            <button type="button" onClick={onBack} title="Back to the collection" className="hFg"
-              style={{ ...mono('flex:none;font-size:12px;background:none;border:none;padding:0;cursor:pointer;transition:color 130ms ease'), color: 'var(--fg-faint)' }}>
-              ←
-            </button>
-          ) : null}
-          <h1 style={{ ...sx('margin:0;font-size:19px;font-weight:500;letter-spacing:-.01em;min-width:0;max-width:520px'), color: 'var(--fg)' }}>
-            {primary
-              ? <InlineEdit value={title} placeholder="Untitled" onCommit={v => queue(primary.key, v)} title="Click to rename" />
-              : title}
-          </h1>
-          {/* Law 8 — every record shows its path, and it is CLICKABLE. The file browser is
-              someone else's component; this only calls the prop. */}
-          <button type="button" title={onOpenPath ? 'Open ' + path : path}
-            onClick={() => onOpenPath && onOpenPath(path)}
-            className={onOpenPath ? 'hAccent' : ''}
-            style={{ ...mono('flex:none;font-size:10px;font-weight:500;background:none;border:none;padding:0'), color: 'var(--fg-faint)', cursor: onOpenPath ? 'pointer' : 'default' }}>
-            {path}
-          </button>
-          {/* No collection ⇒ this is a memory object, not a data record — label it truthfully
-              instead of silently rendering it through whatever collection the RAIL has active
-              (item 1). `kind` is 'other' for a shape not in the known list; nothing to say then. */}
-          {!schema && kind && kind !== 'other' ? (
-            <span title="This document has no collection — its rows are read from its own frontmatter, not a schema"
-              style={{ ...mono('flex:none;font-size:8.5px;font-weight:700;letter-spacing:.14em;padding:2px 7px;border-radius:5px'), border: '1px solid var(--border-3)', color: 'var(--fg-muted)' }}>
-              {kind.toUpperCase()}
-            </span>
-          ) : null}
-          {flags && flags.quarantined ? (
-            <span title="Written into data/ without passing the pipeline — excluded from every count until accepted"
-              style={{ ...mono('flex:none;font-size:8.5px;font-weight:700;letter-spacing:.14em;padding:2px 7px;border-radius:5px'), border: '1px solid var(--danger)', color: 'var(--danger)' }}>
-              QUARANTINED
-            </span>
-          ) : null}
-          {flags && flags.agentPromotion ? (
-            <span title="An agent wrote a stage past shortlist. It is ignored — Law 4."
-              style={{ ...mono('flex:none;font-size:8.5px;font-weight:700;letter-spacing:.14em;padding:2px 7px;border-radius:5px'), border: '1px solid var(--warn)', color: 'var(--warn)' }}>
-              AGENT PROMOTION IGNORED
-            </span>
-          ) : null}
+    <div className="documentSurface">
+      <div className="documentMain">
+        <div className="documentToolbar">
+          <div className="documentToolbarGroup">
+            {onBack ? <Btn variant="ghost" size="sm" onClick={onBack} title="Back to the collection">← Back</Btn> : null}
+            <span className="documentCollection">{schema?.label || (kind && kind !== 'other' ? kind : 'Note')}</span>
+          </div>
+          <div className="documentToolbarGroup">
+            {editing || save !== 'saved' ? <span role="status" title={saveError || 'Changes save automatically'} style={{ fontSize: 11, color: look.colour }}>{saveText}</span> : null}
+            <Btn variant="ghost" size="sm" onClick={() => setMode(v => v === 'raw' ? 'editor' : 'raw')} aria-pressed={mode === 'raw'}>{mode === 'raw' ? 'Note' : 'Raw'}</Btn>
+            <Btn variant="ghost" size="sm" onClick={toggleProps} aria-expanded={propsOpen}>Details</Btn>
+            <Btn variant="secondary" size="sm" onClick={editing ? finishEdit : beginEdit}>{editing ? 'Finish editing' : 'Edit note'}</Btn>
+          </div>
         </div>
-
-        <div style={sx('flex:none;display:flex;align-items:center;gap:10px')}>
-          <Segmented value={mode} onPick={setMode} options={[{ id: 'editor', label: 'Editor' }, { id: 'raw', label: 'Raw' }]} />
-          <span title={saveError || undefined}
-            style={{ ...mono('font-size:10px;font-weight:500;font-variant-numeric:tabular-nums;white-space:nowrap'), color: look.colour }}>
-            {saveText}
-          </span>
-          {/* Archive is secondary chrome on purpose: it is a real action a person needs and could
-              not reach before (the route existed, nothing in the app called it), but it is not
-              what this screen is for. It never says "delete", because Scout never deletes — the
-              record and its reason stay on disk, and the rejects are the training data (Law 5). */}
-          {onArchived && canArchive ? (
-            <Btn variant="ghost" size="sm" onClick={() => setArchiving(a => (a ? null : 'picking'))}
-              disabled={archiving === 'busy'}
-              title="Archive this record. Scout never deletes — it stays on disk with the reason attached."
-              style={{ color: archiving ? 'var(--danger)' : undefined }}>
-              {archiving === 'busy' ? 'Archiving…' : 'Archive'}
-            </Btn>
-          ) : null}
-          {nextStage ? (
-            // The one solid accent fill on this screen (docs/05_UI_SPEC.md §6) — the primary action.
-            <Btn variant="primary" size="md" onClick={() => promote(nextStage)} style={sx('height:32px')}>
-              <span>{String(nextStage).replace(/-/g, ' ')}</span>
-              <span style={{ ...mono('font-size:9.5px;font-weight:600'), opacity: .55 }}>A</span>
-            </Btn>
-          ) : gateValue ? (
-            <Cell field={gate} value={gateValue} />
-          ) : null}
-        </div>
-      </div>
-
       {/* The reason strip — the same shape as NOT SAVED below, and the same five reasons the
           DECIDE queue rejects with (REJECT_REASONS mirrors records.mjs ARCHIVE_REASONS). Importing
           that list rather than retyping it is the point: a sixth reason added in one place must not
@@ -690,160 +585,63 @@ export default function Document({
         </div>
       ) : null}
 
-      <div style={sx('flex:1;min-height:0;overflow-y:auto')}>
-        {mode === 'raw' ? (
-          <div style={sx('display:flex;flex-direction:column')}>
-            <div style={sx('padding:14px 22px 0')}>
-              <Eyebrow style={sx('display:block;margin-bottom:8px;font-size:9px;font-weight:800;letter-spacing:.16em')}>
-                EDIT NOTE AS MARKDOWN · SAVES AS YOU TYPE
-              </Eyebrow>
-              <MarkdownSourceEditor value={body} onChange={queueBody} />
-            </div>
-            <div style={sx('display:flex;align-items:center;gap:10px;padding:14px 22px 0')}>
-              <Eyebrow style={sx('font-size:9px;font-weight:800;letter-spacing:.16em')}>
-                {raw && raw.source === 'disk' ? 'THE FILE ON DISK' : 'RECONSTRUCTED'}
-              </Eyebrow>
-              <span style={{ ...mono('font-size:9.5px'), color: 'var(--fg-faint)' }}>
-                {raw && raw.source === 'disk' ? path : path + ' — /api/files/read is not mounted yet, so this is rendered from what was read'}
-              </span>
-            </div>
-            {/* The full file is a read-only inspection surface. Editing the body above uses
-                queueBody and the existing records API, including its gate and conflict check. */}
-            <pre style={{ ...sx('margin:0;padding:14px 22px 30px;font-size:11.5px;font-weight:500;line-height:1.8;white-space:pre-wrap;word-break:break-word'), fontFamily: MONO, color: 'var(--fg-soft)' }}>
-              {raw ? raw.text : ''}
-            </pre>
-          </div>
-        ) : (
-          <>
-            {/* ── PROPERTIES · collapsed by default (Law 2, §2.1) ─────────────────────────── */}
-            <div style={sx('padding:12px 22px 0')}>
-              <button type="button" onClick={toggleProps} className="hBg" title="P"
-                style={{ ...sx('display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:6px 8px;border-radius:6px;background:none;border:none;cursor:pointer;transition:background 130ms ease;flex-wrap:wrap') }}>
-                <span style={{ ...mono('flex:none;width:9px;font-size:8px'), color: 'var(--fg-faint)' }}>{propsOpen ? '▾' : '▸'}</span>
-                <Eyebrow style={sx('font-size:9px;font-weight:800;letter-spacing:.16em')}>PROPERTIES</Eyebrow>
-                <span style={{ ...mono('font-size:10px;font-weight:600;font-variant-numeric:tabular-nums'), color: 'var(--fg-faint)' }}>{rowCount}</span>
 
-                {/* The three that decide anything, so nothing important is hidden by the collapse. */}
-                {!propsOpen ? (
-                  <span style={sx('display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-left:6px')}>
-                    {gate ? (
-                      <span style={sx('display:inline-flex;align-items:center;gap:7px')}>
-                        <span style={{ ...mono('font-size:9px;font-weight:500'), color: 'var(--fg-faint)' }}>{gate.key}</span>
-                        <Cell field={gate} value={data[gate.key]} />
-                      </span>
-                    ) : null}
-                    {num ? (
-                      <span style={sx('display:inline-flex;align-items:center;gap:7px')}>
-                        <span style={{ ...mono('font-size:9px;font-weight:500'), color: 'var(--fg-faint)' }}>{num.key}</span>
-                        <Cell field={num} value={data[num.key]} />
-                      </span>
-                    ) : null}
-                    {date ? (
-                      <span style={sx('display:inline-flex;align-items:center;gap:7px')}>
-                        <span style={{ ...mono('font-size:9px;font-weight:500'), color: 'var(--fg-faint)' }}>{date.key}</span>
-                        <Cell field={{ ...date, display: date.display || 'freshness' }} value={data[date.key]} />
-                      </span>
-                    ) : fallbackDate ? (
-                      <span style={sx('display:inline-flex;align-items:center;gap:7px')}>
-                        <span style={{ ...mono('font-size:9px;font-weight:500'), color: 'var(--fg-faint)' }}>updated</span>
-                        <Freshness value={fallbackDate} />
-                      </span>
-                    ) : null}
-                  </span>
-                ) : null}
-              </button>
-            </div>
-
-            {propsOpen ? (
-              <div style={sx('padding:6px 14px 10px')}>
-                {/* The SAME component the inspector's PROPERTIES section renders. */}
-                <PropertyRows
-                  collection={schema}
-                  values={data}
-                  onChange={queue}
-                  onFollow={onOpen}
-                  options={options}
-                  variant="document"
-                  showAuto
-                  // A new property is a SCHEMA change, and a document with no schema (a memory
-                  // object — `schema` null, item 1) has no schema to add it to: offering the row
-                  // would either silently target whatever collection the RAIL has active (the
-                  // exact bug this file fixes elsewhere) or add a field nobody can see used.
-                  onAddProperty={onFieldAdded && schema ? () => setAddingProperty(true) : undefined}
-                  // In the row's own slot — a property is composed where the property will be,
-                  // above SYSTEM, not on a dimmed copy of the page and not under the provenance.
-                  addComposer={addingProperty && schema ? (
-                    <AddField
-                      collection={schema}
-                      actor={actor}
-                      onCancel={() => setAddingProperty(false)}
-                      onDone={f => { setAddingProperty(false); onFieldAdded(f); }}
-                    />
-                  ) : null}
-                />
+        <div className="documentScroll">
+          <article className="documentPage" aria-label="Note">
+            <header className="documentHeading">
+              <h1>{primary && editing
+                ? <InlineEdit value={title} placeholder="Untitled" onCommit={v => queue(primary.key, v)} title="Click to rename" />
+                : title}</h1>
+              <div className="documentByline">
+                {writer ? <span>{writer}</span> : null}
+                {when ? <Freshness value={when} /> : null}
+                {gateValue ? <Cell field={gate} value={gateValue} /> : null}
+                {num ? <span>{num.label || num.key}: <Cell field={num} value={data[num.key]} /></span> : null}
+                {data.proposed && !gateValue ? <span>Needs review</span> : null}
+                {flags?.quarantined ? <span style={{ color: 'var(--danger)' }}>Quarantined · excluded from counts</span> : null}
+                {flags?.agentPromotion ? <span style={{ color: 'var(--warn)' }}>Agent promotion ignored</span> : null}
+                {nextStage ? <Btn variant="primary" size="sm" onClick={() => promote(nextStage)}>{String(nextStage).replace(/-/g, ' ')} <span style={{ opacity: .55 }}>A</span></Btn> : null}
               </div>
-            ) : null}
+            </header>
 
-            <div style={sx('padding:6px 22px 0')}><span style={{ ...sx('display:block;height:1px'), background: 'var(--border)' }} /></div>
-
-            {/* ── SUMMARY · the first thing visible when a record opens ───────────────────── */}
-            <div style={sx('padding:18px 22px;display:flex;flex-direction:column;gap:10px')}>
-              <div style={sx('display:flex;align-items:center;justify-content:space-between;gap:12px')}>
-                <Eyebrow style={sx('font-size:9px;font-weight:800;letter-spacing:.18em')}>SUMMARY</Eyebrow>
-                <button type="button" onClick={() => setBodyOpen(v => !v)} className="hFgL"
-                  style={{ ...mono('display:flex;align-items:center;gap:8px;font-size:10px;font-weight:700;letter-spacing:.12em;background:none;border:none;padding:0;cursor:pointer;transition:color 130ms ease'), color: 'var(--fg-faint)' }}>
-                  <span style={{ ...sx('display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:4px;font-size:8px'), border: '1px solid var(--border-2)' }}>
-                    {bodyOpen ? '▾' : '▸'}
-                  </span>
-                  <span>{bodyOpen ? 'HIDE THE FULL NOTE' : 'READ THE FULL NOTE'}</span>
-                </button>
+            {mode === 'raw' ? (
+              <div className="documentRaw">
+                <p>{editing ? 'Markdown · changes save automatically' : 'Markdown source'} </p>
+                <MarkdownSourceEditor value={body} onChange={queueBody} readOnly={!editing} />
+                <details>
+                  <summary>{raw?.source === 'disk' ? 'Full file on disk' : 'Reconstructed file'}</summary>
+                  <div className="documentFilePath">{path}</div>
+                  <pre>{raw?.text || ''}</pre>
+                </details>
               </div>
-              {summary ? (
-                <p style={{ ...sx('margin:0;max-width:70ch;font-size:16px;font-weight:400;line-height:1.55'), color: 'var(--fg-soft)', textWrap: 'pretty' }}>{summary}</p>
-              ) : (
-                <p style={{ ...sx('margin:0;max-width:70ch;font-size:14px;line-height:1.55;font-style:italic'), color: 'var(--fg-faint)' }}>
-                  No summary yet — the first paragraph of the note becomes this line.
-                </p>
-              )}
-              {writer || when ? (
-                <span style={{ ...mono('font-size:9.5px;font-weight:500;letter-spacing:.08em'), color: 'var(--fg-faint)' }}>
-                  WRITTEN BY {writer || 'UNKNOWN'}{when ? ' / ' + when.replace('T', ' ').slice(0, 16) : ''}
-                  {data.proposed ? ' / PROPOSED' : ''}
-                </span>
-              ) : null}
-            </div>
-
-            {/* ── the body · altitude 2 ──────────────────────────────────────────────────── */}
-            {bodyOpen ? (
-              <>
-                <div style={sx('padding:0 22px 6px')}><span style={{ ...sx('display:block;height:1px'), background: 'var(--border)' }} /></div>
-                <div style={sx('padding:12px 22px 30px;display:flex;flex-direction:column;gap:12px')}>
-                  {/* No EDIT / DONE toggle any more. It existed because the two states were two
-                      different components — a textarea and a read-only render — so the app had to
-                      ask which one you wanted. A live-preview editor is both at once: the note
-                      reads as a note and takes a keystroke wherever you click. The mode switch
-                      that remains is Editor / Raw in the header, which is a different question
-                      (the rendered document vs. the bytes on disk, Law 8). */}
-                  <div style={sx('display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap')}>
-                    <Eyebrow style={sx('font-size:9px;font-weight:800;letter-spacing:.18em')}>THE NOTE</Eyebrow>
-                    <span style={{ ...mono('font-size:9.5px;font-weight:500;letter-spacing:.06em'), color: 'var(--fg-faint)' }}>
-                      MARKDOWN · SAVES AS YOU TYPE
-                    </span>
-                  </div>
-                  <RichEditor
-                    key={path}
-                    value={body}
-                    onChange={queueBody}
-                    minHeight={260}
-                    placeholder="Write the part a human would want to read."
-                    style={sx('max-width:74ch')}
-                  />
-                </div>
-              </>
-            ) : null}
-          </>
-        )}
+            ) : bodyOpen ? (
+              <div className="documentBody">
+                <RichEditor key={path} value={body} onChange={queueBody} readOnly={!editing}
+                  minHeight={260} placeholder="Write the part a human would want to read." />
+                {!editing ? <Btn variant="ghost" size="sm" onClick={() => setBodyOpen(false)} style={{ marginTop: 24 }}>Show less ↑</Btn> : null}
+              </div>
+            ) : (
+              <div className="documentPreview">
+                {summary ? <Markdown text={summary} /> : <p style={{ color: 'var(--fg-faint)' }}>No note yet.</p>}
+                <Btn variant="secondary" size="sm" onClick={() => setBodyOpen(true)}>Read note ↓</Btn>
+              </div>
+            )}
+          </article>
+        </div>
       </div>
+      {propsOpen ? <Inspector className="documentDetails" collection={schema}
+        doc={{ path, fields: data, body }} referencedBy={referencedBy}
+        open={detailSection} onToggle={setDetailSection} onClose={toggleProps}
+        onOpen={onOpen} onOpenPath={onOpenPath} onOpenBoard={onOpenBoard}
+        properties={<>
+          <PropertyRows collection={schema} values={data} onChange={queue} onFollow={onOpen}
+            options={options} variant="inspector" showAuto hideEmpty={false} omit={primary ? [primary.key] : []}
+            technicalKeys={technicalKeys}
+            onAddProperty={onFieldAdded && schema ? () => setAddingProperty(true) : undefined}
+            addComposer={addingProperty && schema ? <AddField collection={schema} actor={actor}
+              onCancel={() => setAddingProperty(false)} onDone={f => { setAddingProperty(false); onFieldAdded(f); }} /> : null} />
+          {onArchived && canArchive ? <Btn variant="ghost" size="sm" onClick={() => setArchiving('picking')} disabled={archiving === 'busy'} style={{ marginTop: 16 }}>Archive note…</Btn> : null}
+        </>} /> : null}
     </div>
   );
 }

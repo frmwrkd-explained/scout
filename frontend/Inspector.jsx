@@ -39,10 +39,10 @@ const RAIL_COLLAPSED_W = 28;
 function Section({ id, name, count, open, onToggle, children }) {
   return (
     <div style={sx('border-bottom:1px solid var(--line)')}>
-      <button onClick={() => onToggle(open ? null : id)}
+      <button onClick={() => onToggle(open ? null : id)} aria-expanded={open}
         style={{ ...sx('display:flex;align-items:center;gap:9px;width:100%;padding:11px 16px;cursor:pointer;background:transparent;border:none;transition:color 130ms ease'), color: open ? 'var(--fg-soft)' : 'var(--fg-muted)' }}>
         <span style={{ ...mono('font-size:8px;width:12px;text-align:left'), color: 'var(--fg-faint)' }}>{open ? '▾' : '▸'}</span>
-        <Eyebrow style={sx('font-size:9px;font-weight:800;letter-spacing:.16em;color:inherit;flex:1;text-align:left')}>{name}</Eyebrow>
+        <span style={sx('font-size:12px;font-weight:500;color:inherit;flex:1;text-align:left')}>{name}</span>
         {count != null ? (
           <span style={{ ...mono('font-size:10px;font-weight:600;font-variant-numeric:tabular-nums'), color: 'var(--fg-faint)' }}>{count}</span>
         ) : null}
@@ -61,7 +61,7 @@ function Nothing({ children }) {
 // `screen` names the working-preference scope for the collapse toggle — App.jsx's current screen
 // key ('collection' | 'document'). Omit it and the preference is shared, which is still correct
 // behaviour, just one scope instead of two.
-export default function Inspector({ collection, doc, referencedBy = [], open, onToggle, onOpen, onChange, onOpenPath, onOpenBoard, screen }) {
+export default function Inspector({ collection, doc, referencedBy = [], open, onToggle, onOpen, onChange, onOpenPath, onOpenBoard, screen, properties, onClose, className }) {
   // HISTORY is the event log filtered to this one file — who changed what, agent or human,
   // newest first (T05 §4). It is fetched per selection rather than carried in the row, because a
   // table of 150 rows must not pay for 150 histories nobody opened.
@@ -80,7 +80,7 @@ export default function Inspector({ collection, doc, referencedBy = [], open, on
   React.useEffect(() => { setCollapsed(readCollapsed(screen)); }, [screen]);
   const toggleCollapsed = () => setCollapsed(v => { writeCollapsed(screen, !v); return !v; });
 
-  if (collapsed) {
+  if (collapsed && !onClose) {
     return (
       <aside style={{ ...sx('flex:none;background:var(--surface);border-left:1px solid var(--line);display:flex;flex-direction:column;align-items:center'), width: RAIL_COLLAPSED_W }}>
         <button type="button" onClick={toggleCollapsed} title="Expand the inspector" className="hFg"
@@ -92,9 +92,9 @@ export default function Inspector({ collection, doc, referencedBy = [], open, on
   }
 
   const collapseBtn = (
-    <button type="button" onClick={toggleCollapsed} title="Collapse the inspector" className="hFg"
+    <button type="button" onClick={onClose || toggleCollapsed} title={onClose ? 'Close details' : 'Collapse the inspector'} aria-label={onClose ? 'Close details' : 'Collapse the inspector'} className="hFg"
       style={{ ...mono('flex:none;width:18px;height:18px;display:flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;font-size:10px'), color: 'var(--fg-faint)' }}>
-      ›
+      {onClose ? '×' : '›'}
     </button>
   );
 
@@ -120,33 +120,21 @@ export default function Inspector({ collection, doc, referencedBy = [], open, on
   const linksOut = [...String(doc.body || '').matchAll(/\[\[([^\]]+)\]\]/g)].map(m => m[1]);
 
   return (
-    <aside style={{ ...sx('flex:none;background:var(--surface);border-left:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden'), width: INSPECTOR_W }}>
+    <aside className={className} aria-label="Note details" style={{ ...sx('flex:none;background:var(--surface);border-left:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden'), width: INSPECTOR_W }}>
       <div style={sx('flex:none;height:40px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 16px;border-bottom:1px solid var(--line)')}>
-        <Eyebrow style={sx('font-size:9px;font-weight:800;letter-spacing:.18em;color:var(--fg-muted)')}>INSPECTOR</Eyebrow>
-        {/* Law 8 — every record shows its path, and it is the same string the API takes. It is
-            also CLICKABLE, the way the identical line on the document surface has always been:
-            rendered as dead text it printed the promise of two clicks without honouring it, and
-            with the row's open gesture hidden behind a double-click this was the last exit from a
-            selected record. Selecting a row and clicking its path is now the two clicks. */}
-        <span style={sx('flex:1;min-width:0;display:flex;justify-content:flex-end')}>
-          <button type="button" title={onOpenPath ? 'Open ' + doc.path : doc.path}
-            onClick={() => onOpenPath && onOpenPath(doc.path)}
-            className={onOpenPath ? 'hAccent' : ''}
-            style={{ ...mono('font-size:9.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:none;border:none;padding:0'), color: 'var(--fg-faint)', cursor: onOpenPath ? 'pointer' : 'default' }}>
-            {doc.path}
-          </button>
-        </span>
+        <span style={sx('font-size:12px;font-weight:600;color:var(--fg-muted)')}>Details</span>
+        <span style={sx('flex:1')} />
         {collapseBtn}
       </div>
 
       <div style={sx('flex:1;min-height:0;overflow-y:auto')}>
-        <Section id="props" name="PROPERTIES" count={shown.length} open={open === 'props'} onToggle={onToggle}>
-          {shown.length
+        <Section id="props" name="Properties" count={properties ? null : shown.length} open={open === 'props'} onToggle={onToggle}>
+          {properties || (shown.length
             ? <PropertyRows collection={collection} values={doc.fields} onChange={onChange} onFollow={onOpen} variant="inspector" hideEmpty />
-            : <Nothing>NO PROPERTIES SET</Nothing>}
+            : <Nothing>NO PROPERTIES SET</Nothing>)}
         </Section>
 
-        <Section id="refs" name="REFERENCED BY" count={referencedBy.length} open={open === 'refs'} onToggle={onToggle}>
+        {referencedBy.length ? <Section id="refs" name="Referenced by" count={referencedBy.length} open={open === 'refs'} onToggle={onToggle}>
           {referencedBy.length
             ? referencedBy.map((r, i) => (
                 <button key={i} onClick={() => onOpen && onOpen(null, r.path)}
@@ -164,9 +152,9 @@ export default function Inspector({ collection, doc, referencedBy = [], open, on
                 </button>
               ))
             : <Nothing>NOTHING POINTS HERE</Nothing>}
-        </Section>
+        </Section> : null}
 
-        <Section id="links" name="LINKS" count={linksOut.length} open={open === 'links'} onToggle={onToggle}>
+        {linksOut.length ? <Section id="links" name="Links" count={linksOut.length} open={open === 'links'} onToggle={onToggle}>
           {linksOut.length ? (
             <>
               <span style={{ ...mono('font-size:8.5px;font-weight:700;letter-spacing:.12em;display:block;padding:4px 0'), color: 'var(--fg-faint)' }}>OUT / WRITTEN HERE</span>
@@ -184,9 +172,9 @@ export default function Inspector({ collection, doc, referencedBy = [], open, on
               })}
             </>
           ) : <Nothing>NO WIKILINKS IN THE BODY</Nothing>}
-        </Section>
+        </Section> : null}
 
-        <Section id="history" name="HISTORY" count={history.length || null} open={open === 'history'} onToggle={onToggle}>
+        <Section id="history" name="History" count={history.length || null} open={open === 'history'} onToggle={onToggle}>
           {history.length
             ? history.map((ev, i) => <ActivityRow key={ev.id || i} ev={ev} onOpenPath={onOpenPath} />)
             : <Nothing>NOTHING HAS HAPPENED TO THIS RECORD YET</Nothing>}
@@ -198,9 +186,14 @@ export default function Inspector({ collection, doc, referencedBy = [], open, on
             carries THIS document's path, so the board it opens onto already has this record (and
             its relations) placed — there is no second, path-less "open the whiteboard" control
             here any more; two buttons doing the same thing is the bug this replaces. */}
-        <Section id="graph" name="GRAPH" count={null} open={open === 'graph'} onToggle={onToggle}>
+        <Section id="graph" name="Connections" count={null} open={open === 'graph'} onToggle={onToggle}>
           <GraphPreview doc={doc} references={referencedBy} onOpenBoard={onOpenBoard} />
         </Section>
+      </div>
+      <div style={sx('flex:none;padding:14px 16px;border-top:1px solid var(--line)')}>
+        <span style={sx('display:block;margin-bottom:5px;font-size:11px;color:var(--fg-muted)')}>Markdown file</span>
+        <button type="button" title={doc.path} onClick={() => onOpenPath?.(doc.path)}
+          style={{ ...mono('width:100%;text-align:left;font-size:10px;background:none;border:none;padding:0;overflow-wrap:anywhere;cursor:pointer'), color: 'var(--fg-faint)' }}>{doc.path}</button>
       </div>
     </aside>
   );

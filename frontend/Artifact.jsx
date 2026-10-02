@@ -207,7 +207,7 @@ export default function Artifact({ artifact, actor = 'crystal', agents = [], onO
         {editing ? <><Btn size="sm" variant="primary" busy={saving} disabled={!dirty || !!conflict || !doc.rev} onClick={() => save()}>Save changes</Btn>
           <Btn size="sm" variant="ghost" disabled={saving} onClick={() => { if (conflict) useLatest(); else { change(docRef.current.content); setEditing(false); } }}>Cancel edit</Btn></>
           : <Btn size="sm" variant="secondary" disabled={blocked || !doc.rev} onClick={() => { setEditing(true); setSaved(false); }}>Edit here</Btn>}
-        {onOpenPath ? <Btn size="sm" variant="ghost" disabled={dirty || saving} onClick={() => onOpenPath(path)}>Open full</Btn> : null}
+        {onOpenPath ? <Btn size="sm" variant="ghost" disabled={dirty || saving} onClick={() => onOpenPath(path, { expanded: true })}>Open full</Btn> : null}
         <Btn size="sm" variant="ghost" onClick={() => setShowFile(value => !value)}>{showFile ? 'Hide file' : 'File details'}</Btn>
       </div>
       {showFile ? <code style={sx('display:block;padding:0 11px 9px;font-size:10px;color:var(--fg-muted);overflow-wrap:anywhere')}>{path}</code> : null}

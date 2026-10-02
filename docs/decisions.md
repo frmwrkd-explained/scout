@@ -1259,3 +1259,18 @@ data, telemetry/update checks off and no operating-system service. It uses the a
 Node 26; Scout continues using Node 22. No global runtime, sign-in or system package was changed.
 The role-play uses a new goal-only vault and GPT-6 Luna, consumes subscription attempts, and
 must not be represented as real customer replies or second-person production acceptance.
+
+## Calmer note presentation (2026-10-02)
+
+At the owner’s request, documents give the title and prose priority. The single shared
+Inspector opens from Details (or P), starts closed for each note, and holds editable
+properties, history, connections and the file path. Its technical metadata is a second
+disclosure; generated artifact routing IDs and hashes are read-only there. Empty link
+and reference sections no longer occupy the rail. This replaces the per-collection
+property-open preference and duplicated properties in the document and inspector.
+
+Ordinary records retain the short first-paragraph view. An explicit Open full on an
+inline artifact opens its full body immediately. Expanding replaces the summary, so
+there is only one copy of the content. Read mode uses the existing RichEditor with
+editing disabled; Edit note enables its existing toolbar, autosave and conflict path.
+Raw remains available directly. Palette tokens and source Markdown are unchanged.

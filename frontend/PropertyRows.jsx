@@ -66,7 +66,7 @@ const AUTO_TYPE = {
 // because a schema MAY declare it. When it is undeclared it is still machine-written, so it rides
 // with the machine rows rather than looking like something the person typed.
 const MACHINE_EXTRA = ['provenance', 'archived', 'archived_at', 'archived_by', 'archive_reason', 'archived_from', 'history', 'rev'];
-const isMachine = f => !!f.auto || (f.undeclared && MACHINE_EXTRA.includes(f.key));
+const isMachine = f => !!f.auto || f.technical || (f.undeclared && MACHINE_EXTRA.includes(f.key));
 
 // A value with no schema still has a shape. Deliberately coarse — this only decides which editor
 // opens, and the schema always wins when there is one.
@@ -127,7 +127,7 @@ export function propertyLabel(field) {
 export function PropertyRow({ field, value, onChange, onFollow, options, variant = 'document' }) {
   const d = DENSITY[variant] || DENSITY.document;
   // Derived and automatic fields never take an onChange — the affordance IS the contract.
-  const writable = !!onChange && !isDerived(field) && !field.auto;
+  const writable = !!onChange && !isDerived(field) && !field.auto && !field.technical;
   const machine = isMachine(field);
   return (
     <div className="hBg" style={{ ...d.row, transition: 'background 130ms ease' }}>
@@ -145,7 +145,7 @@ export function PropertyRow({ field, value, onChange, onFollow, options, variant
         }}>
         {propertyLabel(field)}
       </span>
-      <span style={sx('flex:1;min-width:0;display:flex;align-items:center;gap:6px;flex-wrap:wrap')}>
+      <span style={sx('flex:1;min-width:0;display:flex;align-items:center;gap:6px;flex-wrap:wrap;overflow-wrap:anywhere')}>
         {writable
           ? <Editor field={field} value={value} onChange={onChange} onFollow={onFollow} options={options} />
           : <Editor field={field} value={value} onFollow={onFollow} />}
@@ -162,16 +162,10 @@ function SystemGroup({ rows, values, onFollow, variant }) {
   const d = DENSITY[variant] || DENSITY.document;
   return (
     <div style={sx('display:flex;flex-direction:column;margin-top:4px')}>
-      <button type="button" onClick={() => setOpen(v => !v)} className="hBg"
+      <button type="button" onClick={() => setOpen(v => !v)} className="hBg" aria-expanded={open}
         style={{ ...sx('display:flex;align-items:center;gap:8px;padding:3px 8px;border-radius:5px;background:none;border:none;cursor:pointer;text-align:left;transition:background 130ms ease') }}>
         <span style={{ ...mono('flex:none;width:9px;font-size:8px'), color: 'var(--fg-faint)' }}>{open ? '▾' : '▸'}</span>
-        <span style={{ ...mono('font-size:8.5px;font-weight:700;letter-spacing:.16em'), color: 'var(--fg-faint)' }}>SYSTEM</span>
-        <span style={{ ...mono('font-size:9.5px;font-weight:600;font-variant-numeric:tabular-nums'), color: 'var(--fg-faint)' }}>{rows.length}</span>
-        {!open ? (
-          <span style={{ ...sx('font-size:11px'), color: 'var(--fg-faint)' }}>
-            written by the pipeline — provenance, not properties
-          </span>
-        ) : null}
+        <span style={sx('font-size:11px;font-weight:500;color:var(--fg-muted)')}>File details</span>
       </button>
       {open ? (
         <div style={sx('display:flex;flex-direction:column;' + d.pad)}>
@@ -187,8 +181,11 @@ function SystemGroup({ rows, values, onFollow, variant }) {
 export default function PropertyRows({
   collection, values, onChange, onFollow, options = {},
   variant = 'document', hideEmpty = variant === 'inspector', showAuto = false, onAddProperty, addComposer,
+  omit = [], technicalKeys = ['source_task', 'source_cycle', 'result_hash'],
 }) {
-  const rows = rowsFor(collection, values || {}, { hideEmpty, showAuto });
+  const rows = rowsFor(collection, values || {}, { hideEmpty, showAuto })
+    .filter(f => !omit.includes(f.key))
+    .map(f => technicalKeys.includes(f.key) ? { ...f, technical: true } : f);
   const own = rows.filter(f => !isMachine(f));
   const machine = rows.filter(isMachine);
 

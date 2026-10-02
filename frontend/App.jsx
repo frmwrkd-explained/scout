@@ -63,7 +63,7 @@ export default class App extends React.Component {
     collections: [], counts: {}, active: null,   // active COLLECTION id — nothing else goes in here
     activeAssistant: null,
     view: null, views: [], viewCounts: {}, rows: [], quarantined: [],
-    selected: null, docPath: null, section: 'props',
+    selected: null, docPath: null, docExpanded: false, section: 'props',
     referencedBy: [], refsFor: null, external: null,
     assistants: [], memoryCounts: {}, needsYou: 0, project: null, projects: [],
     activityOpen: false, nonce: 0, refreshKey: 0, findings: null,
@@ -252,7 +252,7 @@ export default class App extends React.Component {
   // A path is the app's one address for a thing on disk. Opening one always lands on the document
   // surface — including for a territory or a playbook claim, which have no collection and are read
   // straight from their frontmatter. That is why Law 8 costs two clicks everywhere and not five.
-  openPath = path => {
+  openPath = (path, options = {}) => {
     if (!path) return;
     this.clearToast();
     // A `.md` opens on the document surface — that is Law 8's two clicks, and it is the same
@@ -261,7 +261,7 @@ export default class App extends React.Component {
     if (!String(path).endsWith('.md')) return this.setState({ screen: 'files', arg: path });
     // `arg` cleared here too, not only in go() — a stale one from wherever she was standing
     // (a re-brief target, a board placement) must not survive onto the document screen.
-    this.setState({ screen: 'document', docPath: path, selected: path, section: 'props', arg: null });
+    this.setState({ screen: 'document', docPath: path, docExpanded: !!options.expanded, selected: path, section: 'props', arg: null });
     this.loadReferences(path);
     this.loadExternal(path);
   };
@@ -611,8 +611,12 @@ export default class App extends React.Component {
         return (
           <Document
             path={docPath}
+            startExpanded={this.state.docExpanded}
             collection={activeCollection}
             collections={collections}
+            assistants={this.state.assistants}
+            referencedBy={this.state.referencedBy}
+            onOpenBoard={path => this.go('board', path || null)}
             actor={HUMAN}
             onOpen={this.openRelation}
             onOpenPath={this.openPath}
@@ -688,7 +692,7 @@ export default class App extends React.Component {
     // On the collection screen with nothing selected, an inspector showing "NOTHING SELECTED" in a
     // 302px column is not collapsible chrome, it is a narrower window — item 13. The document
     // screen always has something to show (the document itself).
-    const withInspector = screen === 'document' || (screen === 'collection' && !!doc);
+    const withInspector = screen === 'collection' && !!doc;
     const running = assistants.filter(a => a.status === 'running');
 
     if (this.state.firstRun) {
