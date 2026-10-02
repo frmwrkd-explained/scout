@@ -129,7 +129,7 @@ export default function Activity({ open, onToggle, onOpenPath, running = [] }) {
           <span style={{ ...sx('flex:none;width:7px;height:7px;border-radius:9999px'), background: first ? 'var(--marked)' : 'var(--border-3)' }} />
           <span style={{ ...mono('font-size:10.5px;font-weight:500'), color: first ? 'var(--fg-soft)' : 'var(--fg-faint)' }}>
             {first
-              ? first.id + ' — ' + (first.doing || 'working') + (running.length > 1 ? '  ·  +' + (running.length - 1) + ' more' : '')
+              ? (first.name || first.id) + ' — ' + (first.doing || 'working') + (running.length > 1 ? '  ·  +' + (running.length - 1) + ' more' : '')
               : 'NO ASSISTANTS RUNNING'}
           </span>
         </div>

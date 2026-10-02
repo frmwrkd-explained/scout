@@ -113,7 +113,7 @@ function FormattedEditor({
     // toolbar subscribes to the slice it needs through `useEditorState`.
     shouldRerenderOnTransaction: false,
     editorProps: {
-      attributes: { class: 'sc-rich-content' },
+      attributes: { class: 'sc-rich-content', role: 'textbox', 'aria-label': 'Document content', 'aria-multiline': 'true' },
     },
     onUpdate: ({ editor: live, transaction, appendedTransactions }) => {
       // docChanged — the same guard the CodeMirror listener had. `update` also fires for

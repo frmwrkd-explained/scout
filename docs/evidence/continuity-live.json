@@ -1,0 +1,2861 @@
+{
+  "captured_at": "2026-10-02T18:19:58.393Z",
+  "demo": "http://127.0.0.1:5190",
+  "fixture_only": true,
+  "model": "gpt-6-luna",
+  "team": {
+    "enabled": true,
+    "state": "cooldown",
+    "goal_id": "activation-demo",
+    "project": "goal-collaboration-demo",
+    "coordinator": "team-a326e4c7-conductor",
+    "agents": [
+      {
+        "id": "team-a326e4c7-researcher",
+        "name": "Scout · Research",
+        "job": "Investigate the available evidence, identify unknowns and prepare concrete recommendations. Label assumptions. Never invent research or observed customer outcomes.",
+        "capabilities": [
+          "research"
+        ],
+        "status": "idle",
+        "doing": null,
+        "task": null
+      },
+      {
+        "id": "team-a326e4c7-writer",
+        "name": "Pen · Writer",
+        "job": "Produce useful drafts and implementation material from the brief and prior team outputs. Incorporate human corrections and make the next review easy.",
+        "capabilities": [
+          "draft",
+          "writing"
+        ],
+        "status": "idle",
+        "doing": null,
+        "task": null
+      },
+      {
+        "id": "team-a326e4c7-reviewer",
+        "name": "Check · Reviewer",
+        "job": "Review the team’s actual output against the goal and human constraints. Name concrete defects, propose revisions and distinguish evidence from assumptions.",
+        "capabilities": [
+          "review"
+        ],
+        "status": "idle",
+        "doing": null,
+        "task": null
+      },
+      {
+        "id": "team-a326e4c7-analyst",
+        "name": "Signal · Analyst",
+        "job": "Interpret supplied results, design practical measurement, and recommend the next experiment. Missing evidence stays missing; a draft never counts as a customer result.",
+        "capabilities": [
+          "analysis",
+          "measure"
+        ],
+        "status": "idle",
+        "doing": null,
+        "task": null
+      }
+    ],
+    "cycle": 122,
+    "summary": "The team reached its daily light-model budget. Drafts and human decisions remain available.",
+    "max_parallel": 2,
+    "max_tasks_per_cycle": 3,
+    "min_cycle_minutes": 1,
+    "cooldown_minutes": 5,
+    "max_cycles_per_day": 16,
+    "max_human_reviews": 3,
+    "generation": "72d09b6a-f506-4ba9-95e2-f02c5ed31f36",
+    "lease_expires_at": null,
+    "active_cycle": null,
+    "next_wake": "2026-10-02T22:00:00.000Z",
+    "reason": "Daily coordinator/light call budget reached.",
+    "input_fingerprint": "c9388f7b405eb7c3e6b2f999f3af71af1aa6b76e7cdfbf0516eb4ad7200ec937",
+    "updated": "2026-10-02T18:19:24.994Z",
+    "last_wake": "2026-10-02T18:19:24.157Z",
+    "last_plan_at": "2026-10-02T18:11:48.777Z",
+    "waiting_reason": null,
+    "wait_until": null,
+    "provider": "gpt",
+    "model": "gpt-6-luna",
+    "paused_until_day": null,
+    "human_replan_pending": true,
+    "last_human_fingerprint": "9a889e6e03762a2dcacd54b8dc7d28fbf58c2ed701f05ff883d5f75e8c0b8032",
+    "goal_label": "Get three useful beta tester replies",
+    "project_label": "Goal collaboration demo",
+    "coordinator_name": "Mira · Conductor",
+    "tasks": [
+      {
+        "id": "team-task-91aaea92c5da73f59cf67cfe",
+        "title": "Draft a sample-invoice-first quick-start guide",
+        "status": "done",
+        "assistant": "team-a326e4c7-writer",
+        "depends_on": [],
+        "output_path": "data/artifacts/team-output-acc570b19e8bfb43445645c9.md",
+        "needs_human": false,
+        "question": null
+      },
+      {
+        "id": "team-task-ba9b428f7afde506e5cdde6c",
+        "title": "Prepare a feedback capture sheet and next setup experiment",
+        "status": "done",
+        "assistant": "team-a326e4c7-analyst",
+        "depends_on": [],
+        "output_path": "data/artifacts/team-output-c2ac5a73942344cdbf8aaf83.md",
+        "needs_human": false,
+        "question": null
+      },
+      {
+        "id": "team-task-34ad7873ef687d6c2789a7ac",
+        "title": "Review the quick-start guide against the supplied evidence",
+        "status": "done",
+        "assistant": "team-a326e4c7-reviewer",
+        "depends_on": [
+          "team-task-91aaea92c5da73f59cf67cfe"
+        ],
+        "output_path": "data/artifacts/team-output-fb0edb2301e930a2ef7996c2.md",
+        "needs_human": false,
+        "question": null
+      },
+      {
+        "id": "team-task-595942c8597e128fc990acb5",
+        "title": "Revise the quick-start guide using Check’s review",
+        "status": "done",
+        "assistant": "team-a326e4c7-writer",
+        "depends_on": [
+          "team-task-34ad7873ef687d6c2789a7ac"
+        ],
+        "output_path": "data/artifacts/team-output-700e8cac090eeb118f2f2d20.md",
+        "needs_human": false,
+        "question": null
+      },
+      {
+        "id": "team-task-7e5b871c06130d591768f414",
+        "title": "Check the revised quick-start guide against the brief",
+        "status": "done",
+        "assistant": "team-a326e4c7-reviewer",
+        "depends_on": [
+          "team-task-595942c8597e128fc990acb5"
+        ],
+        "output_path": "data/artifacts/team-output-6cce3dd452a2cab2d4300a50.md",
+        "needs_human": false,
+        "question": null
+      },
+      {
+        "id": "team-task-20c2965fe39e7bfa11643486",
+        "title": "Revise the guide to frame sample-first as a proposal",
+        "status": "done",
+        "assistant": "team-a326e4c7-writer",
+        "depends_on": [],
+        "output_path": "data/artifacts/team-output-c3a34f039fc6fa781c9a0540.md",
+        "needs_human": false,
+        "question": null
+      },
+      {
+        "id": "team-task-c0caa3723a0e3f71baba6e84",
+        "title": "Check revised guide for accuracy and readiness",
+        "status": "done",
+        "assistant": "team-a326e4c7-reviewer",
+        "depends_on": [
+          "team-task-20c2965fe39e7bfa11643486"
+        ],
+        "output_path": "data/artifacts/team-output-291afb004e67145c9c478f26.md",
+        "needs_human": false,
+        "question": null
+      },
+      {
+        "id": "team-task-f08a779a65cfcb95d8565900",
+        "title": "Revise Ana’s saved guide using all three fictional notes",
+        "status": "done",
+        "assistant": "team-a326e4c7-writer",
+        "depends_on": [],
+        "output_path": "data/artifacts/team-output-4b3ce3c3381caa613d1a472d.md",
+        "needs_human": false,
+        "question": null
+      },
+      {
+        "id": "team-task-ebfd884e858f1f1d9a328652",
+        "title": "Verify the revised guide’s exact order and evidence claims",
+        "status": "done",
+        "assistant": "team-a326e4c7-reviewer",
+        "depends_on": [
+          "team-task-f08a779a65cfcb95d8565900"
+        ],
+        "output_path": "data/artifacts/team-output-6ed5e45f92d763b69c975dea.md",
+        "needs_human": false,
+        "question": null
+      },
+      {
+        "id": "team-task-e97ef73e016431e292aeba7d",
+        "title": "Compare the three fictional session notes",
+        "status": "done",
+        "assistant": "team-a326e4c7-researcher",
+        "depends_on": [],
+        "output_path": "data/artifacts/team-output-644dc7c245b892f9628842e1.md",
+        "needs_human": false,
+        "question": null
+      },
+      {
+        "id": "team-task-16964dc45e5eac60d56ef26e",
+        "title": "Revise the guide from Ana’s correction and Research comparison",
+        "status": "done",
+        "assistant": "team-a326e4c7-writer",
+        "depends_on": [
+          "team-task-e97ef73e016431e292aeba7d"
+        ],
+        "output_path": "data/artifacts/team-output-40b6290b1f31a9012cd7a519.md",
+        "needs_human": false,
+        "question": null
+      },
+      {
+        "id": "team-task-3e034a716d1bd853e8f49e6e",
+        "title": "Verify the new guide’s order and evidence claims",
+        "status": "done",
+        "assistant": "team-a326e4c7-reviewer",
+        "depends_on": [
+          "team-task-16964dc45e5eac60d56ef26e"
+        ],
+        "output_path": "data/artifacts/team-output-4a72e4da046bf96d01123a7e.md",
+        "needs_human": false,
+        "question": null
+      },
+      {
+        "id": "team-task-90b2b3be4e0fa5acd7563687",
+        "title": "Compare the three fictional setup observations",
+        "status": "done",
+        "assistant": "team-a326e4c7-researcher",
+        "depends_on": [],
+        "output_path": "data/artifacts/team-output-d3d0547e8813de896cb77b6f.md",
+        "needs_human": false,
+        "question": null
+      },
+      {
+        "id": "team-task-b6819b4512fc4e46fb3c1429",
+        "title": "Revise Ana’s saved quick-start guide",
+        "status": "done",
+        "assistant": "team-a326e4c7-writer",
+        "depends_on": [
+          "team-task-90b2b3be4e0fa5acd7563687"
+        ],
+        "output_path": "data/artifacts/team-output-d42a2d25e885ce76f4e527aa.md",
+        "needs_human": false,
+        "question": null
+      },
+      {
+        "id": "team-task-f1cfa5af8194b2993f3f73a9",
+        "title": "Check the revised guide against Ana’s correction",
+        "status": "done",
+        "assistant": "team-a326e4c7-reviewer",
+        "depends_on": [
+          "team-task-b6819b4512fc4e46fb3c1429"
+        ],
+        "output_path": "data/artifacts/team-output-5ebf3fe79cad238b995e62e6.md",
+        "needs_human": false,
+        "question": null
+      },
+      {
+        "id": "team-task-6ce7ea6d128f273060c55fbf",
+        "title": "Propose two labels for optional business details",
+        "status": "done",
+        "assistant": "team-a326e4c7-writer",
+        "depends_on": [],
+        "output_path": "data/artifacts/team-output-ba893efabea3895b8590dfb8.md",
+        "needs_human": false,
+        "question": null
+      },
+      {
+        "id": "team-task-2c01476dc29777cfb5ed2756",
+        "title": "Adapt feedback sheet to compare optional-step labels",
+        "status": "done",
+        "assistant": "team-a326e4c7-analyst",
+        "depends_on": [
+          "team-task-6ce7ea6d128f273060c55fbf"
+        ],
+        "output_path": "data/artifacts/team-output-bd3e7fd10258d1e655f001cb.md",
+        "needs_human": false,
+        "question": null
+      }
+    ],
+    "recent_outputs": [
+      {
+        "id": "bd3e7fd10258d1e655f001cbb53f39b3bc3d193be076f0b3ed5f33ad2437da2c",
+        "path": "data/artifacts/team-output-bd3e7fd10258d1e655f001cb.md",
+        "title": "Adapt feedback sheet to compare optional-step labels",
+        "assistant": "team-a326e4c7-analyst",
+        "worker": "team-a326e4c7-analyst",
+        "task": "team-task-2c01476dc29777cfb5ed2756",
+        "project": "goal-collaboration-demo",
+        "goal_id": "activation-demo",
+        "created": "2026-10-02T18:12:25.016Z",
+        "review_created": true
+      },
+      {
+        "id": "ba893efabea3895b8590dfb86f904812bcfa5c67b75c6a66d5a73dc89ae238f9",
+        "path": "data/artifacts/team-output-ba893efabea3895b8590dfb8.md",
+        "title": "Propose two labels for optional business details",
+        "assistant": "team-a326e4c7-writer",
+        "worker": "team-a326e4c7-writer",
+        "task": "team-task-6ce7ea6d128f273060c55fbf",
+        "project": "goal-collaboration-demo",
+        "goal_id": "activation-demo",
+        "created": "2026-10-02T18:12:10.930Z",
+        "review_created": false
+      },
+      {
+        "id": "5ebf3fe79cad238b995e62e66dcdcb53fda8b539ec342ab8a4d4c0654ca6029e",
+        "path": "data/artifacts/team-output-5ebf3fe79cad238b995e62e6.md",
+        "title": "Check the revised guide against Ana’s correction",
+        "assistant": "team-a326e4c7-reviewer",
+        "worker": "team-a326e4c7-reviewer",
+        "task": "team-task-f1cfa5af8194b2993f3f73a9",
+        "project": "goal-collaboration-demo",
+        "goal_id": "activation-demo",
+        "created": "2026-10-02T18:00:52.332Z",
+        "review_created": true
+      },
+      {
+        "id": "d42a2d25e885ce76f4e527aa293ec92b7434550888472d069a0c0306d14211d1",
+        "path": "data/artifacts/team-output-d42a2d25e885ce76f4e527aa.md",
+        "title": "Revise Ana’s saved quick-start guide",
+        "assistant": "team-a326e4c7-writer",
+        "worker": "team-a326e4c7-writer",
+        "task": "team-task-b6819b4512fc4e46fb3c1429",
+        "project": "goal-collaboration-demo",
+        "goal_id": "activation-demo",
+        "created": "2026-10-02T17:53:30.103Z",
+        "review_created": false
+      },
+      {
+        "id": "d3d0547e8813de896cb77b6f791657946353f748eda8c5484058e4a7ccde5176",
+        "path": "data/artifacts/team-output-d3d0547e8813de896cb77b6f.md",
+        "title": "Compare the three fictional setup observations",
+        "assistant": "team-a326e4c7-researcher",
+        "worker": "team-a326e4c7-researcher",
+        "task": "team-task-90b2b3be4e0fa5acd7563687",
+        "project": "goal-collaboration-demo",
+        "goal_id": "activation-demo",
+        "created": "2026-10-02T17:53:10.583Z",
+        "review_created": false
+      },
+      {
+        "id": "4a72e4da046bf96d01123a7ee59c08f3f4b7f250e579d9047857b191c1b7e762",
+        "path": "data/artifacts/team-output-4a72e4da046bf96d01123a7e.md",
+        "title": "Verify the new guide’s order and evidence claims",
+        "assistant": "team-a326e4c7-reviewer",
+        "worker": "team-a326e4c7-reviewer",
+        "task": "team-task-3e034a716d1bd853e8f49e6e",
+        "project": "goal-collaboration-demo",
+        "goal_id": "activation-demo",
+        "created": "2026-10-02T17:52:29.363Z",
+        "review_created": true
+      },
+      {
+        "id": "40b6290b1f31a9012cd7a5195189e49e0d61ef289f35b3469174e84df468d61e",
+        "path": "data/artifacts/team-output-40b6290b1f31a9012cd7a519.md",
+        "title": "Revise the guide from Ana’s correction and Research comparison",
+        "assistant": "team-a326e4c7-writer",
+        "worker": "team-a326e4c7-writer",
+        "task": "team-task-16964dc45e5eac60d56ef26e",
+        "project": "goal-collaboration-demo",
+        "goal_id": "activation-demo",
+        "created": "2026-10-02T17:52:18.252Z",
+        "review_created": false
+      },
+      {
+        "id": "644dc7c245b892f9628842e1446e3d5c2f233137168357b3af47981a1e6f80c7",
+        "path": "data/artifacts/team-output-644dc7c245b892f9628842e1.md",
+        "title": "Compare the three fictional session notes",
+        "assistant": "team-a326e4c7-researcher",
+        "worker": "team-a326e4c7-researcher",
+        "task": "team-task-e97ef73e016431e292aeba7d",
+        "project": "goal-collaboration-demo",
+        "goal_id": "activation-demo",
+        "created": "2026-10-02T17:52:03.824Z",
+        "review_created": false
+      },
+      {
+        "id": "6ed5e45f92d763b69c975dea2d6299a3beb99d026ea66c73fd709c9ede739f22",
+        "path": "data/artifacts/team-output-6ed5e45f92d763b69c975dea.md",
+        "title": "Verify the revised guide’s exact order and evidence claims",
+        "assistant": "team-a326e4c7-reviewer",
+        "worker": "team-a326e4c7-reviewer",
+        "task": "team-task-ebfd884e858f1f1d9a328652",
+        "project": "goal-collaboration-demo",
+        "goal_id": "activation-demo",
+        "created": "2026-10-02T17:25:58.843Z",
+        "review_created": true
+      },
+      {
+        "id": "4b3ce3c3381caa613d1a472deede329a4e982cc066d3a77c28ec876d498e09ea",
+        "path": "data/artifacts/team-output-4b3ce3c3381caa613d1a472d.md",
+        "title": "Revise Ana’s saved guide using all three fictional notes",
+        "assistant": "team-a326e4c7-writer",
+        "worker": "team-a326e4c7-writer",
+        "task": "team-task-f08a779a65cfcb95d8565900",
+        "project": "goal-collaboration-demo",
+        "goal_id": "activation-demo",
+        "created": "2026-10-02T17:25:51.545Z",
+        "review_created": false
+      },
+      {
+        "id": "291afb004e67145c9c478f2690e30848d3ccb89177d8cd97fcccd79d85926edf",
+        "path": "data/artifacts/team-output-291afb004e67145c9c478f26.md",
+        "title": "Check revised guide for accuracy and readiness",
+        "assistant": "team-a326e4c7-reviewer",
+        "worker": "team-a326e4c7-reviewer",
+        "task": "team-task-c0caa3723a0e3f71baba6e84",
+        "project": "goal-collaboration-demo",
+        "goal_id": "activation-demo",
+        "created": "2026-10-02T17:06:43.414Z",
+        "review_created": true
+      },
+      {
+        "id": "c3a34f039fc6fa781c9a054000d7305680bda7b838bb314a7e9a00ba001b1fba",
+        "path": "data/artifacts/team-output-c3a34f039fc6fa781c9a0540.md",
+        "title": "Revise the guide to frame sample-first as a proposal",
+        "assistant": "team-a326e4c7-writer",
+        "worker": "team-a326e4c7-writer",
+        "task": "team-task-20c2965fe39e7bfa11643486",
+        "project": "goal-collaboration-demo",
+        "goal_id": "activation-demo",
+        "created": "2026-10-02T17:06:38.397Z",
+        "review_created": false
+      }
+    ],
+    "needs_you": [
+      {
+        "id": "team-review-44c3a369164beff8480402e6",
+        "title": "Choose a label to try locally",
+        "path": "data/work/team-review-44c3a369164beff8480402e6.md",
+        "status": "now",
+        "artifacts": [
+          {
+            "path": "data/artifacts/team-output-ba893efabea3895b8590dfb8.md",
+            "title": "Propose two labels for optional business details",
+            "assistant": "team-a326e4c7-writer"
+          },
+          {
+            "path": "data/artifacts/team-output-40b6290b1f31a9012cd7a519.md",
+            "title": "Revise the guide from Ana’s correction and Research comparison",
+            "assistant": "team-a326e4c7-writer"
+          },
+          {
+            "path": "data/artifacts/team-output-c2ac5a73942344cdbf8aaf83.md",
+            "title": "Prepare a feedback capture sheet and next setup experiment",
+            "assistant": "team-a326e4c7-analyst"
+          },
+          {
+            "path": "data/artifacts/team-output-bd3e7fd10258d1e655f001cb.md",
+            "title": "Adapt feedback sheet to compare optional-step labels",
+            "assistant": "team-a326e4c7-analyst"
+          }
+        ]
+      }
+    ],
+    "budget": {
+      "day": "2026-10-02",
+      "light": {
+        "limit": 48,
+        "used": 48,
+        "remaining": 0
+      },
+      "heavy": {
+        "limit": 4,
+        "used": 0,
+        "remaining": 4
+      }
+    }
+  },
+  "outputs": [
+    {
+      "path": "data/artifacts/team-output-bd3e7fd10258d1e655f001cb.md",
+      "rev": "j0edwb",
+      "data": {
+        "title": "Adapt feedback sheet to compare optional-step labels",
+        "status": "draft",
+        "source_task": "team-task-2c01476dc29777cfb5ed2756",
+        "assistant": "team-a326e4c7-analyst",
+        "goal_id": "activation-demo",
+        "project": "goal-collaboration-demo",
+        "universe": "unit/growth",
+        "result_hash": "bd3e7fd10258d1e655f001cbb53f39b3bc3d193be076f0b3ed5f33ad2437da2c",
+        "source_cycle": "cycle-d0d53130-d83d-4c85-8c6a-24245ddfada0",
+        "tags": [
+          "artifact"
+        ],
+        "created": "2026-10-02",
+        "updated": "2026-10-02",
+        "created_by": "conductor",
+        "updated_by": "conductor",
+        "verified_at": "2026-10-02",
+        "proposed": true,
+        "provenance": "pipeline"
+      },
+      "body": "## Updated feedback sheet\n\n**Local, synthetic comparison for Ana to try.** The label options below are proposals, not live interface text. The supplied session notes are invented; no testers were contacted, and real replies remain **0**.\n\nCompare only these labels for the step after the sample invoice preview:\n\n- **Add business details (optional)**\n- **Continue without business details**\n\nKeep the Tax ID field labeled **Tax ID (optional)** and skippable in both versions. Use the same sample-first guide and setup around each label; this check is only about label clarity, not a comparison of setup flows.\n\n**Decision criterion:** Choose the label Ana understands correctly on first read: business details can wait, and Tax ID can be skipped. Record her interpretation before explaining either option. If neither makes both points clear, revise and check again.\n\n| Label shown | Ana’s first interpretation, in her words | Understands business details can wait? | Understands Tax ID can be skipped? | Confusion or question |\n|---|---|---|---|---|\n| Add business details (optional) |  |  |  |  |\n| Continue without business details |  |  |  |  |\n\nRecord Ana’s response only after she tries the local comparison. Do not fill this sheet from the simulated notes or treat the result as customer evidence.\n"
+    },
+    {
+      "path": "data/artifacts/team-output-ba893efabea3895b8590dfb8.md",
+      "rev": "1allj27",
+      "data": {
+        "title": "Propose two labels for optional business details",
+        "status": "draft",
+        "source_task": "team-task-6ce7ea6d128f273060c55fbf",
+        "assistant": "team-a326e4c7-writer",
+        "goal_id": "activation-demo",
+        "project": "goal-collaboration-demo",
+        "universe": "unit/growth",
+        "result_hash": "ba893efabea3895b8590dfb86f904812bcfa5c67b75c6a66d5a73dc89ae238f9",
+        "source_cycle": "cycle-d0d53130-d83d-4c85-8c6a-24245ddfada0",
+        "tags": [
+          "artifact"
+        ],
+        "created": "2026-10-02",
+        "updated": "2026-10-02",
+        "created_by": "conductor",
+        "updated_by": "conductor",
+        "verified_at": "2026-10-02",
+        "proposed": true,
+        "provenance": "pipeline"
+      },
+      "body": "Copy options for the step after preview:\n\n- **Add business details (optional)**\n- **Continue without business details**\n\nLabel the Tax ID field **Tax ID (optional)** and make it skippable. These are proposed copy options for review, not live interface text.\n"
+    },
+    {
+      "path": "data/artifacts/team-output-5ebf3fe79cad238b995e62e6.md",
+      "rev": "1c8b37f",
+      "data": {
+        "title": "Check the revised guide against Ana’s correction",
+        "status": "draft",
+        "source_task": "team-task-f1cfa5af8194b2993f3f73a9",
+        "assistant": "team-a326e4c7-reviewer",
+        "goal_id": "activation-demo",
+        "project": "goal-collaboration-demo",
+        "universe": "unit/growth",
+        "result_hash": "5ebf3fe79cad238b995e62e66dcdcb53fda8b539ec342ab8a4d4c0654ca6029e",
+        "source_cycle": "cycle-c2c3bb40-dcf4-451e-93aa-4d2eb953c89a",
+        "tags": [
+          "artifact"
+        ],
+        "created": "2026-10-02",
+        "updated": "2026-10-02",
+        "created_by": "conductor",
+        "updated_by": "conductor",
+        "verified_at": "2026-10-02",
+        "proposed": true,
+        "provenance": "pipeline"
+      },
+      "body": "## Review\n\n**Readiness: Ready for Ana’s local evaluation as a proposal.** Pen’s revised guide satisfies the requested order and evidence checks:\n\n- “Try a sample” is the first action, and the sample invoice comes before business details, the client CSV, and payment details.\n- Business details are optional; Tax ID is explicitly labeled optional and can be skipped.\n- The guide separates the current flow from the proposed order and says it does not describe a live interface change.\n- It identifies the session notes as fictional, says no testers were contacted, and reports zero real replies.\n\nThe product brief supports the current flow and sample-invoice capability. The three session notes are invented, so they are not evidence of real customer behavior. The guide’s instruction to explain CSV fields is a proposal, not a verified interface feature. No unsupported deployed-change or customer-outcome claim appears.\n"
+    },
+    {
+      "path": "data/artifacts/team-output-d42a2d25e885ce76f4e527aa.md",
+      "rev": "1n77cp0",
+      "data": {
+        "title": "Revise Ana’s saved quick-start guide",
+        "status": "draft",
+        "source_task": "team-task-b6819b4512fc4e46fb3c1429",
+        "assistant": "team-a326e4c7-writer",
+        "goal_id": "activation-demo",
+        "project": "goal-collaboration-demo",
+        "universe": "unit/growth",
+        "result_hash": "d42a2d25e885ce76f4e527aa293ec92b7434550888472d069a0c0306d14211d1",
+        "source_cycle": "cycle-c2c3bb40-dcf4-451e-93aa-4d2eb953c89a",
+        "tags": [
+          "artifact"
+        ],
+        "created": "2026-10-02",
+        "updated": "2026-10-02",
+        "created_by": "conductor",
+        "updated_by": "conductor",
+        "verified_at": "2026-10-02",
+        "proposed": true,
+        "provenance": "pipeline"
+      },
+      "body": "# Proposed quick-start guide: Sample invoice first\n\n**Local proposal for evaluation.** The current product flow asks for business details and a client CSV before showing a draft invoice, then asks for payment details. The product can create a sample invoice without a CSV or payment details. This guide proposes a different order; it does not describe a change to the live interface.\n\n1. **Try a sample.** Make this the first action.\n2. **View the sample invoice** before entering business details, uploading a client CSV, or adding payment details.\n3. **Choose whether to add business details.** This step is optional.\n4. **Add a Tax ID only if needed.** Label it **Tax ID (optional)** and let users skip it.\n5. **Offer client and payment setup afterward.** Explain the CSV upload and its fields when users choose to add clients.\n\nThe three session notes are fictional, not customer research. No testers were contacted; real replies remain zero. The reply follow-up stays on 4 October. No deployment or real-world outcome is claimed.\n"
+    },
+    {
+      "path": "data/artifacts/team-output-d3d0547e8813de896cb77b6f.md",
+      "rev": "7gown7",
+      "data": {
+        "title": "Compare the three fictional setup observations",
+        "status": "draft",
+        "source_task": "team-task-90b2b3be4e0fa5acd7563687",
+        "assistant": "team-a326e4c7-researcher",
+        "goal_id": "activation-demo",
+        "project": "goal-collaboration-demo",
+        "universe": "unit/growth",
+        "result_hash": "d3d0547e8813de896cb77b6f791657946353f748eda8c5484058e4a7ccde5176",
+        "source_cycle": "cycle-c2c3bb40-dcf4-451e-93aa-4d2eb953c89a",
+        "tags": [
+          "artifact"
+        ],
+        "created": "2026-10-02",
+        "updated": "2026-10-02",
+        "created_by": "conductor",
+        "updated_by": "conductor",
+        "verified_at": "2026-10-02",
+        "proposed": true,
+        "provenance": "pipeline"
+      },
+      "body": "## Shared friction\n\nAll three fictional notes describe setup requirements blocking access to the invoice’s value:\n\n- The designer lacks a Tax ID and leaves before seeing the tool.\n- The writer lacks a client CSV and asks to try with one client.\n- The developer wants to inspect the invoice before entering payment details.\n\nTogether, the notes point to a sample invoice as a useful first step, with business, client, and payment setup deferred until after the preview.\n\n## What Ana’s correction changes\n\nThe earlier guide still asked for a business name before showing the sample. Ana’s correction makes the proposed first screen “Try a sample,” before any business details, CSV, or payment details. After the preview, the guide should offer business details as optional and label the Tax ID “optional,” with a way to skip it. Keep the order clearly framed as a local proposal, not a live product change.\n\n**Guidance for Pen:** Revise the actual guide to put the sample first, then the preview, then optional business details; offer client and payment setup afterward. Preserve the simulation and no-live-change caveats, and have Check verify that exact order.\n\n## What the materials cannot establish\n\nThese notes are invented for a collaboration test, not real customer research. They cannot establish how common these barriers are, whether sample-first would improve activation, or how real users would respond. No testers were contacted; real replies remain zero. The reply follow-up stays on 4 October.\n"
+    },
+    {
+      "path": "data/artifacts/team-output-4a72e4da046bf96d01123a7e.md",
+      "rev": "jgkgvp",
+      "data": {
+        "title": "Verify the new guide’s order and evidence claims",
+        "status": "draft",
+        "source_task": "team-task-3e034a716d1bd853e8f49e6e",
+        "assistant": "team-a326e4c7-reviewer",
+        "goal_id": "activation-demo",
+        "project": "goal-collaboration-demo",
+        "universe": "unit/growth",
+        "result_hash": "4a72e4da046bf96d01123a7ee59c08f3f4b7f250e579d9047857b191c1b7e762",
+        "source_cycle": "cycle-e74ea875-6a02-4a64-80ac-64578eb777d3",
+        "tags": [
+          "artifact"
+        ],
+        "created": "2026-10-02",
+        "updated": "2026-10-02",
+        "created_by": "conductor",
+        "updated_by": "conductor",
+        "verified_at": "2026-10-02",
+        "proposed": true,
+        "provenance": "pipeline"
+      },
+      "body": "## Review\n\nThe latest guide from Pen is not included in the available materials, so I can’t verify its exact order or claims. The available prior draft, [team-output-40b6290b1f31a9012cd7a519.md](data/artifacts/team-output-40b6290b1f31a9012cd7a519.md), puts “Try a sample” first and says to show the invoice before business details. It also labels Tax ID optional, distinguishes the current flow from the proposal, and makes no deployment or customer-result claims. Ana’s correction specifically requires the sample before any business details.\n\nThe source evidence is simulation-only: the product brief says the current flow requests business details and a client CSV before preview, and that a sample can be made without CSV or payment details. The session notes are invented and record zero real replies.\n\n**Readiness:** I can’t confirm Pen’s new guide is ready for Ana’s local try without seeing that revision. Real customer replies remain zero.\n"
+    },
+    {
+      "path": "data/artifacts/team-output-40b6290b1f31a9012cd7a519.md",
+      "rev": "xkeega",
+      "data": {
+        "title": "Revise the guide from Ana’s correction and Research comparison",
+        "status": "draft",
+        "source_task": "team-task-16964dc45e5eac60d56ef26e",
+        "assistant": "team-a326e4c7-writer",
+        "goal_id": "activation-demo",
+        "project": "goal-collaboration-demo",
+        "universe": "unit/growth",
+        "result_hash": "40b6290b1f31a9012cd7a5195189e49e0d61ef289f35b3469174e84df468d61e",
+        "source_cycle": "cycle-e74ea875-6a02-4a64-80ac-64578eb777d3",
+        "tags": [
+          "artifact"
+        ],
+        "created": "2026-10-02",
+        "updated": "2026-10-02",
+        "created_by": "conductor",
+        "updated_by": "conductor",
+        "verified_at": "2026-10-02",
+        "proposed": true,
+        "provenance": "pipeline"
+      },
+      "body": "# Proposed quick-start guide: Sample invoice first\n\n**Local proposal for evaluation.** The current first-run flow asks for business details, a client CSV, and payment details before showing a draft invoice. The product can create a sample invoice without a CSV or payment details. This guide proposes a different order; it does not describe a live interface change.\n\n1. **Try a sample.** Make this the primary first action. Show a sample invoice before asking for business details, a client CSV, or payment details.\n2. **Review the sample invoice.** Let the user judge the invoice before continuing setup.\n3. **Choose whether to add business details.** Make this a small, optional decision.\n4. **Enter a Tax ID only if needed.** Label it **Tax ID (optional)** and let the user skip it.\n5. **Offer client and payment setup afterward.** The sample-first path does not require a client CSV or payment details before preview.\n\nThe session notes are invented fixtures for a collaboration test, not customer research. They contain zero real customer replies, and no testers were contacted. This is a local guide proposal; no deployment or real-world outcome is claimed.\n"
+    },
+    {
+      "path": "data/artifacts/team-output-644dc7c245b892f9628842e1.md",
+      "rev": "1hwkwa8",
+      "data": {
+        "title": "Compare the three fictional session notes",
+        "status": "draft",
+        "source_task": "team-task-e97ef73e016431e292aeba7d",
+        "assistant": "team-a326e4c7-researcher",
+        "goal_id": "activation-demo",
+        "project": "goal-collaboration-demo",
+        "universe": "unit/growth",
+        "result_hash": "644dc7c245b892f9628842e1446e3d5c2f233137168357b3af47981a1e6f80c7",
+        "source_cycle": "cycle-e74ea875-6a02-4a64-80ac-64578eb777d3",
+        "tags": [
+          "artifact"
+        ],
+        "created": "2026-10-02",
+        "updated": "2026-10-02",
+        "created_by": "conductor",
+        "updated_by": "conductor",
+        "verified_at": "2026-10-02",
+        "proposed": true,
+        "provenance": "pipeline"
+      },
+      "body": "## Research handoff for Pen\n\nThe three session notes are **invented fixtures for a collaboration test**, not customer research. They record zero real customer replies, so they cannot establish actual user behavior or outcomes.\n\n**Shared setup friction in the fictional notes:** Each tester is blocked from seeing or judging an invoice until after setup asks for something they lack or aren’t ready to provide: a tax ID, a client CSV, or payment details.\n\n**What Ana’s saved correction changes:** It makes “Try a sample” the primary action and puts the sample invoice before business details, the CSV, and payment details. After preview, users can choose whether to add business details; the tax ID must be labeled optional and skippable. The correction also says the earlier guide still put a business name before preview. This order is a local proposal, not a description of the live product.\n\n**Claims the evidence does not support:** The notes do not show that real testers encountered these barriers, that sample-first improves activation or retention, or that the proposed action and order exist in the live interface. No testers were contacted; real replies remain zero.\n"
+    },
+    {
+      "path": "data/artifacts/team-output-6ed5e45f92d763b69c975dea.md",
+      "rev": "1fhs8zu",
+      "data": {
+        "title": "Verify the revised guide’s exact order and evidence claims",
+        "status": "draft",
+        "source_task": "team-task-ebfd884e858f1f1d9a328652",
+        "assistant": "team-a326e4c7-reviewer",
+        "goal_id": "activation-demo",
+        "project": "goal-collaboration-demo",
+        "universe": "unit/growth",
+        "result_hash": "6ed5e45f92d763b69c975dea2d6299a3beb99d026ea66c73fd709c9ede739f22",
+        "source_cycle": "cycle-8a56bb9a-a499-4ec2-9405-3dc412ad2a82",
+        "tags": [
+          "artifact"
+        ],
+        "created": "2026-10-02",
+        "updated": "2026-10-02",
+        "created_by": "conductor",
+        "updated_by": "conductor",
+        "verified_at": "2026-10-02",
+        "proposed": true,
+        "provenance": "pipeline"
+      },
+      "body": "## Review\n\nThe guide does **not** meet the requested order. It asks Ana to create an account and add business details before reaching the proposed sample-invoice step. The brief confirms the tool can create a sample without CSV or payment details, but does not say a sample can be viewed before account creation or business details. Treating “Try a sample” as the first step would need support from Ana’s correction or another source.\n\nThe guide correctly marks tax ID as optional and distinguishes its proposed sample-first path from the current CSV-first setup. However, “Choose ‘Create a sample invoice’” implies that this option already exists in the interface. Rephrase it as a proposed local step unless the correction confirms that wording is available.\n\nThe brief and notes are simulation fixtures; the notes say there were zero real customer replies. The guide claims no deployment or tester contact, and makes no real customer outcome claims. Real replies remain **zero**.\n\nAna’s correction is missing from the provided context, so I can’t verify the guide against it.\n"
+    },
+    {
+      "path": "data/artifacts/team-output-4b3ce3c3381caa613d1a472d.md",
+      "rev": "16de27l",
+      "data": {
+        "title": "Revise Ana’s saved guide using all three fictional notes",
+        "status": "draft",
+        "source_task": "team-task-f08a779a65cfcb95d8565900",
+        "assistant": "team-a326e4c7-writer",
+        "goal_id": "activation-demo",
+        "project": "goal-collaboration-demo",
+        "universe": "unit/growth",
+        "result_hash": "4b3ce3c3381caa613d1a472deede329a4e982cc066d3a77c28ec876d498e09ea",
+        "source_cycle": "cycle-8a56bb9a-a499-4ec2-9405-3dc412ad2a82",
+        "tags": [
+          "artifact"
+        ],
+        "created": "2026-10-02",
+        "updated": "2026-10-02",
+        "created_by": "conductor",
+        "updated_by": "conductor",
+        "verified_at": "2026-10-02",
+        "proposed": true,
+        "provenance": "pipeline"
+      },
+      "body": "I can’t provide the complete revised guide yet: the required source, Ana’s saved correction in `data/artifacts/team-output-c3a34f039fc6fa781c9a0540.md`, isn’t included in the available context. Please provide that correction so I can revise the saved guide accurately.\n"
+    },
+    {
+      "path": "data/artifacts/team-output-291afb004e67145c9c478f26.md",
+      "rev": "gb1324",
+      "data": {
+        "title": "Check revised guide for accuracy and readiness",
+        "status": "draft",
+        "source_task": "team-task-c0caa3723a0e3f71baba6e84",
+        "assistant": "team-a326e4c7-reviewer",
+        "goal_id": "activation-demo",
+        "project": "goal-collaboration-demo",
+        "universe": "unit/growth",
+        "result_hash": "291afb004e67145c9c478f2690e30848d3ccb89177d8cd97fcccd79d85926edf",
+        "source_cycle": "cycle-ef442c13-5839-4fdc-89b7-79ecfbbc7c33",
+        "tags": [
+          "artifact"
+        ],
+        "created": "2026-10-02",
+        "updated": "2026-10-02",
+        "created_by": "conductor",
+        "updated_by": "conductor",
+        "verified_at": "2026-10-02",
+        "proposed": true,
+        "provenance": "pipeline"
+      },
+      "body": "## Review\n\nThe revised guide is ready for Ana’s local evaluation. It clearly presents sample-first as a proposal, says the current flow asks for a client CSV before preview, marks tax ID as optional, and defers payment details until after the sample invoice.\n\nIt makes no claims of deployment, tester contact, or real customer observations. **Real replies remain at zero.**\n"
+    },
+    {
+      "path": "data/artifacts/team-output-c3a34f039fc6fa781c9a0540.md",
+      "rev": "tbzmed",
+      "data": {
+        "title": "Revise the guide to frame sample-first as a proposal",
+        "status": "draft",
+        "source_task": "team-task-20c2965fe39e7bfa11643486",
+        "assistant": "team-a326e4c7-writer",
+        "goal_id": "activation-demo",
+        "project": "goal-collaboration-demo",
+        "universe": "unit/growth",
+        "result_hash": "c3a34f039fc6fa781c9a054000d7305680bda7b838bb314a7e9a00ba001b1fba",
+        "source_cycle": "cycle-ef442c13-5839-4fdc-89b7-79ecfbbc7c33",
+        "tags": [
+          "artifact"
+        ],
+        "created": "2026-10-02",
+        "updated": "2026-10-02",
+        "created_by": "conductor",
+        "updated_by": "crystal",
+        "verified_at": "2026-10-02",
+        "proposed": false,
+        "provenance": "pipeline"
+      },
+      "body": "# Proposed quick-start guide — Ana’s local correction\n\nThis is a local proposal based on invented session notes. The current product flow asks for a client CSV before preview. No live product change or real customer outcome is claimed.\n\nFor the proposed first screen, the primary action is “Try a sample”. It shows a sample invoice before asking for business details, a client CSV, or payment details.\n\nAfter viewing the sample, choose whether to add business details. Label the field “Tax ID (optional)” and allow it to be skipped. Do not imply that this proposed order already exists in the live product.\n\nMy local evaluation: the earlier guide still asked for a business name before the preview. I want the sample first so I can judge the value without completing setup. Please compare all three supplied fictional session notes, revise this guide around that correction, and ask Check to verify the exact order.\n\nNo testers were contacted. Real replies remain zero; the reply follow-up stays on 4 October.\n"
+    }
+  ],
+  "human_edited_source": {
+    "path": "data/artifacts/team-output-c3a34f039fc6fa781c9a0540.md",
+    "data": {
+      "title": "Revise the guide to frame sample-first as a proposal",
+      "status": "draft",
+      "source_task": "team-task-20c2965fe39e7bfa11643486",
+      "assistant": "team-a326e4c7-writer",
+      "goal_id": "activation-demo",
+      "project": "goal-collaboration-demo",
+      "universe": "unit/growth",
+      "result_hash": "c3a34f039fc6fa781c9a054000d7305680bda7b838bb314a7e9a00ba001b1fba",
+      "source_cycle": "cycle-ef442c13-5839-4fdc-89b7-79ecfbbc7c33",
+      "tags": [
+        "artifact"
+      ],
+      "created": "2026-10-02",
+      "updated": "2026-10-02",
+      "created_by": "conductor",
+      "updated_by": "crystal",
+      "verified_at": "2026-10-02",
+      "proposed": false,
+      "provenance": "pipeline"
+    },
+    "content": "# Proposed quick-start guide — Ana’s local correction\n\nThis is a local proposal based on invented session notes. The current product flow asks for a client CSV before preview. No live product change or real customer outcome is claimed.\n\nFor the proposed first screen, the primary action is “Try a sample”. It shows a sample invoice before asking for business details, a client CSV, or payment details.\n\nAfter viewing the sample, choose whether to add business details. Label the field “Tax ID (optional)” and allow it to be skipped. Do not imply that this proposed order already exists in the live product.\n\nMy local evaluation: the earlier guide still asked for a business name before the preview. I want the sample first so I can judge the value without completing setup. Please compare all three supplied fictional session notes, revise this guide around that correction, and ask Check to verify the exact order.\n\nNo testers were contacted. Real replies remain zero; the reply follow-up stays on 4 October.\n",
+    "rev": "tbzmed",
+    "flags": {
+      "quarantined": false,
+      "agentPromotion": false,
+      "staleness": 0.025462333719135803
+    },
+    "collection": "artifact",
+    "kind": "other"
+  },
+  "work": {
+    "collection": {
+      "id": "work",
+      "label": "Work",
+      "icon": "check",
+      "query": {
+        "tag": "work",
+        "path": "data/work/**"
+      },
+      "fields": [
+        {
+          "key": "title",
+          "type": "text",
+          "primary": true,
+          "required": true
+        },
+        {
+          "key": "bucket",
+          "type": "select",
+          "options": [
+            "research",
+            "reading",
+            "seo",
+            "marketing",
+            "email",
+            "facebook-groups",
+            "reddit",
+            "admin"
+          ]
+        },
+        {
+          "key": "status",
+          "type": "status",
+          "options": [
+            {
+              "value": "planned",
+              "label": "Planned",
+              "colour": "warn",
+              "group": "todo"
+            },
+            {
+              "value": "now",
+              "label": "Now",
+              "colour": "accent",
+              "group": "active"
+            },
+            {
+              "value": "done",
+              "label": "Done",
+              "colour": "ok",
+              "group": "done"
+            },
+            {
+              "value": "parked",
+              "label": "Parked",
+              "colour": "muted",
+              "group": "todo"
+            },
+            {
+              "value": "stuck",
+              "label": "Stuck",
+              "colour": "warn",
+              "group": "todo"
+            }
+          ]
+        },
+        {
+          "key": "day",
+          "type": "date"
+        },
+        {
+          "key": "order",
+          "type": "number"
+        },
+        {
+          "key": "estimate_min",
+          "type": "number"
+        },
+        {
+          "key": "why",
+          "type": "text"
+        },
+        {
+          "key": "result",
+          "type": "number"
+        },
+        {
+          "key": "result_note",
+          "type": "text"
+        },
+        {
+          "key": "prep",
+          "type": "checkbox"
+        },
+        {
+          "key": "prep_state",
+          "type": "select",
+          "options": [
+            "none",
+            "preparing",
+            "ready",
+            "failed"
+          ]
+        },
+        {
+          "key": "goal_id",
+          "type": "text"
+        },
+        {
+          "key": "key_result",
+          "type": "text"
+        },
+        {
+          "key": "destination",
+          "type": "text"
+        },
+        {
+          "key": "done_when",
+          "type": "text"
+        },
+        {
+          "key": "depends_on",
+          "type": "relation",
+          "target": "work",
+          "many": true
+        },
+        {
+          "key": "not_before",
+          "type": "date"
+        },
+        {
+          "key": "follow_up_days",
+          "type": "number"
+        },
+        {
+          "key": "follow_up_title",
+          "type": "text"
+        }
+      ],
+      "description": "The Today loop's work items. `day` empty means backlog; `status` is where it is in the push."
+    },
+    "total": 11,
+    "rows": [
+      {
+        "slug": "2026-10-02-draft-a-short-beta-feedback-email",
+        "path": "data/work/2026-10-02-draft-a-short-beta-feedback-email.md",
+        "title": "Draft a short beta feedback email",
+        "fields": {
+          "title": "Draft a short beta feedback email",
+          "bucket": "email",
+          "status": "done",
+          "day": "2026-10-02",
+          "order": 1,
+          "estimate_min": 15,
+          "result_note": "Done — the reviewed one-question draft is saved in data/delivery/delivery-5c26f9f93d7291c18dbb4712.md. What should I do next?",
+          "prep": false,
+          "prep_state": "none",
+          "goal_id": "activation-demo",
+          "destination": "Local draft",
+          "done_when": "A concise email asks one specific question about first-run setup and is saved locally",
+          "tags": [
+            "work"
+          ],
+          "project": "goal-collaboration-demo",
+          "universe": "unit/growth",
+          "created": "2026-10-02",
+          "updated": "2026-10-02",
+          "created_by": "conductor",
+          "updated_by": "crystal",
+          "verified_at": "2026-10-02",
+          "proposed": false,
+          "provenance": "pipeline"
+        },
+        "summary": ""
+      },
+      {
+        "slug": "2026-10-02-send-the-email-to-beta-testers",
+        "path": "data/work/2026-10-02-send-the-email-to-beta-testers.md",
+        "title": "Review and save the invitation",
+        "fields": {
+          "title": "Review and save the invitation",
+          "bucket": "email",
+          "status": "done",
+          "day": "2026-10-02",
+          "order": 2,
+          "estimate_min": 10,
+          "result_note": "Done — I checked that the saved Scout artifact matches the approved one-question invitation and is signed Ana. It is at data/delivery/delivery-5c26f9f93d7291c18dbb4712.md. Zero people contacted, zero replies. What is left for today?",
+          "prep": false,
+          "prep_state": "none",
+          "goal_id": "activation-demo",
+          "destination": "Scout artifact",
+          "done_when": "The reviewed invitation is saved locally",
+          "tags": [
+            "work"
+          ],
+          "project": "goal-collaboration-demo",
+          "universe": "unit/growth",
+          "created": "2026-10-02",
+          "updated": "2026-10-02",
+          "created_by": "conductor",
+          "updated_by": "crystal",
+          "verified_at": "2026-10-02",
+          "proposed": false,
+          "provenance": "pipeline"
+        },
+        "summary": ""
+      },
+      {
+        "slug": "2026-10-02-track-replies-and-follow-up",
+        "path": "data/work/2026-10-02-track-replies-and-follow-up.md",
+        "title": "Track replies and follow up",
+        "fields": {
+          "title": "Track replies and follow up",
+          "bucket": "admin",
+          "status": "planned",
+          "day": "2026-10-02",
+          "order": 3,
+          "estimate_min": 20,
+          "prep": false,
+          "prep_state": "none",
+          "goal_id": "activation-demo",
+          "destination": "Local reply tracker",
+          "done_when": "Replies are logged and any needed follow-ups are noted",
+          "not_before": "2026-10-04",
+          "tags": [
+            "work"
+          ],
+          "project": "goal-collaboration-demo",
+          "universe": "unit/growth",
+          "created": "2026-10-02",
+          "updated": "2026-10-02",
+          "created_by": "conductor",
+          "updated_by": "crystal",
+          "verified_at": "2026-10-02",
+          "proposed": false,
+          "provenance": "pipeline"
+        },
+        "summary": ""
+      },
+      {
+        "slug": "paperclip-continuity-experiment",
+        "path": "data/work/paperclip-continuity-experiment.md",
+        "title": "Prepare the local onboarding comparison experiment (Paperclip)",
+        "fields": {
+          "title": "Prepare the local onboarding comparison experiment (Paperclip)",
+          "bucket": "research",
+          "status": "planned",
+          "day": "2026-10-02",
+          "estimate_min": 10,
+          "goal_id": "activation-demo",
+          "destination": "Scout artifact",
+          "done_when": "Ana reviews a clearly labelled local comparison script and selects one next experiment. No real testers, replies or live changes are claimed.",
+          "project": "goal-collaboration-demo",
+          "universe": "unit/growth",
+          "tags": [
+            "work"
+          ],
+          "created": "2026-10-02",
+          "updated": "2026-10-02",
+          "created_by": "crystal",
+          "updated_by": "crystal",
+          "verified_at": "2026-10-02",
+          "provenance": "pipeline"
+        },
+        "summary": "Synthetic local preparation, delegated through Paperclip for this collaboration test. No live product access and no tester contact."
+      },
+      {
+        "slug": "team-review-19b6c1938e8f65ef087634b0",
+        "path": "data/work/team-review-19b6c1938e8f65ef087634b0.md",
+        "title": "Ask Ana to try the checked guide locally",
+        "fields": {
+          "title": "Ask Ana to try the checked guide locally",
+          "bucket": "admin",
+          "status": "done",
+          "day": "2026-10-02",
+          "estimate_min": 10,
+          "why": "Review the team’s prepared material and give the next specific correction.",
+          "result": 5,
+          "result_note": "xy",
+          "prep": false,
+          "prep_state": "ready",
+          "goal_id": "activation-demo",
+          "done_when": "After the final guide review, have Ana evaluate the proposed sample-invoice-first steps locally. Capture her exact observations with the existing feedback sheet. Do not treat the simulation notes as real tester replies.",
+          "tags": [
+            "work"
+          ],
+          "project": "goal-collaboration-demo",
+          "universe": "unit/growth",
+          "conductor_review": true,
+          "source_task": null,
+          "artifacts": [
+            {
+              "path": "data/artifacts/team-output-c2ac5a73942344cdbf8aaf83.md",
+              "title": "Prepare a feedback capture sheet and next setup experiment",
+              "assistant": "team-a326e4c7-analyst"
+            }
+          ],
+          "created": "2026-10-02",
+          "updated": "2026-10-02",
+          "created_by": "conductor",
+          "updated_by": "crystal",
+          "verified_at": "2026-10-02",
+          "proposed": false,
+          "provenance": "pipeline"
+        },
+        "summary": "After the final guide review, have Ana evaluate the proposed sample-invoice-first steps locally. Capture her exact observations with the existing feedback sheet. Do not treat the simulation notes as real tester replies."
+      },
+      {
+        "slug": "team-review-3d98589fa1faee0837ed23dc",
+        "path": "data/work/team-review-3d98589fa1faee0837ed23dc.md",
+        "title": "Decide whether Ana should try the checked local guide",
+        "fields": {
+          "title": "Decide whether Ana should try the checked local guide",
+          "bucket": "admin",
+          "status": "done",
+          "day": "2026-10-02",
+          "estimate_min": 10,
+          "why": "Review the team’s prepared material and give the next specific correction.",
+          "result": 0,
+          "result_note": "I am Ana in the local simulation. I read the revised guide and Check’s actual report and approve this local proposal: Try a sample first, invoice before all business details, Tax ID optional, current CSV-first flow clearly separate. My next concern is the wording of the optional-details step. Please have Pen propose two short labels and Signal adapt the existing feedback sheet to compare those labels with one clear criterion; use the approved guide, do not redo Research or the invitation. Paperclip’s separate comparison stays delegated. No real testers contacted, zero real replies; follow-up stays 4 October.",
+          "prep": false,
+          "prep_state": "ready",
+          "goal_id": "activation-demo",
+          "done_when": "Review the final checked guide. Approve it for Ana’s local try, or specify a concrete remaining correction. No product change is deployed, the invitation remains local, and real customer replies are 0.",
+          "tags": [
+            "work"
+          ],
+          "project": "goal-collaboration-demo",
+          "universe": "unit/growth",
+          "conductor_review": true,
+          "source_task": "team-task-c0caa3723a0e3f71baba6e84",
+          "artifacts": [
+            {
+              "path": "data/artifacts/team-output-d42a2d25e885ce76f4e527aa.md",
+              "title": "Revise Ana’s saved quick-start guide",
+              "assistant": "team-a326e4c7-writer"
+            },
+            {
+              "path": "data/artifacts/team-output-d3d0547e8813de896cb77b6f.md",
+              "title": "Compare the three fictional setup observations",
+              "assistant": "team-a326e4c7-researcher"
+            },
+            {
+              "path": "data/artifacts/team-output-c3a34f039fc6fa781c9a0540.md",
+              "title": "Revise the guide to frame sample-first as a proposal",
+              "assistant": "team-a326e4c7-writer"
+            },
+            {
+              "path": "data/artifacts/team-output-5ebf3fe79cad238b995e62e6.md",
+              "title": "Check the revised guide against Ana’s correction",
+              "assistant": "team-a326e4c7-reviewer"
+            }
+          ],
+          "review_generated_paths": [
+            "data/artifacts/team-output-d42a2d25e885ce76f4e527aa.md",
+            "data/artifacts/team-output-d3d0547e8813de896cb77b6f.md",
+            "data/artifacts/team-output-c3a34f039fc6fa781c9a0540.md",
+            "data/artifacts/team-output-5ebf3fe79cad238b995e62e6.md"
+          ],
+          "review_latest_task": "team-task-f1cfa5af8194b2993f3f73a9",
+          "review_lineage": [
+            "team-task-c0caa3723a0e3f71baba6e84",
+            "team-task-ebfd884e858f1f1d9a328652",
+            "team-task-3e034a716d1bd853e8f49e6e",
+            "team-task-f1cfa5af8194b2993f3f73a9"
+          ],
+          "created": "2026-10-02",
+          "updated": "2026-10-02",
+          "created_by": "conductor",
+          "updated_by": "crystal",
+          "verified_at": "2026-10-02",
+          "proposed": false,
+          "provenance": "pipeline"
+        },
+        "summary": "Review the final checked guide. Approve it for Ana’s local try, or specify a concrete remaining correction. No product change is deployed, the invitation remains local, and real customer replies are 0."
+      },
+      {
+        "slug": "team-review-44c3a369164beff8480402e6",
+        "path": "data/work/team-review-44c3a369164beff8480402e6.md",
+        "title": "Choose a label to try locally",
+        "fields": {
+          "title": "Choose a label to try locally",
+          "bucket": "admin",
+          "status": "now",
+          "day": "2026-10-02",
+          "estimate_min": 10,
+          "why": "Review the team’s prepared material and give the next specific correction.",
+          "result_note": "Ana already approved this exact guide/check in the completed review. This repeated review is parked; continue from her saved next request about optional-detail labels and measurement. No customer result is claimed.\n\nAna notices this parked packet also contains the newly prepared Pen labels and Signal sheet produced after her completion. She resumes those actual outputs for the agent’s specified label decision; no customer result is recorded.",
+          "prep": false,
+          "prep_state": "ready",
+          "goal_id": "activation-demo",
+          "done_when": "Choose which label best signals that business details can wait until after the sample and Tax ID is optional, or request one wording change.",
+          "tags": [
+            "work"
+          ],
+          "project": "goal-collaboration-demo",
+          "universe": "unit/growth",
+          "conductor_review": true,
+          "source_task": "team-task-ebfd884e858f1f1d9a328652",
+          "artifacts": [
+            {
+              "path": "data/artifacts/team-output-ba893efabea3895b8590dfb8.md",
+              "title": "Propose two labels for optional business details",
+              "assistant": "team-a326e4c7-writer"
+            },
+            {
+              "path": "data/artifacts/team-output-40b6290b1f31a9012cd7a519.md",
+              "title": "Revise the guide from Ana’s correction and Research comparison",
+              "assistant": "team-a326e4c7-writer"
+            },
+            {
+              "path": "data/artifacts/team-output-c2ac5a73942344cdbf8aaf83.md",
+              "title": "Prepare a feedback capture sheet and next setup experiment",
+              "assistant": "team-a326e4c7-analyst"
+            },
+            {
+              "path": "data/artifacts/team-output-bd3e7fd10258d1e655f001cb.md",
+              "title": "Adapt feedback sheet to compare optional-step labels",
+              "assistant": "team-a326e4c7-analyst"
+            }
+          ],
+          "review_latest_task": "team-task-2c01476dc29777cfb5ed2756",
+          "review_lineage": [
+            "team-task-ebfd884e858f1f1d9a328652",
+            "team-task-3e034a716d1bd853e8f49e6e",
+            "team-task-f1cfa5af8194b2993f3f73a9",
+            "team-task-2c01476dc29777cfb5ed2756"
+          ],
+          "review_generated_paths": [
+            "data/artifacts/team-output-ba893efabea3895b8590dfb8.md",
+            "data/artifacts/team-output-40b6290b1f31a9012cd7a519.md",
+            "data/artifacts/team-output-c2ac5a73942344cdbf8aaf83.md",
+            "data/artifacts/team-output-bd3e7fd10258d1e655f001cb.md"
+          ],
+          "created": "2026-10-02",
+          "updated": "2026-10-02",
+          "created_by": "conductor",
+          "updated_by": "crystal",
+          "verified_at": "2026-10-02",
+          "proposed": false,
+          "provenance": "pipeline"
+        },
+        "summary": "Choose which label best signals that business details can wait until after the sample and Tax ID is optional, or request one wording change."
+      },
+      {
+        "slug": "team-review-8725b572e668663544834c29",
+        "path": "data/work/team-review-8725b572e668663544834c29.md",
+        "title": "Review the checked local guide",
+        "fields": {
+          "title": "Review the checked local guide",
+          "bucket": "admin",
+          "status": "parked",
+          "day": "2026-10-02",
+          "estimate_min": 10,
+          "why": "Review the team’s prepared material and give the next specific correction.",
+          "result_note": "Ana retired this superseded review in the local simulation. Continue from the current saved guide and its new check; no customer result is recorded.",
+          "prep": false,
+          "prep_state": "ready",
+          "goal_id": "activation-demo",
+          "done_when": "Decide whether this checked local guide is ready for Ana to try locally, or specify any remaining correction. No product change is deployed and real customer replies remain at 0.",
+          "tags": [
+            "work"
+          ],
+          "project": "goal-collaboration-demo",
+          "universe": "unit/growth",
+          "conductor_review": true,
+          "source_task": "team-task-7e5b871c06130d591768f414",
+          "artifacts": [
+            {
+              "path": "data/artifacts/team-output-700e8cac090eeb118f2f2d20.md",
+              "title": "Revise the quick-start guide using Check’s review",
+              "assistant": "team-a326e4c7-writer"
+            },
+            {
+              "path": "data/artifacts/team-output-fb0edb2301e930a2ef7996c2.md",
+              "title": "Review the quick-start guide against the supplied evidence",
+              "assistant": "team-a326e4c7-reviewer"
+            },
+            {
+              "path": "data/artifacts/beta-product-brief.md",
+              "title": "Beta product brief · simulation",
+              "assistant": "simulation-fixture"
+            },
+            {
+              "path": "data/artifacts/team-output-6cce3dd452a2cab2d4300a50.md",
+              "title": "Check the revised quick-start guide against the brief",
+              "assistant": "team-a326e4c7-reviewer"
+            }
+          ],
+          "review_generated_paths": [
+            "data/artifacts/team-output-700e8cac090eeb118f2f2d20.md",
+            "data/artifacts/team-output-fb0edb2301e930a2ef7996c2.md",
+            "data/artifacts/beta-product-brief.md",
+            "data/artifacts/team-output-6cce3dd452a2cab2d4300a50.md"
+          ],
+          "review_latest_task": "team-task-7e5b871c06130d591768f414",
+          "review_lineage": [
+            "team-task-7e5b871c06130d591768f414"
+          ],
+          "created": "2026-10-02",
+          "updated": "2026-10-02",
+          "created_by": "conductor",
+          "updated_by": "conductor",
+          "verified_at": "2026-10-02",
+          "proposed": false,
+          "provenance": "pipeline"
+        },
+        "summary": "Decide whether this checked local guide is ready for Ana to try locally, or specify any remaining correction. No product change is deployed and real customer replies remain at 0."
+      },
+      {
+        "slug": "team-review-89da5484f2f1becb9d9a14f0",
+        "path": "data/work/team-review-89da5484f2f1becb9d9a14f0.md",
+        "title": "Approve the checked guide for Ana’s local try",
+        "fields": {
+          "title": "Approve the checked guide for Ana’s local try",
+          "bucket": "admin",
+          "status": "parked",
+          "day": "2026-10-02",
+          "estimate_min": 10,
+          "why": "Review the team’s prepared material and give the next specific correction.",
+          "result_note": "Ana parks the superseded duplicate and uses the latest guide/check in the current review. No customer result is recorded.",
+          "prep": false,
+          "prep_state": "ready",
+          "goal_id": "activation-demo",
+          "done_when": "Review Check’s readiness assessment and approve the revised guide for Ana to evaluate locally, or name one specific correction.",
+          "tags": [
+            "work"
+          ],
+          "project": "goal-collaboration-demo",
+          "universe": "unit/growth",
+          "conductor_review": true,
+          "source_task": null,
+          "artifacts": [
+            {
+              "path": "data/artifacts/team-output-291afb004e67145c9c478f26.md",
+              "title": "Check revised guide for accuracy and readiness",
+              "assistant": "team-a326e4c7-reviewer"
+            },
+            {
+              "path": "data/artifacts/team-output-40b6290b1f31a9012cd7a519.md",
+              "title": "Revise the guide from Ana’s correction and Research comparison",
+              "assistant": "team-a326e4c7-writer"
+            }
+          ],
+          "review_latest_task": null,
+          "review_lineage": [],
+          "review_generated_paths": [
+            "data/artifacts/team-output-291afb004e67145c9c478f26.md",
+            "data/artifacts/team-output-40b6290b1f31a9012cd7a519.md"
+          ],
+          "created": "2026-10-02",
+          "updated": "2026-10-02",
+          "created_by": "conductor",
+          "updated_by": "crystal",
+          "verified_at": "2026-10-02",
+          "proposed": false,
+          "provenance": "pipeline"
+        },
+        "summary": "Review Check’s readiness assessment and approve the revised guide for Ana to evaluate locally, or name one specific correction."
+      },
+      {
+        "slug": "team-review-af435fa17b05940fa1b52c16",
+        "path": "data/work/team-review-af435fa17b05940fa1b52c16.md",
+        "title": "Approve the checked guide for Ana’s local try",
+        "fields": {
+          "title": "Approve the checked guide for Ana’s local try",
+          "bucket": "admin",
+          "status": "parked",
+          "day": "2026-10-02",
+          "estimate_min": 10,
+          "why": "Review the team’s prepared material and give the next specific correction.",
+          "result_note": "Ana retired this superseded review in the local simulation. Continue from the current saved guide and its new check; no customer result is recorded.",
+          "prep": false,
+          "prep_state": "ready",
+          "goal_id": "activation-demo",
+          "done_when": "After Check finishes, approve the guide for Ana to evaluate locally or specify one concrete edit. The invitation stays local; no testers have been contacted and real replies remain 0.",
+          "tags": [
+            "work"
+          ],
+          "project": "goal-collaboration-demo",
+          "universe": "unit/growth",
+          "conductor_review": true,
+          "source_task": null,
+          "artifacts": [
+            {
+              "path": "data/artifacts/team-output-c3a34f039fc6fa781c9a0540.md",
+              "title": "Revise the guide to frame sample-first as a proposal",
+              "assistant": "team-a326e4c7-writer"
+            },
+            {
+              "path": "data/artifacts/team-output-c2ac5a73942344cdbf8aaf83.md",
+              "title": "Prepare a feedback capture sheet and next setup experiment",
+              "assistant": "team-a326e4c7-analyst"
+            }
+          ],
+          "review_latest_task": null,
+          "review_lineage": [],
+          "review_generated_paths": [
+            "data/artifacts/team-output-c3a34f039fc6fa781c9a0540.md",
+            "data/artifacts/team-output-c2ac5a73942344cdbf8aaf83.md"
+          ],
+          "created": "2026-10-02",
+          "updated": "2026-10-02",
+          "created_by": "conductor",
+          "updated_by": "crystal",
+          "verified_at": "2026-10-02",
+          "proposed": false,
+          "provenance": "pipeline"
+        },
+        "summary": "After Check finishes, approve the guide for Ana to evaluate locally or specify one concrete edit. The invitation stays local; no testers have been contacted and real replies remain 0."
+      },
+      {
+        "slug": "team-review-ec7db18bb7d524d45db0a1a6",
+        "path": "data/work/team-review-ec7db18bb7d524d45db0a1a6.md",
+        "title": "Decide whether the checked guide is ready for Ana’s local try",
+        "fields": {
+          "title": "Decide whether the checked guide is ready for Ana’s local try",
+          "bucket": "admin",
+          "status": "parked",
+          "day": "2026-10-02",
+          "estimate_min": 10,
+          "why": "Review the team’s prepared material and give the next specific correction.",
+          "result_note": "Ana parks this duplicate local guide decision and continues the existing current review; no result is recorded.",
+          "prep": false,
+          "prep_state": "ready",
+          "goal_id": "activation-demo",
+          "done_when": "After Check reviews the revised guide, approve it for local evaluation or specify one concrete correction.",
+          "tags": [
+            "work"
+          ],
+          "project": "goal-collaboration-demo",
+          "universe": "unit/growth",
+          "conductor_review": true,
+          "source_task": null,
+          "artifacts": [
+            {
+              "path": "data/artifacts/team-output-c3a34f039fc6fa781c9a0540.md",
+              "title": "Revise the guide to frame sample-first as a proposal",
+              "assistant": "team-a326e4c7-writer"
+            },
+            {
+              "path": "data/artifacts/team-output-c2ac5a73942344cdbf8aaf83.md",
+              "title": "Prepare a feedback capture sheet and next setup experiment",
+              "assistant": "team-a326e4c7-analyst"
+            }
+          ],
+          "review_latest_task": null,
+          "review_lineage": [],
+          "review_generated_paths": [
+            "data/artifacts/team-output-c3a34f039fc6fa781c9a0540.md",
+            "data/artifacts/team-output-c2ac5a73942344cdbf8aaf83.md"
+          ],
+          "created": "2026-10-02",
+          "updated": "2026-10-02",
+          "created_by": "conductor",
+          "updated_by": "crystal",
+          "verified_at": "2026-10-02",
+          "proposed": false,
+          "provenance": "pipeline"
+        },
+        "summary": "After Check reviews the revised guide, approve it for local evaluation or specify one concrete correction."
+      }
+    ],
+    "quarantined": []
+  },
+  "chat": {
+    "id": "today-2026-10-02",
+    "schema": 1,
+    "scope": "standalone",
+    "project": null,
+    "title": "Today · 2026-10-02",
+    "mode": "agent",
+    "kind": "today",
+    "executor": "today",
+    "agentCommand": "claude",
+    "cliSessionId": null,
+    "allowedTools": [],
+    "checkpoints": [],
+    "branchedFrom": null,
+    "archived": false,
+    "created": 1790957186832,
+    "createdAt": "Oct 2, 18:06",
+    "updated": 1790963240607,
+    "updatedAt": "Oct 2, 19:47",
+    "messages": [
+      {
+        "id": "m-1790957194256-1",
+        "role": "user",
+        "ts": 1790957194256,
+        "tsStamp": "Oct 2, 18:06",
+        "turn": 0,
+        "text": "I want three useful replies from beta testers this week. Help me get started.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0
+      },
+      {
+        "id": "m-1790957198080-2",
+        "role": "assistant",
+        "ts": 1790957198080,
+        "tsStamp": "Oct 2, 18:06",
+        "turn": 0,
+        "text": "Let’s draft a short beta tester message that asks one easy, specific question and makes replying simple. Where will you ask them: email, a community, or somewhere else?",
+        "directives": [],
+        "attachments": [],
+        "cost": 0
+      },
+      {
+        "id": "m-1790957264769-3",
+        "role": "user",
+        "ts": 1790957264769,
+        "tsStamp": "Oct 2, 18:07",
+        "turn": 1,
+        "text": "Email. They are busy freelancers who tried our beta, and I want feedback on the first-run setup. I have 45 minutes today. Please make a small plan. This is a simulation, so keep the output local.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0
+      },
+      {
+        "id": "m-1790957271809-4",
+        "role": "assistant",
+        "ts": 1790957271809,
+        "tsStamp": "Oct 2, 18:07",
+        "turn": 1,
+        "text": "\n\nAdded: Draft a short beta feedback email · Added: Send the email to beta testers · Added: Track replies and follow up.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0
+      },
+      {
+        "id": "m-1790957307504-5",
+        "role": "user",
+        "ts": 1790957307504,
+        "tsStamp": "Oct 2, 18:08",
+        "turn": 2,
+        "text": "That is too much like a campaign. I am keeping this local: please rename the send step to review and save the invitation, make the reply-check step wait until 4 October, and start the draft now. I am stuck on what to ask—please draft one short, friendly email.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0
+      },
+      {
+        "id": "m-1790957313906-6",
+        "role": "assistant",
+        "ts": 1790957313906,
+        "tsStamp": "Oct 2, 18:08",
+        "turn": 2,
+        "text": "Here’s a short draft:\n\n**Subject:** Quick question about beta setup\n\nHi [Name],\n\nThanks for trying the beta. Was anything confusing or harder than expected when you first set it up? A sentence or two would be really helpful.\n\nThanks,  \n[Your name]\n\nUpdated: Send the email to beta testers · Updated: Track replies and follow up · Started: Draft a short beta feedback email.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0
+      },
+      {
+        "id": "m-1790957342105-7",
+        "role": "user",
+        "ts": 1790957342105,
+        "tsStamp": "Oct 2, 18:09",
+        "turn": 3,
+        "text": "The two questions feel like homework. Make it warmer and ask only what nearly made them stop during setup. Sign it Ana. Then put that exact draft into Needs you as a Scout artifact preview; I will review it.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0
+      },
+      {
+        "id": "m-1790957350034-8",
+        "role": "assistant",
+        "ts": 1790957350034,
+        "tsStamp": "Oct 2, 18:09",
+        "turn": 3,
+        "text": "Hi [Name],\n\nThanks for giving the beta a try! Was there a moment during setup when you nearly stopped? Even a quick reply would help.\n\nThanks,  \nAna\n\nDelivery preview is in Needs you.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0
+      },
+      {
+        "id": "m-1790957487241-1",
+        "role": "user",
+        "ts": 1790957487241,
+        "tsStamp": "Oct 2, 18:11",
+        "turn": 4,
+        "text": "Done — I reviewed the one-question invitation and saved the approved version in data/delivery/delivery-5c26f9f93d7291c18dbb4712.md. Nobody was contacted and we have zero replies. What should I do next? Please also suggest a small goal-progress widget for review.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0
+      },
+      {
+        "id": "m-1790957493819-2",
+        "role": "assistant",
+        "ts": 1790957493819,
+        "tsStamp": "Oct 2, 18:11",
+        "turn": 4,
+        "text": "The approved invitation is saved locally, and nobody has been contacted. Next, review and save the invitation for beta testers; then you can decide whether to send it. The reply check is set for 4 October.\n\nWidget suggestion is in Needs you.\n\nCouldn’t apply: Completion needs an explicit done statement for the current item.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0
+      },
+      {
+        "id": "m-1790957564770-1",
+        "role": "user",
+        "ts": 1790957564770,
+        "tsStamp": "Oct 2, 18:12",
+        "turn": 5,
+        "text": "Done — the reviewed draft is saved in data/delivery/delivery-5c26f9f93d7291c18dbb4712.md. What should I do next?",
+        "directives": [],
+        "attachments": [],
+        "cost": 0
+      },
+      {
+        "id": "m-1790957570467-2",
+        "role": "assistant",
+        "ts": 1790957570467,
+        "tsStamp": "Oct 2, 18:12",
+        "turn": 5,
+        "text": "The draft is saved. Next, review and save the invitation for beta testers; the reply check is scheduled for 4 October. You can decide separately whether to send it.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0
+      },
+      {
+        "id": "m-1790957817907-1",
+        "role": "user",
+        "ts": 1790957817907,
+        "tsStamp": "Oct 2, 18:16",
+        "turn": 6,
+        "text": "Done — the reviewed one-question draft is saved in data/delivery/delivery-5c26f9f93d7291c18dbb4712.md. What should I do next?",
+        "directives": [],
+        "attachments": [],
+        "cost": 0
+      },
+      {
+        "id": "m-1790957822478-2",
+        "role": "assistant",
+        "ts": 1790957822478,
+        "tsStamp": "Oct 2, 18:17",
+        "turn": 6,
+        "text": "The reviewed invitation is saved locally. Next, review and save the invitation for beta testers; you can decide separately whether to send it.\n\nCompleted: Draft a short beta feedback email.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0
+      },
+      {
+        "id": "m-1790957877246-3",
+        "role": "user",
+        "ts": 1790957877246,
+        "tsStamp": "Oct 2, 18:17",
+        "turn": 7,
+        "text": "The next item still says its destination is email and done means sent. Please change both: destination Scout artifact, done means I have reviewed and saved the local invitation. Nobody will be contacted in this simulation. What do you need me to check before I call it done?",
+        "directives": [],
+        "attachments": [],
+        "cost": 0
+      },
+      {
+        "id": "m-1790957883560-4",
+        "role": "assistant",
+        "ts": 1790957883560,
+        "tsStamp": "Oct 2, 18:18",
+        "turn": 7,
+        "text": "Check that the invitation in Needs you matches the approved one-question draft and is saved at the local path you expect. Once you confirm that, you can mark the review-and-save item done; nobody needs to be contacted.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0
+      },
+      {
+        "id": "m-1790957958009-1",
+        "role": "user",
+        "ts": 1790957958009,
+        "tsStamp": "Oct 2, 18:19",
+        "turn": 8,
+        "text": "Please actually update the current item now: destination Scout artifact; done when the reviewed invitation is saved locally. Keep the goal at zero replies.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0
+      },
+      {
+        "id": "m-1790957964308-2",
+        "role": "assistant",
+        "ts": 1790957964308,
+        "tsStamp": "Oct 2, 18:19",
+        "turn": 8,
+        "text": "I’ll update the current item to point to the Scout artifact and define completion as saving the reviewed invitation locally. The goal stays at zero replies. Please check that the saved artifact matches the approved one-question draft before marking the item done.\n\nUpdated: Review and save the invitation.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0
+      },
+      {
+        "id": "m-1790958027795-3",
+        "role": "user",
+        "ts": 1790958027795,
+        "tsStamp": "Oct 2, 18:20",
+        "turn": 9,
+        "text": "Done — I checked that the saved Scout artifact matches the approved one-question invitation and is signed Ana. It is at data/delivery/delivery-5c26f9f93d7291c18dbb4712.md. Zero people contacted, zero replies. What is left for today?",
+        "directives": [],
+        "attachments": [],
+        "cost": 0
+      },
+      {
+        "id": "m-1790958027825-4",
+        "role": "assistant",
+        "ts": 1790958027825,
+        "tsStamp": "Oct 2, 18:20",
+        "turn": 0,
+        "text": "Plan’s clear and the backlog is empty — tell me what today is for, or I can leave the clock off.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "empty-2026-10-02"
+        }
+      },
+      {
+        "id": "m-1790958032774-5",
+        "role": "assistant",
+        "ts": 1790958032774,
+        "tsStamp": "Oct 2, 18:20",
+        "turn": 9,
+        "text": "Nothing else is due today. Reply tracking is waiting until 2026-10-04; the goal remains at zero replies, and nobody was contacted.\n\nCompleted: Review and save the invitation.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0
+      },
+      {
+        "id": "m-1790958225946-6",
+        "role": "assistant",
+        "ts": 1790958225946,
+        "tsStamp": "Oct 2, 18:23",
+        "turn": 0,
+        "text": "Daily review is in: 12 min tracked, 2 done, 0 results. Tomorrow: No further work is due; reply tracking is scheduled for 4 October.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "review-2026-10-02"
+        }
+      },
+      {
+        "id": "m-1790960670185-1",
+        "role": "assistant",
+        "ts": 1790960670185,
+        "tsStamp": "Oct 2, 19:04",
+        "turn": 0,
+        "text": "The invitation is reviewed and saved locally; no testers were contacted and the reply count remains 0. I’m moving to the first-run friction: make a sample invoice before asking for tax, CSV, or payment details, then have Check review the guide. While the 4 October reply check waits, prepare a feedback capture sheet and a small next experiment.\n\nPen · Writer: Draft a sample-invoice-first quick-start guide\nSignal · Analyst: Prepare a feedback capture sheet and next setup experiment\nCheck · Reviewer: Review the quick-start guide against the supplied evidence",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-cycle-cycle-b6d5b761-c8c9-4aa2-9951-2180070d79b0",
+          "assistant": "team-a326e4c7-conductor"
+        }
+      },
+      {
+        "id": "m-1790960678311-2",
+        "role": "assistant",
+        "ts": 1790960678311,
+        "tsStamp": "Oct 2, 19:04",
+        "turn": 0,
+        "text": "Pen · Writer prepared “Draft a sample-invoice-first quick-start guide”.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-output-acc570b19e8bfb43445645c9c51b5e502fefccaf06ff1e4610a64492f2a45064",
+          "assistant": "team-a326e4c7-writer",
+          "artifacts": [
+            {
+              "path": "data/artifacts/team-output-acc570b19e8bfb43445645c9.md",
+              "title": "Draft a sample-invoice-first quick-start guide",
+              "assistant": "team-a326e4c7-writer"
+            }
+          ]
+        }
+      },
+      {
+        "id": "m-1790960689970-3",
+        "role": "assistant",
+        "ts": 1790960689970,
+        "tsStamp": "Oct 2, 19:04",
+        "turn": 0,
+        "text": "Signal · Analyst prepared “Prepare a feedback capture sheet and next setup experiment”.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-output-c2ac5a73942344cdbf8aaf83b49091fb7a4e2c8c2ed1442774fe3f08302aeb76",
+          "assistant": "team-a326e4c7-analyst",
+          "artifacts": [
+            {
+              "path": "data/artifacts/team-output-c2ac5a73942344cdbf8aaf83.md",
+              "title": "Prepare a feedback capture sheet and next setup experiment",
+              "assistant": "team-a326e4c7-analyst"
+            }
+          ]
+        }
+      },
+      {
+        "id": "m-1790960695615-4",
+        "role": "assistant",
+        "ts": 1790960695615,
+        "tsStamp": "Oct 2, 19:04",
+        "turn": 0,
+        "text": "Check · Reviewer prepared “Review the quick-start guide against the supplied evidence”.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-output-fb0edb2301e930a2ef7996c22578be1c6b997fe54a00bcd40aa9c69967300172",
+          "assistant": "team-a326e4c7-reviewer",
+          "artifacts": [
+            {
+              "path": "data/artifacts/team-output-fb0edb2301e930a2ef7996c2.md",
+              "title": "Review the quick-start guide against the supplied evidence",
+              "assistant": "team-a326e4c7-reviewer"
+            }
+          ]
+        }
+      },
+      {
+        "id": "m-1790960723562-5",
+        "role": "assistant",
+        "ts": 1790960723562,
+        "tsStamp": "Oct 2, 19:05",
+        "turn": 0,
+        "text": "Today’s local work produced a sample-invoice-first guide, a feedback capture sheet, and a next experiment. Check reviewed the guide and found two fixes: clarify that the sample path is a proposal because the current flow asks for a CSV first, and remove unsupported directions about manually adding clients or reviewing field mappings. The invitation remains a saved local draft; no testers were contacted and real replies remain at 0.\n\nPen · Writer: Revise the quick-start guide using Check’s review\nCheck · Reviewer: Check the revised quick-start guide against the brief",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-cycle-cycle-f6a447cf-98be-4302-bdde-b04828b87a3b",
+          "assistant": "team-a326e4c7-conductor"
+        }
+      },
+      {
+        "id": "m-1790960732399-6",
+        "role": "assistant",
+        "ts": 1790960732399,
+        "tsStamp": "Oct 2, 19:05",
+        "turn": 0,
+        "text": "Pen · Writer prepared “Revise the quick-start guide using Check’s review”.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-output-700e8cac090eeb118f2f2d204dc296c2f5405f824e36bd6bd263a8976a4365b8",
+          "assistant": "team-a326e4c7-writer",
+          "artifacts": [
+            {
+              "path": "data/artifacts/team-output-700e8cac090eeb118f2f2d20.md",
+              "title": "Revise the quick-start guide using Check’s review",
+              "assistant": "team-a326e4c7-writer"
+            }
+          ]
+        }
+      },
+      {
+        "id": "m-1790960739490-7",
+        "role": "assistant",
+        "ts": 1790960739490,
+        "tsStamp": "Oct 2, 19:05",
+        "turn": 0,
+        "text": "Check · Reviewer prepared “Check the revised quick-start guide against the brief”.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-output-6cce3dd452a2cab2d4300a509589edf27bf978eccf5086b4730878c4b0236568",
+          "assistant": "team-a326e4c7-reviewer",
+          "artifacts": [
+            {
+              "path": "data/artifacts/team-output-6cce3dd452a2cab2d4300a50.md",
+              "title": "Check the revised quick-start guide against the brief",
+              "assistant": "team-a326e4c7-reviewer"
+            }
+          ]
+        }
+      },
+      {
+        "id": "m-1790960790855-8",
+        "role": "assistant",
+        "ts": 1790960790855,
+        "tsStamp": "Oct 2, 19:06",
+        "turn": 0,
+        "text": "The current guide is checked, with one wording fix recommended to make clear that sample-invoice-first is a proposed path because the live setup asks for a CSV first. The feedback capture sheet and next experiment are ready locally. Real customer replies remain at 0; the invitation has not been sent.\n\nPen · Writer: Revise the guide to frame sample-first as a proposal\nCheck · Reviewer: Check revised guide for accuracy and readiness",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-cycle-cycle-ef442c13-5839-4fdc-89b7-79ecfbbc7c33",
+          "assistant": "team-a326e4c7-conductor"
+        }
+      },
+      {
+        "id": "m-1790960798424-9",
+        "role": "assistant",
+        "ts": 1790960798424,
+        "tsStamp": "Oct 2, 19:06",
+        "turn": 0,
+        "text": "Pen · Writer prepared “Revise the guide to frame sample-first as a proposal”.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-output-c3a34f039fc6fa781c9a054000d7305680bda7b838bb314a7e9a00ba001b1fba",
+          "assistant": "team-a326e4c7-writer",
+          "artifacts": [
+            {
+              "path": "data/artifacts/team-output-c3a34f039fc6fa781c9a0540.md",
+              "title": "Revise the guide to frame sample-first as a proposal",
+              "assistant": "team-a326e4c7-writer"
+            }
+          ]
+        }
+      },
+      {
+        "id": "m-1790960803473-a",
+        "role": "assistant",
+        "ts": 1790960803473,
+        "tsStamp": "Oct 2, 19:06",
+        "turn": 0,
+        "text": "Check · Reviewer prepared “Check revised guide for accuracy and readiness”.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-output-291afb004e67145c9c478f2690e30848d3ccb89177d8cd97fcccd79d85926edf",
+          "assistant": "team-a326e4c7-reviewer",
+          "artifacts": [
+            {
+              "path": "data/artifacts/team-output-291afb004e67145c9c478f26.md",
+              "title": "Check revised guide for accuracy and readiness",
+              "assistant": "team-a326e4c7-reviewer"
+            }
+          ]
+        }
+      },
+      {
+        "id": "m-1790960849399-b",
+        "role": "assistant",
+        "ts": 1790960849399,
+        "tsStamp": "Oct 2, 19:07",
+        "turn": 0,
+        "text": "The local invitation is reviewed and saved, and the quick-start guide has passed review for Ana to evaluate. The feedback sheet and next experiment are ready. Real tester replies remain at 0. Ask Ana to try the guide locally and capture her observations; the reply check waits until 4 October.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-cycle-cycle-a0c6e07f-00d3-4f78-b7bf-155bbb893a0e",
+          "assistant": "team-a326e4c7-conductor"
+        }
+      },
+      {
+        "id": "m-1790961271855-c",
+        "role": "user",
+        "ts": 1790961271855,
+        "tsStamp": "Oct 2, 19:14",
+        "turn": 10,
+        "text": "I am Ana in this simulation. The invitation is finished, but I still have 35 minutes and want to improve setup. Please have Scout compare the three supplied session notes. I want the first screen to say “Try a sample” and show a sample invoice before asking for business details. Tax ID must be clearly optional. Keep the current CSV-first flow and this proposed flow distinct. Use that correction in the next saved guide, have Check review it, and bring me one concrete decision.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0
+      },
+      {
+        "id": "m-1790961277441-d",
+        "role": "assistant",
+        "ts": 1790961277441,
+        "tsStamp": "Oct 2, 19:14",
+        "turn": 10,
+        "text": "Research will compare the three supplied session notes; Pen will use your correction in the next saved guide, and Check will review it. Then I’ll bring you one concrete decision. Please check that the guide keeps the current CSV-first flow separate from the proposed “Try a sample” path, shows the sample invoice before business details, and labels Tax ID optional.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0
+      },
+      {
+        "id": "m-1790961883572-1",
+        "role": "user",
+        "ts": 1790961883572,
+        "tsStamp": "Oct 2, 19:24",
+        "turn": 11,
+        "text": "I am Ana. I saved my correction directly in Pen’s latest guide: the first action is “Try a sample”, and the sample invoice comes before ALL business details. Tax ID is optional. Compare the three supplied fictional session notes, revise from my saved document, then have Check verify it. Keep the current CSV-first flow distinct from this proposal. I still have work time after the email; bring me one concrete decision. Nobody has been contacted and real replies remain zero.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "goal_id": "activation-demo",
+          "project": "goal-collaboration-demo"
+        }
+      },
+      {
+        "id": "m-1790961889360-2",
+        "role": "assistant",
+        "ts": 1790961889360,
+        "tsStamp": "Oct 2, 19:24",
+        "turn": 11,
+        "text": "Research will compare the three supplied fictional session notes, Pen will revise the guide from your saved correction, and Check will verify that the current CSV-first flow stays distinct from the proposal. I’ll bring you one decision to review: whether to use the checked proposal for Ana’s local try. Please check that “Try a sample” comes first, the sample invoice appears before all business details, and Tax ID is clearly optional. No one has been contacted; real replies remain at zero.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0
+      },
+      {
+        "id": "m-1790961933101-3",
+        "role": "assistant",
+        "ts": 1790961933101,
+        "tsStamp": "Oct 2, 19:25",
+        "turn": 0,
+        "text": "Your review packet: Review the checked local guide. The actual drafts and the check are attached.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-packet-6cce3dd452a2cab2d4300a509589edf27bf978eccf5086b4730878c4b0236568-4a9df10bd2085f09",
+          "assistant": "team-a326e4c7-conductor",
+          "artifacts": [
+            {
+              "path": "data/artifacts/team-output-700e8cac090eeb118f2f2d20.md",
+              "title": "Revise the quick-start guide using Check’s review",
+              "assistant": "team-a326e4c7-writer"
+            },
+            {
+              "path": "data/artifacts/team-output-fb0edb2301e930a2ef7996c2.md",
+              "title": "Review the quick-start guide against the supplied evidence",
+              "assistant": "team-a326e4c7-reviewer"
+            },
+            {
+              "path": "data/artifacts/team-output-6cce3dd452a2cab2d4300a50.md",
+              "title": "Check the revised quick-start guide against the brief",
+              "assistant": "team-a326e4c7-reviewer"
+            }
+          ]
+        }
+      },
+      {
+        "id": "m-1790961933137-4",
+        "role": "assistant",
+        "ts": 1790961933137,
+        "tsStamp": "Oct 2, 19:25",
+        "turn": 0,
+        "text": "Your review packet: Decide whether Ana should try the checked local guide. The actual drafts and the check are attached.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-packet-291afb004e67145c9c478f2690e30848d3ccb89177d8cd97fcccd79d85926edf-36e4d7e073433468",
+          "assistant": "team-a326e4c7-conductor",
+          "artifacts": [
+            {
+              "path": "data/artifacts/team-output-c3a34f039fc6fa781c9a0540.md",
+              "title": "Revise the guide to frame sample-first as a proposal",
+              "assistant": "team-a326e4c7-writer"
+            },
+            {
+              "path": "data/artifacts/team-output-291afb004e67145c9c478f26.md",
+              "title": "Check revised guide for accuracy and readiness",
+              "assistant": "team-a326e4c7-reviewer"
+            }
+          ]
+        }
+      },
+      {
+        "id": "m-1790961947147-5",
+        "role": "assistant",
+        "ts": 1790961947147,
+        "tsStamp": "Oct 2, 19:25",
+        "turn": 0,
+        "text": "Ana’s saved correction is clear: start with “Try a sample,” show the invoice before any business details, and label Tax ID optional. Have Pen compare all three fictional session notes and revise her saved guide, then have Check verify the flow and its distinction from the current CSV-first setup; real replies remain 0.\n\n- Pen · Writer: Revise Ana’s saved guide using all three fictional notes\n- Check · Reviewer: Verify the revised guide’s exact order and evidence claims",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-cycle-cycle-8a56bb9a-a499-4ec2-9405-3dc412ad2a82",
+          "assistant": "team-a326e4c7-conductor"
+        }
+      },
+      {
+        "id": "m-1790961951690-6",
+        "role": "assistant",
+        "ts": 1790961951690,
+        "tsStamp": "Oct 2, 19:25",
+        "turn": 0,
+        "text": "Pen · Writer prepared “Revise Ana’s saved guide using all three fictional notes”.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-output-4b3ce3c3381caa613d1a472deede329a4e982cc066d3a77c28ec876d498e09ea",
+          "assistant": "team-a326e4c7-writer",
+          "artifacts": [
+            {
+              "path": "data/artifacts/team-output-4b3ce3c3381caa613d1a472d.md",
+              "title": "Revise Ana’s saved guide using all three fictional notes",
+              "assistant": "team-a326e4c7-writer"
+            }
+          ]
+        }
+      },
+      {
+        "id": "m-1790961959037-7",
+        "role": "assistant",
+        "ts": 1790961959037,
+        "tsStamp": "Oct 2, 19:25",
+        "turn": 0,
+        "text": "Check · Reviewer prepared “Verify the revised guide’s exact order and evidence claims”.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-output-6ed5e45f92d763b69c975dea2d6299a3beb99d026ea66c73fd709c9ede739f22",
+          "assistant": "team-a326e4c7-reviewer",
+          "artifacts": [
+            {
+              "path": "data/artifacts/team-output-4b3ce3c3381caa613d1a472d.md",
+              "title": "Revise Ana’s saved guide using all three fictional notes",
+              "assistant": "team-a326e4c7-writer"
+            },
+            {
+              "path": "data/artifacts/team-output-6ed5e45f92d763b69c975dea.md",
+              "title": "Verify the revised guide’s exact order and evidence claims",
+              "assistant": "team-a326e4c7-reviewer"
+            }
+          ]
+        }
+      },
+      {
+        "id": "m-1790963234017-1",
+        "role": "user",
+        "ts": 1790963234017,
+        "tsStamp": "Oct 2, 19:47",
+        "turn": 12,
+        "text": "Please have Scout · Research actually compare the three supplied fictional session notes first. Use my saved guide correction as a source. Then have Pen revise the guide and Check review that new draft. The first action is “Try a sample”, before ALL business details; Tax ID is optional. Keep the current CSV-first flow separate. The older reviews are superseded. Paperclip is preparing a separate comparison script; do not duplicate or complete that delegated work. Give me one checked decision here.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "goal_id": "activation-demo",
+          "project": "goal-collaboration-demo"
+        }
+      },
+      {
+        "id": "m-1790963240596-2",
+        "role": "assistant",
+        "ts": 1790963240596,
+        "tsStamp": "Oct 2, 19:47",
+        "turn": 12,
+        "text": "Scout · Research, Pen, and Check are idle, and the team is paused; the latest saved guide and its review are available. I can’t start or dispatch work from this response. Please review whether the checked guide already puts “Try a sample” before all business details, labels Tax ID optional, and keeps the CSV-first flow separate. The Paperclip comparison script remains delegated, and real replies remain 0.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0
+      },
+      {
+        "id": "m-1790963240703-3",
+        "role": "assistant",
+        "ts": 1790963240703,
+        "tsStamp": "Oct 2, 19:47",
+        "turn": 0,
+        "text": "You’re 10 min over on Decide whether Ana should try the checked local guide. Done, stuck, or should I split it?",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "nudge-2026-10-02-over-team-review-3d98589fa1faee0837ed23dc"
+        }
+      },
+      {
+        "id": "m-1790963483135-4",
+        "role": "assistant",
+        "ts": 1790963483135,
+        "tsStamp": "Oct 2, 19:51",
+        "turn": 0,
+        "text": "Your review packet: Review the checked local guide. The actual drafts and the check are attached.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-packet-6cce3dd452a2cab2d4300a509589edf27bf978eccf5086b4730878c4b0236568-84cb1c4e0c755022",
+          "assistant": "team-a326e4c7-conductor",
+          "artifacts": [
+            {
+              "path": "data/artifacts/team-output-700e8cac090eeb118f2f2d20.md",
+              "title": "Revise the quick-start guide using Check’s review",
+              "assistant": "team-a326e4c7-writer"
+            },
+            {
+              "path": "data/artifacts/team-output-fb0edb2301e930a2ef7996c2.md",
+              "title": "Review the quick-start guide against the supplied evidence",
+              "assistant": "team-a326e4c7-reviewer"
+            },
+            {
+              "path": "data/artifacts/beta-product-brief.md",
+              "title": "Beta product brief · simulation",
+              "assistant": "simulation-fixture"
+            },
+            {
+              "path": "data/artifacts/team-output-6cce3dd452a2cab2d4300a50.md",
+              "title": "Check the revised quick-start guide against the brief",
+              "assistant": "team-a326e4c7-reviewer"
+            }
+          ]
+        }
+      },
+      {
+        "id": "m-1790963483363-5",
+        "role": "assistant",
+        "ts": 1790963483363,
+        "tsStamp": "Oct 2, 19:51",
+        "turn": 0,
+        "text": "Your review packet: Decide whether Ana should try the checked local guide. The actual drafts and the check are attached.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-packet-291afb004e67145c9c478f2690e30848d3ccb89177d8cd97fcccd79d85926edf-4c9d036e3e1b5abe",
+          "assistant": "team-a326e4c7-conductor",
+          "artifacts": [
+            {
+              "path": "data/artifacts/team-output-c3a34f039fc6fa781c9a0540.md",
+              "title": "Revise the guide to frame sample-first as a proposal",
+              "assistant": "team-a326e4c7-writer"
+            },
+            {
+              "path": "data/artifacts/team-output-6cce3dd452a2cab2d4300a50.md",
+              "title": "Check the revised quick-start guide against the brief",
+              "assistant": "team-a326e4c7-reviewer"
+            },
+            {
+              "path": "data/artifacts/team-output-700e8cac090eeb118f2f2d20.md",
+              "title": "Revise the quick-start guide using Check’s review",
+              "assistant": "team-a326e4c7-writer"
+            },
+            {
+              "path": "data/artifacts/team-output-291afb004e67145c9c478f26.md",
+              "title": "Check revised guide for accuracy and readiness",
+              "assistant": "team-a326e4c7-reviewer"
+            }
+          ]
+        }
+      },
+      {
+        "id": "m-1790963483515-6",
+        "role": "assistant",
+        "ts": 1790963483515,
+        "tsStamp": "Oct 2, 19:51",
+        "turn": 0,
+        "text": "Your review packet: Decide whether Ana can try the checked guide locally. The actual drafts and the check are attached.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-packet-6ed5e45f92d763b69c975dea2d6299a3beb99d026ea66c73fd709c9ede739f22-4d9e3b91af69bf5f",
+          "assistant": "team-a326e4c7-conductor",
+          "artifacts": [
+            {
+              "path": "data/artifacts/team-output-4b3ce3c3381caa613d1a472d.md",
+              "title": "Revise Ana’s saved guide using all three fictional notes",
+              "assistant": "team-a326e4c7-writer"
+            },
+            {
+              "path": "data/artifacts/team-output-c3a34f039fc6fa781c9a0540.md",
+              "title": "Revise the guide to frame sample-first as a proposal",
+              "assistant": "team-a326e4c7-writer"
+            },
+            {
+              "path": "data/artifacts/team-output-6ed5e45f92d763b69c975dea.md",
+              "title": "Verify the revised guide’s exact order and evidence claims",
+              "assistant": "team-a326e4c7-reviewer"
+            }
+          ]
+        }
+      },
+      {
+        "id": "m-1790963508966-7",
+        "role": "assistant",
+        "ts": 1790963508966,
+        "tsStamp": "Oct 2, 19:51",
+        "turn": 0,
+        "text": "Scout · Research will compare the three fictional session notes first; Pen will use that comparison and Ana’s saved correction to revise the guide, and Check will review the new draft. Paperclip’s separate comparison script remains untouched. After review, choose whether Ana should try the checked guide locally; real customer replies remain at zero.\n\n- Scout · Research: Compare the three fictional session notes\n- Pen · Writer: Revise the guide from Ana’s correction and Research comparison\n- Check · Reviewer: Verify the new guide’s order and evidence claims",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-cycle-cycle-e74ea875-6a02-4a64-80ac-64578eb777d3",
+          "assistant": "team-a326e4c7-conductor"
+        }
+      },
+      {
+        "id": "m-1790963525455-8",
+        "role": "assistant",
+        "ts": 1790963525455,
+        "tsStamp": "Oct 2, 19:52",
+        "turn": 0,
+        "text": "Scout · Research prepared “Compare the three fictional session notes”.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-output-644dc7c245b892f9628842e1446e3d5c2f233137168357b3af47981a1e6f80c7",
+          "assistant": "team-a326e4c7-researcher",
+          "artifacts": [
+            {
+              "path": "data/artifacts/beta-session-notes.md",
+              "title": "First-run session notes · simulation",
+              "assistant": "simulation-fixture"
+            },
+            {
+              "path": "data/artifacts/team-output-c3a34f039fc6fa781c9a0540.md",
+              "title": "Revise the guide to frame sample-first as a proposal",
+              "assistant": "team-a326e4c7-writer"
+            },
+            {
+              "path": "data/artifacts/team-output-644dc7c245b892f9628842e1.md",
+              "title": "Compare the three fictional session notes",
+              "assistant": "team-a326e4c7-researcher"
+            }
+          ]
+        }
+      },
+      {
+        "id": "m-1790963539361-9",
+        "role": "assistant",
+        "ts": 1790963539361,
+        "tsStamp": "Oct 2, 19:52",
+        "turn": 0,
+        "text": "Pen · Writer prepared “Revise the guide from Ana’s correction and Research comparison”.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-output-40b6290b1f31a9012cd7a5195189e49e0d61ef289f35b3469174e84df468d61e",
+          "assistant": "team-a326e4c7-writer",
+          "artifacts": [
+            {
+              "path": "data/artifacts/team-output-644dc7c245b892f9628842e1.md",
+              "title": "Compare the three fictional session notes",
+              "assistant": "team-a326e4c7-researcher"
+            },
+            {
+              "path": "data/artifacts/beta-product-brief.md",
+              "title": "Beta product brief · simulation",
+              "assistant": "simulation-fixture"
+            },
+            {
+              "path": "data/artifacts/beta-session-notes.md",
+              "title": "First-run session notes · simulation",
+              "assistant": "simulation-fixture"
+            },
+            {
+              "path": "data/artifacts/team-output-40b6290b1f31a9012cd7a519.md",
+              "title": "Revise the guide from Ana’s correction and Research comparison",
+              "assistant": "team-a326e4c7-writer"
+            }
+          ]
+        }
+      },
+      {
+        "id": "m-1790963550557-a",
+        "role": "assistant",
+        "ts": 1790963550557,
+        "tsStamp": "Oct 2, 19:52",
+        "turn": 0,
+        "text": "Check · Reviewer prepared “Verify the new guide’s order and evidence claims”.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-output-4a72e4da046bf96d01123a7ee59c08f3f4b7f250e579d9047857b191c1b7e762",
+          "assistant": "team-a326e4c7-reviewer",
+          "artifacts": [
+            {
+              "path": "data/artifacts/team-output-40b6290b1f31a9012cd7a519.md",
+              "title": "Revise the guide from Ana’s correction and Research comparison",
+              "assistant": "team-a326e4c7-writer"
+            },
+            {
+              "path": "data/artifacts/team-output-644dc7c245b892f9628842e1.md",
+              "title": "Compare the three fictional session notes",
+              "assistant": "team-a326e4c7-researcher"
+            },
+            {
+              "path": "data/artifacts/beta-product-brief.md",
+              "title": "Beta product brief · simulation",
+              "assistant": "simulation-fixture"
+            },
+            {
+              "path": "data/artifacts/team-output-4a72e4da046bf96d01123a7e.md",
+              "title": "Verify the new guide’s order and evidence claims",
+              "assistant": "team-a326e4c7-reviewer"
+            }
+          ]
+        }
+      },
+      {
+        "id": "m-1790963550561-b",
+        "role": "assistant",
+        "ts": 1790963550561,
+        "tsStamp": "Oct 2, 19:52",
+        "turn": 0,
+        "text": "Your review packet: Decide whether Ana should try the checked guide locally. The actual drafts and the check are attached.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-packet-4a72e4da046bf96d01123a7ee59c08f3f4b7f250e579d9047857b191c1b7e762-57829bb923c99516",
+          "assistant": "team-a326e4c7-conductor",
+          "artifacts": [
+            {
+              "path": "data/artifacts/team-output-40b6290b1f31a9012cd7a519.md",
+              "title": "Revise the guide from Ana’s correction and Research comparison",
+              "assistant": "team-a326e4c7-writer"
+            },
+            {
+              "path": "data/artifacts/team-output-644dc7c245b892f9628842e1.md",
+              "title": "Compare the three fictional session notes",
+              "assistant": "team-a326e4c7-researcher"
+            },
+            {
+              "path": "data/artifacts/beta-product-brief.md",
+              "title": "Beta product brief · simulation",
+              "assistant": "simulation-fixture"
+            },
+            {
+              "path": "data/artifacts/team-output-4a72e4da046bf96d01123a7e.md",
+              "title": "Verify the new guide’s order and evidence claims",
+              "assistant": "team-a326e4c7-reviewer"
+            }
+          ]
+        }
+      },
+      {
+        "id": "m-1790963574760-c",
+        "role": "assistant",
+        "ts": 1790963574760,
+        "tsStamp": "Oct 2, 19:52",
+        "turn": 0,
+        "text": "Scout · Research will compare the three fictional session notes using your saved correction, then Pen will revise the guide and Check will review that exact draft. Your one decision is whether the checked proposal is ready for your local evaluation; real replies remain zero.\n\n- Scout · Research: Compare the three fictional setup observations\n- Pen · Writer: Revise Ana’s saved quick-start guide\n- Check · Reviewer: Check the revised guide against Ana’s correction",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-cycle-cycle-c2c3bb40-dcf4-451e-93aa-4d2eb953c89a",
+          "assistant": "team-a326e4c7-conductor"
+        }
+      },
+      {
+        "id": "m-1790963592717-d",
+        "role": "assistant",
+        "ts": 1790963592717,
+        "tsStamp": "Oct 2, 19:53",
+        "turn": 0,
+        "text": "Scout · Research prepared “Compare the three fictional setup observations”.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-output-d3d0547e8813de896cb77b6f791657946353f748eda8c5484058e4a7ccde5176",
+          "assistant": "team-a326e4c7-researcher",
+          "artifacts": [
+            {
+              "path": "data/artifacts/beta-session-notes.md",
+              "title": "First-run session notes · simulation",
+              "assistant": "simulation-fixture"
+            },
+            {
+              "path": "data/artifacts/team-output-c3a34f039fc6fa781c9a0540.md",
+              "title": "Revise the guide to frame sample-first as a proposal",
+              "assistant": "team-a326e4c7-writer"
+            },
+            {
+              "path": "data/artifacts/team-output-d3d0547e8813de896cb77b6f.md",
+              "title": "Compare the three fictional setup observations",
+              "assistant": "team-a326e4c7-researcher"
+            }
+          ]
+        }
+      },
+      {
+        "id": "m-1790963612484-e",
+        "role": "assistant",
+        "ts": 1790963612484,
+        "tsStamp": "Oct 2, 19:53",
+        "turn": 0,
+        "text": "Pen · Writer prepared “Revise Ana’s saved quick-start guide”.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-output-d42a2d25e885ce76f4e527aa293ec92b7434550888472d069a0c0306d14211d1",
+          "assistant": "team-a326e4c7-writer",
+          "artifacts": [
+            {
+              "path": "data/artifacts/team-output-d3d0547e8813de896cb77b6f.md",
+              "title": "Compare the three fictional setup observations",
+              "assistant": "team-a326e4c7-researcher"
+            },
+            {
+              "path": "data/artifacts/team-output-c3a34f039fc6fa781c9a0540.md",
+              "title": "Revise the guide to frame sample-first as a proposal",
+              "assistant": "team-a326e4c7-writer"
+            },
+            {
+              "path": "data/artifacts/beta-product-brief.md",
+              "title": "Beta product brief · simulation",
+              "assistant": "simulation-fixture"
+            },
+            {
+              "path": "data/artifacts/team-output-d42a2d25e885ce76f4e527aa.md",
+              "title": "Revise Ana’s saved quick-start guide",
+              "assistant": "team-a326e4c7-writer"
+            }
+          ]
+        }
+      },
+      {
+        "id": "m-1790964028945-1",
+        "role": "assistant",
+        "ts": 1790964028945,
+        "tsStamp": "Oct 2, 20:00",
+        "turn": 0,
+        "text": "3 things parked today — want me to re-plan the afternoon?",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "nudge-2026-10-02-parked"
+        }
+      },
+      {
+        "id": "m-1790964052996-2",
+        "role": "assistant",
+        "ts": 1790964052996,
+        "tsStamp": "Oct 2, 20:00",
+        "turn": 0,
+        "text": "Check · Reviewer prepared “Check the revised guide against Ana’s correction”.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-output-5ebf3fe79cad238b995e62e66dcdcb53fda8b539ec342ab8a4d4c0654ca6029e",
+          "assistant": "team-a326e4c7-reviewer",
+          "artifacts": [
+            {
+              "path": "data/artifacts/team-output-d42a2d25e885ce76f4e527aa.md",
+              "title": "Revise Ana’s saved quick-start guide",
+              "assistant": "team-a326e4c7-writer"
+            },
+            {
+              "path": "data/artifacts/team-output-d3d0547e8813de896cb77b6f.md",
+              "title": "Compare the three fictional setup observations",
+              "assistant": "team-a326e4c7-researcher"
+            },
+            {
+              "path": "data/artifacts/team-output-c3a34f039fc6fa781c9a0540.md",
+              "title": "Revise the guide to frame sample-first as a proposal",
+              "assistant": "team-a326e4c7-writer"
+            },
+            {
+              "path": "data/artifacts/team-output-5ebf3fe79cad238b995e62e6.md",
+              "title": "Check the revised guide against Ana’s correction",
+              "assistant": "team-a326e4c7-reviewer"
+            }
+          ]
+        }
+      },
+      {
+        "id": "m-1790964053003-3",
+        "role": "assistant",
+        "ts": 1790964053003,
+        "tsStamp": "Oct 2, 20:00",
+        "turn": 0,
+        "text": "Your review packet: Decide whether the checked guide is ready for your local try. The actual drafts and the check are attached.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-packet-5ebf3fe79cad238b995e62e66dcdcb53fda8b539ec342ab8a4d4c0654ca6029e-0774c1b8ca4c086a",
+          "assistant": "team-a326e4c7-conductor",
+          "artifacts": [
+            {
+              "path": "data/artifacts/team-output-d42a2d25e885ce76f4e527aa.md",
+              "title": "Revise Ana’s saved quick-start guide",
+              "assistant": "team-a326e4c7-writer"
+            },
+            {
+              "path": "data/artifacts/team-output-d3d0547e8813de896cb77b6f.md",
+              "title": "Compare the three fictional setup observations",
+              "assistant": "team-a326e4c7-researcher"
+            },
+            {
+              "path": "data/artifacts/team-output-c3a34f039fc6fa781c9a0540.md",
+              "title": "Revise the guide to frame sample-first as a proposal",
+              "assistant": "team-a326e4c7-writer"
+            },
+            {
+              "path": "data/artifacts/team-output-5ebf3fe79cad238b995e62e6.md",
+              "title": "Check the revised guide against Ana’s correction",
+              "assistant": "team-a326e4c7-reviewer"
+            }
+          ]
+        }
+      },
+      {
+        "id": "m-1790964065535-4",
+        "role": "assistant",
+        "ts": 1790964065535,
+        "tsStamp": "Oct 2, 20:01",
+        "turn": 0,
+        "text": "Research has compared the three fictional notes, and Pen’s revised guide incorporates your saved correction. Check confirmed the sample comes before all business details, Tax ID is optional, and the current CSV-first flow is clearly separated from the proposal. Real replies remain at zero. Review the checked guide and decide whether Ana can try it locally.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-cycle-cycle-1d005044-3794-4992-9999-35d27b8230ce",
+          "assistant": "team-a326e4c7-conductor"
+        }
+      },
+      {
+        "id": "m-1790964360381-1",
+        "role": "assistant",
+        "ts": 1790964360381,
+        "tsStamp": "Oct 2, 20:06",
+        "turn": 0,
+        "text": "Your current packet is finished. The team is checking the goal and preparing the next useful work. The dated follow-up stays waiting; we’ll keep advancing other work meanwhile.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-next-2026-10-02-106"
+        }
+      },
+      {
+        "id": "m-1790964726250-2",
+        "role": "assistant",
+        "ts": 1790964726250,
+        "tsStamp": "Oct 2, 20:12",
+        "turn": 0,
+        "text": "Scout’s comparison, Pen’s revision, and Check’s review are complete. The guide keeps the proposed “Try a sample” path separate from the current CSV-first flow; choose whether to approve it for Ana’s local try. Real replies remain at zero.\n\n- Pen · Writer: Propose two labels for optional business details\n- Signal · Analyst: Adapt feedback sheet to compare optional-step labels",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-cycle-cycle-d0d53130-d83d-4c85-8c6a-24245ddfada0",
+          "assistant": "team-a326e4c7-conductor"
+        }
+      },
+      {
+        "id": "m-1790964731506-3",
+        "role": "assistant",
+        "ts": 1790964731506,
+        "tsStamp": "Oct 2, 20:12",
+        "turn": 0,
+        "text": "Pen · Writer prepared “Propose two labels for optional business details”.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-output-ba893efabea3895b8590dfb86f904812bcfa5c67b75c6a66d5a73dc89ae238f9",
+          "assistant": "team-a326e4c7-writer",
+          "artifacts": [
+            {
+              "path": "data/artifacts/team-output-40b6290b1f31a9012cd7a519.md",
+              "title": "Revise the guide from Ana’s correction and Research comparison",
+              "assistant": "team-a326e4c7-writer"
+            },
+            {
+              "path": "data/artifacts/team-output-ba893efabea3895b8590dfb8.md",
+              "title": "Propose two labels for optional business details",
+              "assistant": "team-a326e4c7-writer"
+            }
+          ]
+        }
+      },
+      {
+        "id": "m-1790964745890-4",
+        "role": "assistant",
+        "ts": 1790964745890,
+        "tsStamp": "Oct 2, 20:12",
+        "turn": 0,
+        "text": "Signal · Analyst prepared “Adapt feedback sheet to compare optional-step labels”.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-output-bd3e7fd10258d1e655f001cbb53f39b3bc3d193be076f0b3ed5f33ad2437da2c",
+          "assistant": "team-a326e4c7-analyst",
+          "artifacts": [
+            {
+              "path": "data/artifacts/team-output-ba893efabea3895b8590dfb8.md",
+              "title": "Propose two labels for optional business details",
+              "assistant": "team-a326e4c7-writer"
+            },
+            {
+              "path": "data/artifacts/team-output-40b6290b1f31a9012cd7a519.md",
+              "title": "Revise the guide from Ana’s correction and Research comparison",
+              "assistant": "team-a326e4c7-writer"
+            },
+            {
+              "path": "data/artifacts/team-output-c2ac5a73942344cdbf8aaf83.md",
+              "title": "Prepare a feedback capture sheet and next setup experiment",
+              "assistant": "team-a326e4c7-analyst"
+            },
+            {
+              "path": "data/artifacts/team-output-bd3e7fd10258d1e655f001cb.md",
+              "title": "Adapt feedback sheet to compare optional-step labels",
+              "assistant": "team-a326e4c7-analyst"
+            }
+          ]
+        }
+      },
+      {
+        "id": "m-1790964745900-5",
+        "role": "assistant",
+        "ts": 1790964745900,
+        "tsStamp": "Oct 2, 20:12",
+        "turn": 0,
+        "text": "Your review packet: Choose a label to try locally. The actual drafts and the check are attached.",
+        "directives": [],
+        "attachments": [],
+        "cost": 0,
+        "meta": {
+          "kind": "conductor",
+          "key": "team-packet-bd3e7fd10258d1e655f001cbb53f39b3bc3d193be076f0b3ed5f33ad2437da2c-aa39be88792c0ef8",
+          "assistant": "team-a326e4c7-conductor",
+          "artifacts": [
+            {
+              "path": "data/artifacts/team-output-ba893efabea3895b8590dfb8.md",
+              "title": "Propose two labels for optional business details",
+              "assistant": "team-a326e4c7-writer"
+            },
+            {
+              "path": "data/artifacts/team-output-40b6290b1f31a9012cd7a519.md",
+              "title": "Revise the guide from Ana’s correction and Research comparison",
+              "assistant": "team-a326e4c7-writer"
+            },
+            {
+              "path": "data/artifacts/team-output-c2ac5a73942344cdbf8aaf83.md",
+              "title": "Prepare a feedback capture sheet and next setup experiment",
+              "assistant": "team-a326e4c7-analyst"
+            },
+            {
+              "path": "data/artifacts/team-output-bd3e7fd10258d1e655f001cb.md",
+              "title": "Adapt feedback sheet to compare optional-step labels",
+              "assistant": "team-a326e4c7-analyst"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "goals": {
+    "goals": [
+      {
+        "id": "activation-demo",
+        "path": "goals/activation-demo.md",
+        "data": {
+          "type": "goal",
+          "id": "activation-demo",
+          "label": "Get three useful beta tester replies",
+          "target": 3,
+          "current": 0,
+          "unit": "replies",
+          "universe": "unit/growth",
+          "created": "2026-10-02",
+          "created_by": "crystal",
+          "updated": "2026-10-02",
+          "updated_by": "crystal"
+        },
+        "body": "Local role-play: improve beta onboarding and obtain three useful setup observations. The invitation is only one packet. Continue useful work after it: examine the supplied first-run flow and session notes, choose a friction to fix with Ana, produce a concrete revised setup guide, have another specialist review it, ask Ana to try it, and adapt to her evidence. Prepare a feedback capture sheet and the next experiment while the dated reply check waits. Read the beta product brief and simulated session notes in the artifact collection. Use named specialists with actual result handoffs. When Ana approves one useful change, carry it into the next draft and review round; do not ask her to invent your next task or say the day is finished. Keep the real customer-reply metric at zero: fixtures and saved drafts are not real replies. All artifacts stay local; sending and publishing need separate human approval.",
+        "label": "Get three useful beta tester replies",
+        "current": 0,
+        "target": 3,
+        "unit": "replies",
+        "computed": false,
+        "daysLeft": null,
+        "behind": false,
+        "staleness": null
+      }
+    ]
+  },
+  "paperclip_import": {
+    "path": "data/paperclip-result/pc-61a1c6cf092621eb6ae01d7f4fcf108a194d1b3d.md",
+    "data": {
+      "title": "Paperclip draft: Prepare the local onboarding comparison experiment (Paperclip)",
+      "status": "found",
+      "source_work": "paperclip-continuity-experiment",
+      "paperclip_issue": "6a8a0871-2193-4afd-8aa1-143853da5cda",
+      "paperclip_comment": "ed7c61e7-1ce5-422d-a7e7-7b70171cc181",
+      "goal_id": "activation-demo",
+      "evidence": "http://127.0.0.1:5191/issues/6a8a0871-2193-4afd-8aa1-143853da5cda",
+      "tags": [
+        "paperclip-result"
+      ],
+      "paperclip_run": "ce0be144-7d9e-408f-80f8-73ee8ce05fa3",
+      "paperclip_source_hash": "851b0b7bd861d401c082638bbd147feb6c1e7a20f1fe9e4dc8dbdeb95389efe8",
+      "project": "goal-collaboration-demo",
+      "universe": "unit/growth",
+      "created": "2026-10-02",
+      "updated": "2026-10-02",
+      "created_by": "paperclip",
+      "updated_by": "paperclip",
+      "verified_at": "2026-10-02",
+      "proposed": true,
+      "provenance": "pipeline"
+    },
+    "content": "# Local Onboarding Comparison Experiment\n\n**Draft for Ana’s review.** This is a local comparison plan based on supplied fictional fixtures. No real testers, replies, or live changes are claimed.\n\n## Scenario A: Current CSV-first flow\n\nThe supplied description says the flow asks for business details, then a CSV, then payment before preview.\n\n## Scenario B: Proposed “Try a sample” flow\n\nThe proposal is to offer “Try a sample” first and show a sample invoice before asking for business details, a CSV, or payment. It also proposes labeling Tax ID optional. This is a proposal, not implemented behavior.\n\n## Neutral observation prompts\n\n1. What would you expect to happen after the first action?\n2. What, if anything, would you hesitate to provide?\n3. At what point would you feel ready to continue?\n4. What information would you need before deciding whether to proceed?\n5. What would you do next in this scenario?\n\n## Decision criterion\n\nChoose the next experiment based on which scenario more clearly lets a participant understand what happens next and decide whether to continue, without feeling pressured to provide information.\n\n## Next concrete local action\n\nAna reviews this comparison script and selects one next experiment. No tester contact is part of this local step. The reply check remains scheduled for 4 October.\n\nSource: http://127.0.0.1:5191/issues/6a8a0871-2193-4afd-8aa1-143853da5cda\n",
+    "rev": "5mda27",
+    "flags": {
+      "quarantined": false,
+      "agentPromotion": false,
+      "staleness": 0.025462342978395062
+    },
+    "collection": "paperclip-result",
+    "kind": "other"
+  }
+}

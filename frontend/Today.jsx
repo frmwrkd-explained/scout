@@ -24,12 +24,14 @@
 // KEYS: Enter in the composer sends · ⌘↩ marks the now item done.
 
 import React from 'react';
+import { TeamPulse } from './Admin';
 import { sx } from './sx';
 import { MONO } from './tokens';
 import { api } from './api';
 import { Btn, Chip, Empty, Eyebrow, Input } from './ui';
 import { Markdown } from './Markdown';
 import { TodayExtras } from './Integrations';
+import Artifact, { ArtifactList, messageArtifacts, artifactMessageText, workArtifacts, normalizeArtifacts } from './Artifact';
 
 const mono = (extra = '') => ({ ...sx('font-variant-numeric:tabular-nums;' + extra), fontFamily: MONO });
 
@@ -233,22 +235,31 @@ function PlanRow({ it, ix, total, onStart, onMove, onOpen }) {
 
 // One transcript entry. Conductor lines are the quiet system voice (a small eyebrow, no bubble);
 // user messages float right; agent replies left.
-function ChatMsg({ m }) {
+function ChatMsg({ m, actor, onOpenPath, onSaved, agents, refreshKey }) {
+  const artifacts = messageArtifacts(m);
+  const text = artifactMessageText(m, artifacts);
+  const assistant = m.meta?.assistant;
+  const assistantId = typeof assistant === 'object' ? assistant?.id : assistant;
+  const speaker = m.meta?.assistant_name || (typeof assistant === 'object' ? assistant?.name : '')
+    || (agents || []).find(agent => agent.id === assistantId)?.name || assistantId || artifacts[0]?.assistant || 'Conductor';
+  const documents = <ArtifactList artifacts={artifacts} actor={actor} agents={agents} onOpenPath={onOpenPath} onSaved={onSaved} refreshKey={refreshKey} />;
   const conductor = m.meta && m.meta.kind === 'conductor';
   if (conductor) {
     return (
       <div style={sx('padding:10px 16px;border-bottom:1px solid var(--line)')}>
-        <Eyebrow style={sx('font-size:8.5px;font-weight:800;letter-spacing:.2em;color:var(--fg-faint);margin-bottom:5px')}>CONDUCTOR</Eyebrow>
+        <Eyebrow style={sx('font-size:8.5px;font-weight:800;letter-spacing:.2em;color:var(--fg-faint);margin-bottom:5px')}>{speaker}</Eyebrow>
         <div style={sx('font-size:12px;line-height:1.5;color:var(--fg-muted)')}>
-          <Markdown text={m.text || ''} />
+          <Markdown text={text} />
         </div>
+        {documents}
       </div>
     );
   }
   if (m.role === 'system') {
     return (
       <div style={sx('padding:6px 16px;text-align:center')}>
-        <span style={{ ...mono('font-size:9.5px;letter-spacing:.06em;color:var(--fg-faint)') }}>{m.text}</span>
+        <span style={{ ...mono('font-size:9.5px;letter-spacing:.06em;color:var(--fg-faint)') }}>{text}</span>
+        {documents}
       </div>
     );
   }
@@ -256,12 +267,14 @@ function ChatMsg({ m }) {
   return (
     <div style={sx('display:flex;padding:5px 16px;justify-content:' + (mine ? 'flex-end' : 'flex-start'))}>
       <div style={{
-        ...sx('max-width:82%;font-size:12.5px;line-height:1.5;padding:8px 12px;border-radius:10px'),
+        ...sx('max-width:92%;min-width:0;font-size:12.5px;line-height:1.5;padding:8px 12px;border-radius:10px'),
         background: mine ? 'var(--accent-12)' : 'var(--surface-2)',
         border: '1px solid ' + (mine ? 'var(--accent-35)' : 'var(--border)'),
         color: 'var(--fg)',
       }}>
-        {mine ? <span>{m.text}</span> : <Markdown text={m.text || (m.error ? '⚠ ' + m.error : '')} />}
+        {!mine ? <Eyebrow style={sx('font-size:8.5px;letter-spacing:.1em;color:var(--fg-muted);margin-bottom:5px')}>{speaker}</Eyebrow> : null}
+        {mine ? <span>{text}</span> : <Markdown text={text || (m.error ? '⚠ ' + m.error : '')} />}
+        {documents}
       </div>
     </div>
   );
@@ -285,6 +298,9 @@ export default function Today({ onGo, onOpenPath, onWrote, refreshKey, actor, on
   const [backlogOpen, setBacklogOpen] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [actionError, setActionError] = React.useState('');
+  const [focusedArtifact, setFocusedArtifact] = React.useState(null);
+  const [focusedDirty, setFocusedDirty] = React.useState(false);
+  const artifactDesk = React.useRef(null);
   const [, setTick] = React.useState(0);
 
   const dataRef = React.useRef(data);
@@ -313,7 +329,8 @@ export default function Today({ onGo, onOpenPath, onWrote, refreshKey, actor, on
     const tick = async () => {
       await load();
       if (dead) return;
-      t = setTimeout(tick, dataRef.current && dataRef.current.planning ? 3000 : 60 * 1000);
+      const d = dataRef.current;
+      t = setTimeout(tick, d?.planning || ['thinking', 'working'].includes(d?.conductor?.state) ? 3000 : 60 * 1000);
     };
     tick();
     return () => { dead = true; clearTimeout(t); };
@@ -337,7 +354,7 @@ export default function Today({ onGo, onOpenPath, onWrote, refreshKey, actor, on
     es.addEventListener('turn-done', () => { setStream(''); setTurnBusy(false); reload(); load(); onWrote?.(); });
     es.addEventListener('turn-cancelled', () => { setStream(''); setTurnBusy(false); reload(); });
     es.addEventListener('error', () => { setTurnBusy(false); reload(); });
-    es.addEventListener('system-event', () => { reload(); });
+    es.addEventListener('system-event', () => { reload(); load(); onWrote?.(); });
     return () => es.close();
   }, [chatId, load, onWrote]);
 
@@ -417,18 +434,32 @@ export default function Today({ onGo, onOpenPath, onWrote, refreshKey, actor, on
   // Prepared material lives in the item's body under `## Prepared` — fetched only while a now
   // item is active, so the NOW card never waits on it.
   const [nowDoc, setNowDoc] = React.useState(null);
+  const focusArtifact = React.useCallback(ref => {
+    const artifact = normalizeArtifacts([ref])[0];
+    if (!artifact) return;
+    if (focusedDirty && focusedArtifact?.path !== artifact.path) {
+      setActionError('Save or cancel the edit on the table before opening another document.'); return;
+    }
+    setFocusedArtifact(previous => previous?.path === artifact.path ? previous : artifact);
+    setTimeout(() => artifactDesk.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 0);
+  }, [focusedDirty, focusedArtifact?.path]);
+  const artifactSaved = React.useCallback(doc => {
+    if (doc.path === dataRef.current?.now?.path) setNowDoc(doc);
+    onWrote?.(); load();
+  }, [load, onWrote]);
   const nowId = data && data.now && data.now.id;
   const nowPrep = data && data.now && data.now.prep_state;
+  const nowPacket = JSON.stringify(data?.now?.artifacts || []);
   React.useEffect(() => {
     setNowDoc(null);
     if (!nowId) return undefined;
     let dead = false;
-    const pull = () => api.document((dataRef.current.now || {}).path || '').then(d => { if (!dead) setNowDoc(d); }).catch(() => {});
+    const pull = () => api.record((dataRef.current.now || {}).path || '').then(d => { if (!dead) setNowDoc(d); }).catch(() => {});
     pull();
     const iv = setInterval(pull, 20 * 1000);
     return () => { dead = true; clearInterval(iv); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nowId, nowPrep]);
+  }, [nowId, nowPrep, nowPacket, refreshKey]);
 
   if (loadErr && !data) {
     return (
@@ -462,13 +493,18 @@ export default function Today({ onGo, onOpenPath, onWrote, refreshKey, actor, on
     return m ? m[1].trim() : '';
   })();
   const messages = (chat && chat.messages) || [];
+  const packetArtifacts = workArtifacts(now, nowDoc);
+  const teamArtifacts = normalizeArtifacts(data.conductor?.recent_outputs || []).slice(0, 4);
+  const teamAgents = [...(data.conductor?.agents || []),
+    { id: data.conductor?.coordinator, name: data.conductor?.coordinator_name || 'Conductor' },
+    { id: 'conductor', name: data.conductor?.coordinator_name || 'Conductor' }];
 
   const planLabel = data.day
     ? new Date(data.day + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
     : 'Today';
 
   return (
-    <div style={sx('flex:1;min-height:0;display:flex;flex-direction:column;padding:18px 22px;gap:14px')}>
+    <div className="todayWorkspace" style={sx('flex:1;min-height:0;display:flex;flex-direction:column;padding:18px 22px;gap:14px')}>
       {/* ── header ── */}
       <div style={sx('flex:none;display:flex;align-items:baseline;gap:16px')}>
         <h1 style={sx('font-size:17px;font-weight:700;color:var(--fg);letter-spacing:-.01em')}>{planLabel}</h1>
@@ -485,12 +521,13 @@ export default function Today({ onGo, onOpenPath, onWrote, refreshKey, actor, on
         {data.planning ? <span style={{ ...mono('font-size:10px;letter-spacing:.1em;color:var(--fg-faint)') }}>PLANNING…</span> : null}
         <Btn size="sm" variant="ghost" busy={busy} onClick={endDay} title="Write today's review now">End day</Btn>
       </div>
+      <TeamPulse team={data.conductor} onAdmin={() => onGo?.('admin')} />
 
       {actionError ? <div role="alert" style={sx('color:var(--warn);font-size:12px')}>{actionError}</div> : null}
 
-      <div style={sx('flex:1;min-height:0;display:flex;gap:14px')}>
+      <div className="todayColumns" style={sx('flex:1;min-height:0')}>
         {/* ── left: the plan ── */}
-        <div style={sx('flex:none;width:300px;min-height:0;display:flex;flex-direction:column;gap:12px')}>
+        <div className="todayPlan" style={sx('min-height:0;display:flex;flex-direction:column;gap:12px')}>
           <Section label="TODAY" right={plural((data.plan || []).filter(i => i.status === 'done').length, 'done', 'done') + ' / ' + (data.plan || []).length} grow>
             <div style={sx('flex:1;min-height:0;overflow:auto;margin-top:8px')}>
               {(data.plan || []).map((it, ix) => (
@@ -565,8 +602,8 @@ export default function Today({ onGo, onOpenPath, onWrote, refreshKey, actor, on
         </div>
 
         {/* ── center: now + the conductor ── */}
-        <div style={sx('flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:12px')}>
-          <section style={sx('flex:none;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px 18px;display:flex;flex-direction:column;gap:10px')}>
+        <div className="todayDesk" style={sx('min-width:0;min-height:0;display:flex;flex-direction:column;gap:12px')}>
+          <section style={sx('flex:none;max-height:46vh;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px 18px;display:flex;flex-direction:column;gap:10px')}>
             {data.planning ? (
               <span style={{ ...mono('font-size:10px;letter-spacing:.12em;color:var(--fg-faint)') }}>PLANNING YOUR DAY…</span>
             ) : null}
@@ -584,7 +621,7 @@ export default function Today({ onGo, onOpenPath, onWrote, refreshKey, actor, on
                 {now.why ? <div style={sx('font-size:11.5px;color:var(--fg-muted);line-height:1.4')}>{now.why}</div> : null}
                 {now.goal_id || now.destination || now.done_when ? (
                   <div style={sx('display:flex;flex-direction:column;gap:4px;font-size:11.5px;color:var(--fg-muted)')}>
-                    {now.goal_id ? <Btn variant="ghost" size="sm" onClick={() => onOpenPath && onOpenPath('goals/' + now.goal_id + '.md')}
+                    {now.goal_id ? <Btn variant="ghost" size="sm" onClick={() => focusArtifact({ path: 'goals/' + now.goal_id + '.md', title: (data.goals || []).find(goal => goal.id === now.goal_id)?.label || 'Goal brief' })}
                       style={sx('align-self:flex-start;padding:0;color:var(--fg-soft)')}>
                       Goal: {(data.goals || []).find(goal => goal.id === now.goal_id)?.label || now.goal_id}
                     </Btn> : null}
@@ -597,11 +634,12 @@ export default function Today({ onGo, onOpenPath, onWrote, refreshKey, actor, on
                 {now.prep && now.prep_state === 'preparing' ? (
                   <span style={{ ...mono('font-size:10px;letter-spacing:.08em;color:var(--fg-faint)') }}>PREPARING MATERIAL…</span>
                 ) : null}
-                {preparedText ? (
-                  <div style={sx('max-height:40vh;overflow:auto;border-top:1px solid var(--line);padding-top:8px;font-size:12px;color:var(--fg-soft)')}>
-                    <Markdown text={preparedText} />
-                  </div>
-                ) : null}
+                {packetArtifacts.length || now.path ? <div style={sx('display:flex;flex-direction:column;gap:7px;border-top:1px solid var(--line);padding-top:9px')}>
+                  <Eyebrow style={sx('font-size:9px;color:var(--fg-muted)')}>YOUR WORK PACKET{preparedText ? ' · material ready' : ''}</Eyebrow>
+                  <ArtifactList artifacts={packetArtifacts} actor={actor} agents={teamAgents} onOpenPath={onOpenPath} onSaved={artifactSaved} refreshKey={refreshKey} />
+                  {now.path ? <Artifact key={now.path} artifact={{ path: now.path, title: now.title, type: 'Working notes' }} seed={nowDoc || undefined}
+                    actor={actor} agents={teamAgents} onOpenPath={onOpenPath} onSaved={artifactSaved} refreshKey={String(refreshKey) + ':' + (nowDoc?.rev || '')} /> : null}
+                </div> : null}
                 <div style={sx('display:flex;gap:8px;align-items:center;flex-wrap:wrap')}>
                   {now.clock && now.clock.running ? (
                     <Btn size="sm" variant="ghost" busy={busy} onClick={() => act(() => { onWorkClockIntent?.('pause'); return api.todayPause(); })}>Pause</Btn>
@@ -648,6 +686,7 @@ export default function Today({ onGo, onOpenPath, onWrote, refreshKey, actor, on
               <div style={sx('display:flex;align-items:center;gap:12px')}>
                 <span style={sx('flex:1;font-size:12.5px;color:var(--fg-muted)')}>
                   {data.planned === false ? 'The day isn’t planned yet — the first poll plans it.'
+                    : ['thinking', 'working'].includes(data.conductor?.state) ? 'The team is preparing your next review. Their drafts will appear here.'
                     : data.plan.some(item => item.status !== 'done' && item.wait_reason) ? 'Nothing ready right now — your waiting work stays in the plan.'
                     : 'Nothing planned — ask me to plan, or add an item on the left.'}
                 </span>
@@ -658,11 +697,22 @@ export default function Today({ onGo, onOpenPath, onWrote, refreshKey, actor, on
           {/* the day's thread */}
           <section style={sx('flex:1;min-height:0;background:var(--surface);border:1px solid var(--border);border-radius:8px;display:flex;flex-direction:column;overflow:hidden')}>
             <div style={sx('flex:1;min-height:0;overflow:auto;padding:8px 0;display:flex;flex-direction:column;gap:2px')}>
-              {messages.map(m => <ChatMsg key={m.id} m={m} />)}
+              {focusedArtifact ? <div ref={artifactDesk} style={sx('padding:8px 16px 12px;border-bottom:1px solid var(--line)')}>
+                <div style={sx('display:flex;align-items:center;gap:8px;margin-bottom:6px')}><Eyebrow style={sx('flex:1;font-size:9px')}>ON THE TABLE</Eyebrow>
+                  <Btn size="sm" variant="ghost" disabled={focusedDirty} onClick={() => setFocusedArtifact(null)}>Put away</Btn></div>
+                <Artifact key={focusedArtifact.path} artifact={focusedArtifact} defaultExpanded actor={actor} agents={teamAgents} onDirty={setFocusedDirty}
+                  onOpenPath={onOpenPath} onSaved={artifactSaved} refreshKey={refreshKey} />
+              </div> : null}
+              {teamArtifacts.length ? <div style={sx('padding:8px 16px 12px;border-bottom:1px solid var(--line)')}>
+                <Eyebrow style={sx('font-size:9px;margin-bottom:8px;color:var(--fg-muted)')}>FROM YOUR TEAM</Eyebrow>
+                <ArtifactList artifacts={teamArtifacts} actor={actor} agents={teamAgents} onOpenPath={onOpenPath} onSaved={artifactSaved} refreshKey={refreshKey} />
+              </div> : null}
+              {messages.map(m => <ChatMsg key={m.id} m={m} actor={actor} onOpenPath={onOpenPath} onSaved={artifactSaved}
+                agents={teamAgents} refreshKey={refreshKey} />)}
               {stream || turnBusy ? (
                 <div style={sx('display:flex;padding:5px 16px')}>
                   <div style={sx('max-width:82%;font-size:12.5px;line-height:1.5;padding:8px 12px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border);color:var(--fg)')}>
-                    {stream ? <Markdown text={stream} /> : <span style={{ ...mono('font-size:10px;letter-spacing:.12em;color:var(--fg-faint)') }}>THINKING…</span>}
+                    {stream ? <Markdown text={artifactMessageText({ text: stream })} /> : <span style={{ ...mono('font-size:10px;letter-spacing:.12em;color:var(--fg-faint)') }}>THINKING…</span>}
                   </div>
                 </div>
               ) : null}
@@ -686,8 +736,8 @@ export default function Today({ onGo, onOpenPath, onWrote, refreshKey, actor, on
         </div>
 
         {/* ── right: time ── */}
-        <div style={sx('flex:none;width:320px;min-height:0;display:flex;flex-direction:column;gap:12px')}>
-          <TodayExtras work={data.now || data.next} plannedWork={data.next} onGo={onGo} onOpenPath={onOpenPath} onWrote={onWrote} refreshKey={refreshKey} />
+        <div className="todayStats" style={sx('min-width:0;min-height:0;display:flex;flex-direction:column;gap:12px')}>
+          <TodayExtras work={data.now || data.next} plannedWork={data.next} onGo={onGo} onOpenPath={onOpenPath} onOpenArtifact={focusArtifact} onWrote={onWrote} refreshKey={refreshKey} />
           <Section label="TIME" grow>
             <div style={sx('flex:none;display:flex;gap:6px;padding:10px 16px 0')}>
               {[['today', 'Today'], ['week', 'Week'], ['month', 'Month']].map(([k, l]) => (

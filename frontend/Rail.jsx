@@ -15,7 +15,7 @@
 // Props:
 //   screen            current screen key — 'today' 'decide' 'project' 'collection' 'document'
 //                     'goals' 'territory' 'playbook' 'memory' 'knows' 'assistants' 'assistant'
-//                     'files' 'board' 'settings'
+//                     'files' 'board' 'settings' 'admin'
 //   onNavigate(key, arg)  the one navigation callback
 //   onSearch()        opens the ⌘K palette (item 11) — the SEARCH row at the top of nav is the
 //                     visible way in; the chord works with or without it.
@@ -140,6 +140,7 @@ export default function Rail({
           <Row label="Needs you" count={needsYou} on={screen === 'decide'} onClick={go('decide')}
             countTone={needsYou > 0 ? 'var(--warn)' : 'var(--border-2)'} />
           <Row label="Today" on={screen === 'today'} onClick={go('today')} />
+          <Row label="Admin" on={screen === 'admin'} onClick={go('admin')} />
           <Row label="Project" on={screen === 'project'} onClick={go('project')} />
         </div>
 
@@ -176,7 +177,7 @@ export default function Rail({
         <Group label="ASSISTANTS">
           {assistants.length
             ? assistants.map(a => (
-                <Row key={a.id} isMono height={28} label={a.id}
+                <Row key={a.id} isMono height={28} label={a.name || a.id}
                   dot={DOT[a.status] || DOT.idle}
                   right={String(a.status || 'idle').toUpperCase()}
                   countTone={DOT[a.status] || 'var(--fg-faint)'}

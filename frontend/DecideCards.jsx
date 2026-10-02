@@ -35,6 +35,7 @@
 // why this normaliser exists and why nothing downstream reads frontmatter directly.
 
 import React from 'react';
+import Artifact, { localArtifactPath } from './Artifact';
 import { sx } from './sx';
 import { MONO } from './tokens';
 import { Eyebrow, Input } from './ui';
@@ -332,7 +333,17 @@ export function RefList({ refs, onOpenPath }) {
 // Each stops at altitude 1: what it is, one line, the facts that qualify it, and — where she is
 // approving something literal — the literal thing.
 
-function FindingBody({ card }) {
+function FindingBody({ card, onOpenPath }) {
+  const draftPath = card.collection === 'paperclip-result' ? localArtifactPath(card.subject) : null;
+  if (draftPath) return <>
+    <Region>
+      <Head>Review the Paperclip draft</Head>
+      <Line>Read the prepared work, then accept it for your shortlist or reject it with a correction.</Line>
+    </Region>
+    <div style={sx('padding:0 40px 28px')}>
+      <Artifact artifact={{ path: draftPath, type: 'Paperclip draft', assistant: 'Paperclip' }} defaultExpanded onOpenPath={onOpenPath} />
+    </div>
+  </>;
   const facts = card.facts.length ? card.facts : normalizeFacts([
     card.collection ? '#' + card.collection : null,
     card.territory,
@@ -349,6 +360,34 @@ function FindingBody({ card }) {
 
 function OutboundBody({ card }) {
   const words = card.message;
+  let handoff = null;
+  const bridgeHash = card.raw?.bridge_hash || card.raw?.data?.bridge_hash;
+  if (card.channel === 'paperclip' && bridgeHash) {
+    try {
+      const snapshot = JSON.parse(words);
+      if (snapshot.version === 1 && snapshot.fingerprint === bridgeHash &&
+        typeof snapshot.issue?.title === 'string' && typeof snapshot.issue?.description === 'string') handoff = snapshot;
+    } catch { /* An unreadable export keeps the literal outbound view. */ }
+  }
+  if (handoff) {
+    const boundary = 'Prepare a result for review.';
+    const start = handoff.issue.description.indexOf(boundary);
+    const brief = start < 0 ? handoff.issue.description : handoff.issue.description.slice(start);
+    return <>
+      <Region>
+        <Head>{handoff.issue.title}</Head>
+        <Line>Approve this work for the Paperclip agent. Sending it starts a separate preparation run.</Line>
+        <Facts items={normalizeFacts(['Paperclip', handoff.connection?.url, 'Draft for your review'])} />
+      </Region>
+      <Slab label="WORK FOR THE PAPERCLIP AGENT">
+        <SlabProse>{brief}</SlabProse>
+        <details>
+          <summary style={sx('font-size:12px;color:var(--fg-muted);cursor:pointer')}>Exact export details</summary>
+          <pre style={sx('white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px;line-height:1.5;color:var(--fg-muted)')}>{words}</pre>
+        </details>
+      </Slab>
+    </>;
+  }
   const hasLink = !!words && /https?:\/\//i.test(words);
   const meta = words ? [words.trim().length + ' CHARS', hasLink ? 'CONTAINS A LINK' : 'NO LINKS'].join(' / ') : null;
   return (

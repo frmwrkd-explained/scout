@@ -34,6 +34,7 @@ import { ensureWorkflowFields, workReadiness, validateWorkflow, assertCompletion
 import { previewDelivery } from './delivery.mjs';
 import { proposeWidget } from './widgets.mjs';
 import { assertPaperclipWorkAvailable } from './paperclip.mjs';
+import { conductorStatus, wakeConductor, pauseConductor } from './conductor.mjs';
 
 export class TodayError extends Error {
   constructor(msg, status = 400, extra = {}) { super(msg); this.status = status; Object.assign(this, extra); }
@@ -273,6 +274,11 @@ export function rollup(segments, items = {}, { from = null, to = null } = {}) {
 
 // ── the day's session ──────────────────────────────────────────────────────────────────────────
 export const todaySessionId = day => 'today-' + day;
+
+// Team outputs use the existing daily conversation, so work continues in one place.
+export function publishTeamMessage(text, { key, artifacts = [], assistant = null } = {}) {
+  return postConductor(ensureTodaySession(localDay()).id, text, { key, artifacts, assistant });
+}
 
 export function ensureTodaySession(day) {
   const id = todaySessionId(day);
@@ -702,6 +708,7 @@ export async function getToday(now = Date.now()) {
     settings: (({ dayStart, dayEnd, dayMinutes, brainDailyLimits }) => ({ dayStart, dayEnd, dayMinutes, brainDailyLimits }))(getSettings()),
     providers: await providersStatus(),
     goals: listGoals({}),
+    conductor: conductorStatus(),
   };
 }
 
@@ -754,12 +761,26 @@ async function advance(actor) {
   if (!next) {
     const session = ensureTodaySession(day);
     const waiting = items.filter(item => !isDone(item) && !localReadiness(item, items, day).ready).length;
-    postConductor(session.id, waiting ? 'Nothing else is ready today — ' + waiting + ' item' + (waiting === 1 ? ' is' : 's are') + ' waiting. The clock is off.'
-      : 'Plan\u2019s clear and the backlog is empty \u2014 tell me what today is for, or I can leave the clock off.', { key: 'empty-' + day });
+    const team = conductorStatus();
+    if (team.enabled && !['paused', 'ended'].includes(team.state)) {
+      wakeConductor({ reason: 'queue-needs-work' });
+      postConductor(session.id, 'Your current packet is finished. The team is checking the goal and preparing the next useful work.'
+        + (waiting ? ' The dated follow-up stays waiting; we’ll keep advancing other work meanwhile.' : ''),
+      { key: 'team-next-' + day + '-' + (team.cycle || 0) });
+    } else {
+      postConductor(session.id, waiting ? 'Nothing else is ready today — ' + waiting + ' item' + (waiting === 1 ? ' is' : 's are') + ' waiting. The clock is off.'
+        : 'The current queue is finished. Choose a goal in Admin to have a team prepare the next work.', { key: 'empty-' + day });
+    }
     return null;
   }
   await startItem(next.id, { actor });
   return itemById(next.id);
+}
+
+// A completed specialist round can make a review ready after the previous human packet ended.
+// Use the same serialized advancement and clock as Done; never create a second Now item.
+export function activateReadyWork({ actor = 'conductor' } = {}) {
+  return serializeWork(() => advance(actor));
 }
 
 async function stopClocked(item, actor, outcome, extra = {}) {
@@ -820,6 +841,7 @@ async function doneItem(id, { result = undefined, result_note = undefined, actor
   if (result_note !== undefined && result_note !== null && result_note !== '') patch.result_note = String(result_note);
   await stopClocked(item, actor, 'done', { result: patch.result ?? (Number(item.result) || 0) });
   await patchRecord(item.path, patch, { workTransition: WORK_TRANSITION, actor });
+  wakeConductor({ reason: 'work-completed' });
   const followup = await scheduleFollowup(item, { actor, now: Date.now() });
   if (followup) {
     postConductor(ensureTodaySession(localDay()).id, 'Follow-up scheduled: ' + (followup.title || item.follow_up_title || item.title), { key: 'followup-' + item.id });
@@ -834,6 +856,7 @@ async function parkItem(id, { actor = DEFAULT_ACTOR } = {}) {
   if (item.status === 'parked') return { next: await advance(actor) };
   await stopClocked(item, actor, 'parked');
   if (item.status !== 'parked') await patchRecord(item.path, { status: 'parked' }, { workTransition: WORK_TRANSITION, actor });
+  wakeConductor({ reason: 'work-parked' });
   return { next: await advance(actor) };
 }
 
@@ -845,6 +868,7 @@ async function stuckItem(id, { reason, actor = DEFAULT_ACTOR } = {}) {
   if (!item) throw new TodayError('no work item "' + id + '"', 404);
   await stopClocked(item, actor, 'stuck', { reason: why });
   if (item.status !== 'stuck') await patchRecord(item.path, { status: 'stuck' }, { workTransition: WORK_TRANSITION, actor });
+  wakeConductor({ reason: 'human-blocked' });
   const day = localDay();
   const session = ensureTodaySession(day);
   postConductor(session.id, 'Stuck on ' + item.title + ': ' + why, { key: 'stuck-' + day + '-' + item.id });
@@ -876,8 +900,12 @@ async function addItem(input, { actor = DEFAULT_ACTOR } = {}) {
   const id = (forDay || 'backlog') + '-' + slugify(t);
   const workflow = validateWorkflow(input, { id, items: workItems() });
   const order = (workItems().filter(i => normDay(i.day) === forDay).reduce((m, i) => Math.max(m, Number(i.order) || 0), 0)) + 1;
+  const team = conductorStatus();
+  const membership = workflow.goal_id && workflow.goal_id === team.goal_id
+    ? { project: team.project, universe: listGoals().find(g => g.id === workflow.goal_id)?.data?.universe || 'local' } : {};
   const r = upsertRecord({
     collection: 'work', id, title: t, bucket: bucket || 'admin', status: 'planned', ...workflow,
+    ...membership,
     ...(forDay ? { day: forDay } : {}), order,
     estimate_min: hasEstimate ? Math.round(estN) : 30,
     ...(why ? { why: String(why) } : {}), prep: !!prep, prep_state: 'none',
@@ -1048,11 +1076,14 @@ async function todayExecutor({ session, history, userText, emit }) {
     } catch { /* none */ }
   }
   const cache = (() => { try { return renderCache({}); } catch { return ''; } })();
+  const team = conductorStatus();
   const prompt = [
     'You are the conductor inside Scout\u2019s Today screen. Work WITH the human toward their goal. Be concrete, warm and brief. The human wrote the last line.',
     'If the goal or next step is unclear, ask ONE useful question. Once clarified, propose at most three small work items tied to an existing goal, with a destination and completion evidence. Draft useful material directly in the conversation when requested. When the human is blocked, offer one achievable alternative. Keep attention on one next action. Never repeat a question already answered in the recent thread.',
     'Always include a short human-readable reply outside an action block. Respect constraints such as local-only output in both your reply and task titles. Creating a draft is not a customer reply or a measured result.',
     'When the human changes how work will be delivered, update destination and done_when together with its title. Ask them to check a concrete detail of the output before completion.',
+    team.enabled ? 'You coordinate a continuing team, not just this single packet. Do not ask the human to invent your next task when their goal is already known. A completed email does not end the day. A dated follow-up does not block independent useful work. Use the real team state below: say what specialists are doing and give ONE concrete next decision or review. Do not claim a worker started, finished or saved a document unless the state proves it. The background coordinator dispatches specialists and replenishes useful work automatically. Do not duplicate its already queued tasks. Only the human ends the day.' : '',
+    team.enabled ? 'Current continuing team: ' + JSON.stringify(team) : '',
     completion.receipts.length ? 'Scout has already handled the human completion: ' + completion.receipts.join('; ') + '. The plan below is the new state. Do not complete another item in this turn.' : '',
     completion.dropped.length ? 'Completion was refused: ' + completion.dropped.join('; ') + '. Ask for the missing evidence; do not claim completion.' : '',
     'Existing goals (use these exact IDs for goal_id): ' + JSON.stringify(listGoals().map(goal => ({ id: goal.id, label: goal.label, target: goal.target, current: goal.current, unit: goal.unit }))),
@@ -1099,6 +1130,7 @@ async function todayExecutor({ session, history, userText, emit }) {
   let final = shown.trim();
   if (receipts.length) final += '\n\n' + receipts.join(' · ') + '.';
   if (drops.length) final += '\n\nCouldn\u2019t apply: ' + drops.join('; ') + '.';
+  wakeConductor({ reason: 'human-conversation' });
   emit({ type: 'text-delta', text: final });
   return { text: final, directives: [], cost: 0 };
 }
@@ -1319,6 +1351,7 @@ export function registerTodayRoutes(app, deps = {}) {
   // day returns planning:true and the next poll sees the plan (a Gemini call must never hold GET).
   app.get('/api/today', wrap(async () => {
     ensurePlanned().catch(() => {});
+    wakeConductor({ reason: 'today-open' });
     return getToday();
   }));
 
@@ -1345,6 +1378,7 @@ export function registerTodayRoutes(app, deps = {}) {
     const root = getStorageRoot();
     await closeDayClock({ actor: actorOf(req), root });
     assertRoot(root);
+    pauseConductor({ reason: 'The human ended the day', untilTomorrow: true });
     return dailyReview(localDay(), { force: true });
   }));
   app.post('/api/today/review-week', wrap(async req => {

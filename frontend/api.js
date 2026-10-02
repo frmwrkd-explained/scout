@@ -28,6 +28,12 @@ const opts = body => ({ headers: { 'Content-Type': 'application/json' }, body: J
 
 export const api = {
   integration: (path, method = 'GET', body) => fetch('/api/' + path, { method, ...(body === undefined ? {} : opts(body)) }).then(j),
+  conductor: () => fetch('/api/conductor').then(j),
+  configureConductor: body => fetch('/api/conductor', { method: 'PUT', ...opts(body) }).then(j),
+  setupTeam: body => fetch('/api/conductor/team', { method: 'POST', ...opts(body) }).then(j),
+  wakeConductor: body => fetch('/api/conductor/wake', { method: 'POST', ...opts(body || {}) }).then(j),
+  pauseConductor: body => fetch('/api/conductor/pause', { method: 'POST', ...opts(body || {}) }).then(j),
+  resumeConductor: body => fetch('/api/conductor/resume', { method: 'POST', ...opts(body || {}) }).then(j),
   state: () => fetch('/api/state').then(j),
 
   // ── collections · documents · views (M1) ──────────────────────────────────────────────────

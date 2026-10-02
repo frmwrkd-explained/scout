@@ -136,7 +136,7 @@ function PreparationResult({ initialTask, initialWake }) {
   </Card>;
 }
 
-export function TodayExtras({ work, plannedWork, onGo, onOpenPath, onWrote, refreshKey }) {
+export function TodayExtras({ work, plannedWork, onGo, onOpenPath, onOpenArtifact, onWrote, refreshKey }) {
   const [widgets, setWidgets] = React.useState([]), [deliveries, setDeliveries] = React.useState({ destinations: [], receipts: [] });
   const [paperclip, setPaperclip] = React.useState(null), [draft, setDraft] = React.useState(''), [destination, setDestination] = React.useState('local-artifact');
   const [busy, setBusy] = React.useState(false), [message, setMessage] = React.useState('');
@@ -152,7 +152,7 @@ export function TodayExtras({ work, plannedWork, onGo, onOpenPath, onWrote, refr
   React.useEffect(() => { load(); }, [load, refreshKey, work?.id, plannedWork?.id]);
   const act = async fn => { setBusy(true); setMessage(''); try { await fn(); onWrote?.(); await load(); } catch (error) { setMessage(error.message); } finally { setBusy(false); } };
   return <div style={sx('display:flex;flex-direction:column;gap:10px;max-height:320px;overflow:auto;flex:none')}>
-    {widgets.map(widget => <Card key={widget.id} style={sx('padding:12px;display:flex;flex-direction:column;gap:8px')}><Eyebrow>{widget.title}</Eyebrow>{widget.rows.length ? widget.rows.map(row => <div key={row.id} style={sx('font-size:12px')}><Btn variant="ghost" size="sm" onClick={() => row.path && onOpenPath?.(row.path)}>{row.label}</Btn><span>{row.detail}</span></div>) : <span style={sx('font-size:12px;color:var(--fg-muted)')}>Nothing here yet.</span>}</Card>)}
+    {widgets.map(widget => <Card key={widget.id} style={sx('padding:12px;display:flex;flex-direction:column;gap:8px')}><Eyebrow>{widget.title}</Eyebrow>{widget.rows.length ? widget.rows.map(row => <div key={row.id} style={sx('font-size:12px')}><Btn variant="ghost" size="sm" onClick={() => row.path && (onOpenArtifact ? onOpenArtifact({ path: row.path, title: row.label }) : onOpenPath?.(row.path))}>{row.label}</Btn><span>{row.detail}</span></div>) : <span style={sx('font-size:12px;color:var(--fg-muted)')}>Nothing here yet.</span>}</Card>)}
     {work ? <Card style={sx('padding:12px;display:flex;flex-direction:column;gap:8px')}><Eyebrow>HANDOFF · {work.title}</Eyebrow>
       <select aria-label="Delivery destination" value={destination} onChange={event => setDestination(event.target.value)} style={sx('background:var(--surface);color:var(--fg);border:1px solid var(--border);padding:6px;border-radius:4px')}>{deliveries.destinations.map(row => <option key={row.id} value={row.id}>{row.label}</option>)}</select>
       <textarea aria-label="Output to deliver" placeholder="Paste the output to review…" value={draft} onChange={event => setDraft(event.target.value)} style={sx('font:inherit;font-size:12px;padding:8px;resize:vertical;background:var(--surface);color:var(--fg);border:1px solid var(--border);border-radius:4px')} />
@@ -162,24 +162,24 @@ export function TodayExtras({ work, plannedWork, onGo, onOpenPath, onWrote, refr
       <Eyebrow>PAPERCLIP · {paperclipWork.title}</Eyebrow>
       {delegated ? <span style={sx('font-size:12px;color:var(--fg-muted)')}>This item is already delegated. Check its result below.</span> : <Btn size="sm" disabled={paperclipWork.status !== 'planned'} busy={busy} onClick={() => act(async () => { await api.integration('paperclip/preview', 'POST', { workId: paperclipWork.id, actor: 'crystal' }); onGo?.('decide'); })}>Review Paperclip handoff</Btn>}
     </Card> : null}
-    {deliveries.receipts.slice(-3).map(receipt => <span key={receipt.id} style={sx('font-size:11px')}>{receipt.title}: {receipt.status}{receipt.result?.path ? <Btn variant="ghost" size="sm" onClick={() => onOpenPath?.(receipt.result.path)}>Open output</Btn> : null}</span>)}
+    {deliveries.receipts.slice(-3).map(receipt => <span key={receipt.id} style={sx('font-size:11px')}>{receipt.title}: {receipt.status}{receipt.result?.path ? <Btn variant="ghost" size="sm" onClick={() => onOpenArtifact ? onOpenArtifact({ path: receipt.result.path, title: receipt.title, type: 'Delivery draft' }) : onOpenPath?.(receipt.result.path)}>Preview output</Btn> : null}</span>)}
     <Btn variant="ghost" size="sm" busy={busy} onClick={() => act(load)}>Refresh handoffs</Btn>
-    <ApprovedDeliveries onGo={onGo} onOpenPath={onOpenPath} busy={busy} act={act} refreshKey={refreshKey} receipts={deliveries.receipts} paperclipReceipts={paperclipReceipts} />
-    <PaperclipReceipts status={paperclip} busy={busy} act={act} />
+    <ApprovedDeliveries onGo={onGo} onOpenPath={onOpenPath} onOpenArtifact={onOpenArtifact} busy={busy} act={act} refreshKey={refreshKey} receipts={deliveries.receipts} paperclipReceipts={paperclipReceipts} />
+    <PaperclipReceipts status={paperclip} busy={busy} act={act} onOpenArtifact={onOpenArtifact} />
     {message ? <span role="status" style={sx('font-size:12px;color:var(--danger)')}>{message}</span> : null}
   </div>;
 }
-function ApprovedDeliveries({ onOpenPath, busy, act, refreshKey, receipts, paperclipReceipts }) {
+function ApprovedDeliveries({ onOpenPath, onOpenArtifact, busy, act, refreshKey, receipts, paperclipReceipts }) {
   const [cards, setCards] = React.useState([]);
   React.useEffect(() => { let live = true; api.proposals('accepted').then(result => { if (live) setCards((result.proposals || []).filter(card => card.delivery_hash || card.bridge_hash)); }).catch(() => {}); return () => { live = false; }; }, [refreshKey]);
   return cards.filter(card => !receipts.some(receipt => receipt.proposalId === card.id && receipt.status === 'delivered') &&
     !(card.bridge_hash && paperclipReceipts.some(receipt => receipt.kind === 'issue' && receipt.remoteId &&
-      (receipt.proposalId === card.id || receipt.workId === card.bridge_work)))).slice(-4).map(card => <Card key={card.id} style={sx('padding:10px;display:flex;gap:6px;flex-direction:column;font-size:12px')}><span>{card.title} · approved</span><Btn size="sm" busy={busy} onClick={() => act(async () => { const receipt = card.bridge_hash ? await api.integration('paperclip/push', 'POST', { proposalId: card.id, workId: card.bridge_work, actor: 'crystal' }) : await api.integration('deliveries/execute', 'POST', { proposalId: card.id }); if (receipt.result?.path) onOpenPath?.(receipt.result.path); })}>{card.bridge_hash ? 'Send approved Paperclip handoff' : 'Deliver approved output'}</Btn></Card>);
+      (receipt.proposalId === card.id || receipt.workId === card.bridge_work)))).slice(-4).map(card => <Card key={card.id} style={sx('padding:10px;display:flex;gap:6px;flex-direction:column;font-size:12px')}><span>{card.title} · approved</span><Btn size="sm" busy={busy} onClick={() => act(async () => { const receipt = card.bridge_hash ? await api.integration('paperclip/push', 'POST', { proposalId: card.id, workId: card.bridge_work, actor: 'crystal' }) : await api.integration('deliveries/execute', 'POST', { proposalId: card.id }); if (receipt.result?.path) { if (onOpenArtifact) onOpenArtifact({ path: receipt.result.path, title: card.title, type: 'Delivery draft' }); else onOpenPath?.(receipt.result.path); } })}>{card.bridge_hash ? 'Send approved Paperclip handoff' : 'Deliver approved output'}</Btn></Card>);
 }
-function PaperclipReceipts({ status, busy, act }) {
+function PaperclipReceipts({ status, busy, act, onOpenArtifact }) {
   const receipts = Array.isArray(status?.receipts) ? status.receipts : Object.values(status?.receipts || {});
   return receipts.filter(receipt => receipt.kind === 'issue').slice(-4).map(receipt => <Card key={receipt.key} style={sx('padding:10px;display:flex;flex-direction:column;gap:6px;font-size:12px')}><span>{receipt.title || receipt.workId || receipt.work_id} · {receipt.status}</span>
-    <Btn size="sm" busy={busy} onClick={() => act(() => api.integration('paperclip/' + encodeURIComponent(receipt.workId || receipt.work_id) + '/pull', 'POST', { actor: 'crystal' }))}>Check Paperclip result</Btn>
+    <Btn size="sm" busy={busy} onClick={() => act(async () => { const pulled = await api.integration('paperclip/' + encodeURIComponent(receipt.workId || receipt.work_id) + '/pull', 'POST', { actor: 'crystal' }); if (pulled.imported?.[0]?.path) onOpenArtifact?.({ path: pulled.imported[0].path, title: 'Paperclip result: ' + (receipt.title || 'delegated work'), assistant: 'Paperclip' }); })}>Check Paperclip result</Btn>
     {!['done', 'cancelled'].includes(receipt.state) ? <Btn size="sm" busy={busy} onClick={() => act(() => api.integration('paperclip/' + encodeURIComponent(receipt.workId || receipt.work_id) + '/cancel', 'POST', { actor: 'crystal', reason: 'Operator cancelled the delegation from Today' }))}>Cancel handoff</Btn> : null}
   </Card>);
 }

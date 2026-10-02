@@ -12,6 +12,7 @@ import { logEvent } from './log.mjs';
 import { localDay } from './daytime.mjs';
 import { assertPaperclipWorkAvailable } from './paperclip.mjs';
 import { propose } from './proposals.mjs';
+import { readRecord } from './records.mjs';
 import { hasWorkerPolicy, getWorkerPolicy, workerProjectAllowed, isProtectedFinance,
   projectWorkerPrompt, issueWorkerRun, withWorkerIdentity, currentWorkerIdentity, assertWorkerDispatchAllowed } from './workerScope.mjs';
 
@@ -19,6 +20,12 @@ export class WorkerError extends Error {
   constructor(message, status = 400) { super(message); this.name = 'WorkerError'; this.status = status; }
 }
 const active = new Map(); // root + wake id -> promise; durable receipts also survive a restart
+const settledListeners = new Set();
+export function onWorkerSettled(fn) {
+  if (typeof fn !== 'function') throw new WorkerError('worker settlement listener must be a function');
+  settledListeners.add(fn);
+  return () => settledListeners.delete(fn);
+}
 const receiptsDir = () => path.join(getStorageRoot(), '.scout', 'worker-wakes');
 const receiptFile = id => path.join(receiptsDir(), safe(id) + '.md');
 const stamp = n => new Date(n).toISOString();
@@ -99,6 +106,18 @@ export function matchingWorkers(task, { assistantId = null } = {}) {
   return listAssistants().filter(a => a.worker_enabled === true && (!assistantId || a.id === assistantId)
     && (!a.project || String(a.project) === task.project) && workerCanTask(a, task) && taskAllowed(a, task));
 }
+export function workerTaskReadiness(task, tasks = listTasks({ project: task.project })) {
+  if (task.depends_on == null) return { ready: true, reason: '' };
+  if (!Array.isArray(task.depends_on) || task.depends_on.some(id => typeof id !== 'string')) {
+    return { ready: false, reason: 'Task dependencies must be a list of task IDs.' };
+  }
+  for (const id of task.depends_on) {
+    const source = tasks.find(t => t.id === id && t.project === task.project);
+    if (!source) return { ready: false, reason: 'Missing task dependency: ' + id };
+    if (source.status !== 'done') return { ready: false, reason: 'Waiting for ' + source.title };
+  }
+  return { ready: true, reason: '' };
+}
 
 function createWake({ key, task, project, assistant = null, actor = 'crystal', source = 'manual', now = Date.now() }) {
   if (!String(key || '').trim() || String(key).length > 200) throw new WorkerError('wake key is required and must be at most 200 characters');
@@ -159,6 +178,73 @@ function ownTaskPrompt(task) {
     project: task.project, instructions: task.body, requires: task.requires || [],
     question: task.question || null, requested_output: task.requested_output || null });
 }
+function dependencyOutput(source, assistant, identity) {
+  if (!source.output_path) return String(source.prepared_text || '');
+  // Human edits to the canonical draft supersede the immutable original preparation text.
+  // An inaccessible or mismatched artifact fails the run; it never falls back to an owner read.
+  const read = () => readRecord(source.output_path);
+  const record = identity ? withWorkerIdentity(identity.token, read) : read();
+  if (record.collection !== 'artifact' || record.data.project !== source.project ||
+    (source.goal_id && record.data.goal_id !== source.goal_id) ||
+    String(record.data.universe || 'local') !== String(source.universe || 'local') ||
+    !taskAllowed(assistant, { ...source, ...record.data, project: source.project, path: record.path })) {
+    throw new WorkerError('The upstream draft is outside the assigned task scope.', 403);
+  }
+  return String(record.content || '');
+}
+export function referencedArtifactPaths(instructions) {
+  return [...new Set(String(instructions || '').match(/\bdata\/artifacts\/[^\s`"'<>()[\]{}|]+\.md\b/g) || [])];
+}
+function readSourceArtifact(sourcePath, task, assistant, identity) {
+  if (typeof sourcePath !== 'string' || !/^data\/artifacts\/(?:[a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_-]+\.md$/.test(sourcePath)) {
+    throw new WorkerError('A source artifact path is invalid; repair the brief before preparing it.', 400);
+  }
+  const read = () => readRecord(sourcePath);
+  const record = identity ? withWorkerIdentity(identity.token, read) : read();
+  if (record.collection !== 'artifact' || record.data.project !== task.project ||
+    (task.goal_id && record.data.goal_id && record.data.goal_id !== task.goal_id) ||
+    String(record.data.universe || 'local') !== String(task.universe || 'local') ||
+    !taskAllowed(assistant, { ...task, ...record.data, project: task.project, path: record.path })) {
+    throw new WorkerError('A requested source artifact is outside the assigned task scope.', 403);
+  }
+  return { path: record.path, title: record.data.title || path.basename(record.path, '.md'),
+    assistant: record.data.assistant || null, author: record.data.updated_by || record.data.created_by || null,
+    status: record.data.status || 'draft', material: 'Saved source/reference document. It may be an earlier draft; it does not replace the ready upstream output for this task.',
+    output: String(record.content || '') };
+}
+function excerpt(text, limit) {
+  const value = String(text || '');
+  if (value.length <= limit) return value;
+  const notice = '\n\n[Middle omitted to keep the source excerpt bounded.]\n\n';
+  const head = Math.floor((limit - notice.length) * 0.7);
+  return value.slice(0, head) + notice + value.slice(-(limit - notice.length - head));
+}
+function preparationMaterials(task, assistant, identity) {
+  if (task.source_artifacts != null && (!Array.isArray(task.source_artifacts) || task.source_artifacts.some(p => typeof p !== 'string'))) {
+    throw new WorkerError('source_artifacts must be a list of canonical artifact paths.');
+  }
+  const paths = [...new Set([...(task.source_artifacts || []), ...referencedArtifactPaths(task.body)])];
+  if (paths.length > 4) throw new WorkerError('A brief may reference at most four source artifacts.');
+  if ((task.depends_on || []).length > 8) throw new WorkerError('A brief may have at most eight direct task dependencies.');
+  // Referenced material is explicitly fetched after identity projection; it cannot disappear
+  // behind the hot cache's token cap. Any inaccessible reference stops the call before a prompt.
+  const requestedSources = paths.map(p => readSourceArtifact(p, task, assistant, identity));
+  const dependencies = (task.depends_on || []).map(id => getTask(task.project, id))
+    .filter(source => source && source.status === 'done' && taskAllowed(assistant, source))
+    .map(source => ({ id: source.id, path: source.output_path || null, title: source.title,
+      assistant: source.prepared_by || source.worker_id || null,
+      assistant_name: (source.prepared_by || source.worker_id) ? getAssistant(source.prepared_by || source.worker_id)?.name || null : null,
+      requires: source.requires || [], completed_at: source.prepared_at || null,
+      material: 'Ready output of a direct completed dependency for this assigned task. This is the actual new upstream material requested by the brief, not a prior draft.',
+      output: dependencyOutput(source, assistant, identity) }));
+  // A document declared both ways belongs in the ready dependency section. Its newest body
+  // remains explicit there, so deduplication cannot hide the actual requested review target.
+  const sources = requestedSources.filter(source => !dependencies.some(dep => dep.path === source.path));
+  const fingerprint = createHash('sha256').update(JSON.stringify({ sources, dependencies })).digest('hex');
+  const limit = Math.min(6000, Math.floor(24_000 / Math.max(1, sources.length + dependencies.length)));
+  return { sources: sources.map(source => ({ ...source, output: excerpt(source.output, limit) })),
+    dependencies: dependencies.map(source => ({ ...source, output: excerpt(source.output, limit) })), fingerprint };
+}
 async function performPreparation({ wake, assistant, task, config, root, deps, identity }) {
   const clock = typeof deps.clock === 'function' ? deps.clock : Date.now;
   let heartbeat;
@@ -178,14 +264,22 @@ async function performPreparation({ wake, assistant, task, config, root, deps, i
   try {
     const context = identity ? withWorkerIdentity(identity.token, () => projectWorkerPrompt({ assistantId: assistant.id, project: task.project })) :
       'Only the assigned task below is supplied. No private workspace, memory or hub data is included.';
+    const materials = preparationMaterials(task, assistant, identity);
     const prompt = [
       'You are ' + assistant.name + ', preparing work for a person in Scout.',
       'Your job: ' + assistant.job,
       'Prepare useful material for the assigned task. Return concise Markdown the person can review and use.',
       'You have no tools. Never say that you sent, published, joined, installed or deployed anything. State any missing information plainly.',
+      'READY UPSTREAM TASK OUTPUTS are the actual completed direct dependencies for this assigned task. If the brief asks for the new/latest guide or draft from a named specialist, its matching ready writing output below is that guide. Review that supplied output; do not call it an absent revision or a prior draft.',
+      'CANONICAL SOURCE DOCUMENTS are saved input/reference material, which may include earlier drafts. Use them to check facts and human corrections; they do not supersede the ready upstream output. A draft status describes review readiness, not an older version.',
       context, 'ASSIGNED TASK', ownTaskPrompt(task),
+      'CANONICAL SOURCE DOCUMENTS', JSON.stringify(materials.sources),
+      'READY UPSTREAM TASK OUTPUTS', JSON.stringify(materials.dependencies),
     ].join('\n\n');
     result = await (deps.think || think)({ purpose: 'prep', prompt, timeoutMs: Math.min(config.leaseMs - 1000, 20 * 60_000) });
+    if (result?.ok && getStorageRoot() === root && preparationMaterials(task, assistant, identity).fingerprint !== materials.fingerprint) {
+      result = { ok: false, reason: 'Canonical source material changed during preparation; the stale response was discarded.' };
+    }
   } catch (e) { result = { ok: false, reason: e.message || String(e) }; }
   finally { clearInterval(heartbeat); }
   if (getStorageRoot() !== root) return { ...wake, state: 'paused', reason: 'workspace changed during worker preparation' };
@@ -271,6 +365,8 @@ async function performTools({ wake, assistant, task, config, root, deps }) {
 function startWake(wake, { now, config, deps }) {
   const task = getTask(wake.project, wake.task);
   if (!task || task.status !== 'open' || task.needs_human) return { started: false, reason: 'task is not open for a worker' };
+  const readiness = workerTaskReadiness(task);
+  if (!readiness.ready) return { started: false, reason: readiness.reason };
   const assistants = matchingWorkers(task, { assistantId: wake.requested_assistant }).filter(a => !isRunning(a.id) &&
     !listWorkerWakes().some(w => w.state === 'running' && w.assistant === a.id && Date.parse(w.lease_expires_at) > now));
   const assistant = assistants[0];
@@ -300,12 +396,28 @@ function startWake(wake, { now, config, deps }) {
   const key = activeKey(root, wake.id);
   const done = (mode === 'prepare' ? performPreparation : performTools)({ wake: running, assistant, task: claimed.task, config, root, deps, identity });
   active.set(key, done);
-  done.finally(() => { if (active.get(key) === done) active.delete(key); identity?.revoke(); }).catch(() => {});
+  done.finally(() => {
+    if (active.get(key) === done) active.delete(key);
+    identity?.revoke();
+    if (getStorageRoot() !== root) return;
+    for (const listener of settledListeners) {
+      try { Promise.resolve(listener({ root, wakeId: wake.id, taskId: task.id, project: task.project,
+        assistant: assistant.id, state: getWorkerWake(wake.id)?.state })).catch(() => {}); } catch { /* observers never fail a worker */ }
+    }
+  }).catch(() => {});
   return { started: true, wake: running, done };
 }
 
 // Manual wakes are explicit owner actions and can run while autoRun is off. A repeated key
 // never starts a second run. Scheduled work requires both settings and per-worker opt-in.
+function restoredDailyBudget(wake, config, now) {
+  if (wake.mode !== 'prepare' || wake.state !== 'cooldown' || wake.attempts >= config.maxAttempts) return null;
+  const parts = String(wake.reason || '').split(' · ');
+  const matches = parts.map(reason => /^(?:(?:gemini|devin|gpt|claude|codex|stub): )?(light|heavy) daily call limit reached \(\d+\)$/.exec(reason));
+  if (!matches.length || matches.some(m => !m)) return null;
+  const tiers = [...new Set(matches.map(m => m[1]))], budget = brainBudgetToday(now);
+  return !budget.error && tiers.every(tier => budget[tier].remaining > 0) ? tiers : null;
+}
 export function wakeWorker(input = {}, { now = Date.now(), deps = {} } = {}) {
   if (currentWorkerIdentity()) throw new WorkerError('a worker cannot authorize another worker run', 403);
   return withWorkerLock(() => {
@@ -313,7 +425,17 @@ export function wakeWorker(input = {}, { now = Date.now(), deps = {} } = {}) {
     recoverWakes(now, config);
     const created = createWake({ ...input, source: 'manual', now });
     let start = { started: false, reason: 'wake already exists' };
-    if (created.created && availableSlots(config, now)) start = startWake(created.wake, { now, config, deps });
+    // A restored owner-set daily allowance is immediately usable. Remote provider quotas,
+    // generic rate limits, exhausted retry counts and paused receipts retain their cooldown.
+    const restored = restoredDailyBudget(created.wake, config, now);
+    const eligible = created.created || (created.wake.state === 'pending' && !created.wake.attempts) ||
+      (['retry', 'cooldown'].includes(created.wake.state) && created.wake.attempts < config.maxAttempts &&
+        created.wake.next_at && Date.parse(created.wake.next_at) <= now) || !!restored;
+    if (eligible && availableSlots(config, now)) {
+      start = startWake(restored ? { ...created.wake, budget_restored_at: stamp(now) } : created.wake, { now, config, deps });
+      if (restored && start.started) recordEvent(start.wake, 'budget-restored', { tiers: restored,
+        previous_next_at: created.wake.next_at, previous_reason: created.wake.reason });
+    }
     return { ...created, ...start, wake: getWorkerWake(created.wake.id) };
   });
 }
@@ -331,7 +453,7 @@ export function tickWorkers({ now = Date.now(), deps = {} } = {}) {
     const overnightDue = config.overnightEnabled && new Date(n).getHours() >= config.overnightHour;
     const wakes = listWorkerWakes();
     for (const task of listTasks({ status: 'open' })) {
-      if (task.needs_human || !matchingWorkers(task).length) continue;
+      if (task.needs_human || !workerTaskReadiness(task).ready || !matchingWorkers(task).length) continue;
       if (wakes.some(w => w.project === task.project && w.task === task.id && ['pending', 'running', 'retry', 'cooldown', 'paused'].includes(w.state))) continue;
       const key = (overnightDue ? 'overnight:' + localDay(n) : 'queue:' + (task.worker_revision || 1)) + ':' + task.project + ':' + task.id;
       createWake({ key, task: task.id, project: task.project, actor: 'schedule', source: overnightDue ? 'overnight' : 'queue', now: n });

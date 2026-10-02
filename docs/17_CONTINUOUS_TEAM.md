@@ -1,0 +1,62 @@
+# Continuous goal teams
+
+Choose an existing goal and project in Admin, then set up the team. Mira coordinates Scout (research), Pen (writing), Check (review) and Signal (analysis). These are ordinary assistant files, with declared skills and a read-only project/universe policy. Their job descriptions and names remain editable. Reopening setup preserves those edits.
+
+The conductor keeps a persistent goal loop. It reads the selected goal, scoped canonical hot context, supplied artifact bodies, work prerequisites, actual specialist outputs, recent human conversation and decisions. It briefs specialists, consumes their material into draft documents, and places a concrete human review into Today. When the human finishes or corrects the work, it reassesses the goal and can brief the next revision immediately. A scheduled wake also checks for new facts and due follow-ups.
+
+The coordinator sees sixteen bounded artifact body previews plus a scoped index of up to 128 permitted source paths, titles and full body hashes. Authored evidence and human edits come before generated history in that index. Older evidence therefore stays selectable even after it leaves the body previews, and the specialist still receives its canonical text. The latest completed work's result note takes precedence over older conversation requests.
+
+A dated external follow-up stays dated. Waiting for a reply does not make the broader goal complete: the team can prepare independent useful work while that outcome is pending. The conductor cannot send, publish or record a fictitious observation. Synthetic research must be labelled. Drafts and internal reviews do not change goal metrics or count as customer replies. Outward delivery still uses the separate exact human approval and delivery receipt pipeline.
+
+## One canonical path
+
+`backend/conductor.mjs` coordinates existing modules rather than implementing another task runner or document writer:
+
+- `memory.mjs` produces wake context. For a configured coordinator it runs under a server-issued read-only worker identity, so unrelated universes and finance documents cannot be relayed into specialist briefs. A legacy coordinator without a policy gets selected facts only.
+- `tasks.mjs` owns specialist tasks, claiming and leases. `workers.mjs` executes text-only preparation using the existing light brain and durable provider attempt ledger.
+- Task `depends_on` names upstream task IDs. A downstream specialist cannot start until those tasks finish; its prompt contains the actual prepared text, checked against its scope. The prompt names these **Ready upstream task outputs**, with task ID, path, specialist name and skills, and explicitly identifies a requested new writing dependency as the actual guide to review. Saved inputs appear separately as **Canonical source documents**, which may be earlier drafts. A document declared both ways remains in the ready output section. `source_artifacts` names up to four currently permitted saved drafts. A canonical artifact path referenced in an older brief is also resolved under the worker identity, so missing task dependency metadata cannot omit a saved human correction. Any inaccessible source stops the provider call. Source/dependency excerpts share a 24,000-character cap and retain both opening context and tail corrections.
+- `records.mjs` writes prepared output to the `artifact` collection and writes human reviews into the existing `work` collection.
+- `today.mjs` advances that review using its existing serialized one-Now rule and clock, and publishes attributed draft links in the existing daily chat.
+- `proposals.mjs` carries a necessary question into Needs you. Accepted answers remain canonical memory/decisions for future rounds.
+
+Team setup assigns the selected project and goal universe to legacy work for that same goal when those fields are missing. It does not reassign work that already belongs to another project or universe. This preserves an existing email/follow-up workflow when a continuous team is enabled later.
+
+## Persistence and bounds
+
+The opt-in configuration and current state live in `.scout/conductor/team.md`. Each coordinator round has its own file under `.scout/conductor/cycles/`; each consumed task/output digest has its own receipt under `.scout/conductor/consumed/`. Drafts live in `data/artifacts/`, human reviews in `data/work/`, and specialist tasks in the existing project task directory. No separate database or system cron is required.
+
+The wake reserves a durable three-minute coordinator lease before it detaches its work. Concurrent triggers coalesce. After a backend restart, a live lease prevents a second round; an expired lease is recorded as recovered. Workspace changes, configuration changes and pause invalidate an outstanding model answer before it can apply. Unreadable configuration, cycle or output receipts fail closed.
+
+Tasks use a semantic digest of the goal, specialist, instructions, upstream identities and the authorized full body hashes of their named source artifacts. Repeating an unchanged brief/source reuses the existing task; a human edit to that same path produces a new task, including edits beyond the coordinator's bounded body preview. Hashes come from canonical projection and cannot be supplied by the model. Each actual prepared output has one artifact and one consumption receipt, and recovery preserves human edits to an already stored draft. Each reviewed packet has at most one human review. Intermediate research/drafts can feed another specialist without adding another human decision.
+
+A checked packet includes the actual upstream drafts as well as the final check, with at most four generated references. Older checked-only packets are backfilled through the revision-aware record writer. A later checked revision reuses an open review through task dependencies or a shared writing lineage reached through canonical source-artifact provenance. The artifact's producer must name that exact output path, in the same goal, project and universe. A source-only research → writing → check revision therefore refreshes the current Now packet even when all review slots are occupied. A standalone human decision about that same open writing lineage also reuses the available review, including sibling revisions derived from a shared original writer output; earlier source references cannot replace its latest checked attachments. An analyst merely citing that guide keeps its separate decision, and an analyst-only human decision remains separate. Generated attachments update while the person's body, notes, manually attached references, review criterion, status and clock remain intact. Recorded lineage and task ordering prevent old receipts from downgrading the packet.
+
+Human edits to the canonical draft become the downstream prompt's source text; immutable original run output remains in the task receipt. A specialist also rechecks scoped source/dependency material after preparation; a mid-call edit discards the stale answer and leaves a bounded retry rather than marking that response done. Every coordinator fact, including task output, goal memory, decisions and recent explicitly scoped human messages, passes canonical membership projection. Historical round prose is omitted because it might contain material whose permission changed. A membership change invalidates a model response in flight, and a new human edit arriving mid-thought causes the stale brief to be discarded and reassessed.
+
+Default bounds are two concurrent team preparations, four new tasks per coordinator plan, three pending human reviews and twelve coordinator model attempts per local day. These fit inside the existing global worker concurrency and light-model daily budget. Provider failures and exhausted budgets leave a visible durable cooldown; they do not silently start heavy work. Unchanged facts do not buy another planning call. Useful human completion/correction bypasses ordinary cadence, while result consumption and dependent task dispatch happen immediately.
+
+Daily coordinator/light allowance cooldowns end at the next local-day boundary. Exhausting an evening allowance cannot block the next morning until the previous evening's wall-clock time. Provider-specific cooldowns keep their own timing.
+
+An explicit manual wake can resume its existing cooldown early when its recorded reason is solely the canonical local light/heavy daily call limit and that same allowance now has room. The wake and run history remain intact, its attempt count increases, and restoration is logged. Remote provider quotas, mixed quota errors, exhausted attempts and paused receipts retain their bounds. No allowance is changed by this recovery path.
+
+A future wake with unchanged facts also leaves round history unchanged until its deadline. Invalid JSON or an invalid task plan applies nothing, and retains a bounded invalid-response field and validation error in that cycle's Markdown for diagnosis. The raw invalid reply is never supplied back through unscoped historical summaries.
+
+Human completion and parking remain authoritative during recovery. If a same-scope closed review covers an output task through its original source, latest source or stored review lineage, old receipts cannot recreate that packet at another digest path. A genuinely new task output can still create its next review.
+
+Manual pause persists until Resume. End day pauses new coordination until the next morning's normal wake. A worker already preparing may finish and retain its output; it is consumed when the conductor resumes. The text-only brain has no cancellation API, so pausing also refuses an outstanding answer without claiming its provider process was stopped.
+
+## Module and HTTP contracts
+
+`conductorStatus()` is read-only and returns `enabled`, `state`, `goal_id`, `goal_label`, `project`, `project_label`, `coordinator`, `coordinator_name`, `cycle`, `summary`, `reason`, `next_wake`, `agents`, `tasks`, `recent_outputs`, `needs_you` and the canonical brain budget. `agents` contains actual assistant status and its current claimed task. `recent_outputs` contains canonical path/title/assistant/task references, and `needs_you` contains pending human work reviews.
+
+States are `idle`, `thinking`, `working`, `waiting`, `cooldown`, `paused` and `ended`. Thinking means the coordinator is assessing a round; working means specialists have claimed preparation. Waiting means no new useful brief was applied from the current facts, not that the goal has been achieved.
+
+`configureConductor(patch, {actor})` accepts owner-selected `enabled`, `goal_id`, `project`, `coordinator`, specialist IDs in `agents`, and bounded `max_parallel`, `max_tasks_per_cycle`, `min_cycle_minutes`, `cooldown_minutes`, `max_cycles_per_day` and `max_human_reviews`. Configuration/pause/resume/forced wakes require the local human owner. Worker credentials cannot invoke the owner coordinator.
+
+`wakeConductor({reason, force, actor})` returns `{started, status}` immediately. `pauseConductor({reason, untilTomorrow, actor})` and `resumeConductor({actor})` persist control state. `conductorSettled()` waits for detached rounds in integration tests. `ensureArtifactCollection()` lets canonical owner team setup establish the schema before granting read access.
+
+The server exposes GET/PUT `/api/conductor`, POST `/api/conductor/team`, and POST `/api/conductor/wake`, `/pause`, `/resume`. Today opening, completion, parking, blockage and conversation trigger reassessment; worker settlement and the existing scheduler also wake the team. Enabling this team is separate from the legacy `autoRun` scheduler flag: owner team opt-in authorizes its bounded explicit preparation wakes.
+
+## Verification
+
+`tests/conductor.test.mjs` runs a research → writing → review packet through the real canonical queue with stand-in model text. It verifies that dependency prompts contain actual upstream output, outputs become distinct canonical drafts, one human review becomes Now, and a specific correction creates another iteration without waiting for normal cadence. It also checks pause/stale answer refusal, forged agent actor refusal, workspace isolation, DAG validation, budgets, fresh disabled workspaces, corruption handling and lease recovery. The separate real GPT-6 Luna replay, including failures discovered during human document editing, is recorded in `18_CONTINUITY_SIMULATION.md`. Unit-test output does not stand in for that provider or browser evidence.

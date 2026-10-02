@@ -31,7 +31,7 @@ The existing `feat/today-loop` and `feat/tiptap-editor` worktrees remain intact.
 | G16 | Enforce worker scope and finance isolation | Server-issued identity, projected reads/prompts, canonical writes, actor forgery/finance/cross-universe refusal. Restricted workers use no-tools preparation. Host filesystem access is outside this boundary. | Implemented; enforcement tests pass |
 | G17 | Route work by skills and prepare overnight | Capability matching, cross-process leases, heartbeats, bounded concurrency/retries, cooldown and durable opt-in wake receipts. Result viewer shows actual prepared output. | Implemented; orchestration tests pass |
 | G18 | Add approved adaptive widgets | Typed catalog, evidence-backed proposal, human approval, persistent layout and canonical data. No executable model UI. | Implemented; approval/data tests pass |
-| G19 | Bridge Paperclip if operationally useful | Real isolated Paperclip 2026.1001.0 passed approved export, duplicate suppression, proposed-only import and cancellation. Its demo worker performed zero runs. | Implemented; real control plane verified |
+| G19 | Bridge Paperclip if operationally useful | Real isolated Paperclip 2026.1001.0 passed approved export, duplicate suppression, proposed-only import and cancellation. A separately approved native HTTP worker completed one GPT-6 Luna preparation; its real run comment returned as a proposed draft in Needs you. Local work and the goal remain incomplete until human review and evidence. | Implemented; native worker and control plane verified |
 | G20 | Prove the original production gates with a real operator | Real role-play uses GPT-6 Luna. A second person, one-week cache proof, packaging and a real business finding remain separate acceptance work. | Open |
 
 See `15_GOAL_INTEGRATIONS.md` for operation and `16_GOAL_COLLABORATION.md` for the real-provider
@@ -103,3 +103,32 @@ and source feature worktrees are preserved. Temporary Paperclip dependencies and
 G14–G19 are implemented with the limits in the table above. G20 remains open: role-play and local
 REST verification do not replace a second person, real customer outcomes, one-week cache reuse
 or production packaging.
+
+## Continuous team and native Paperclip replay verified on 2026-10-02
+
+The 18:36 feedback correctly rejected the earlier email-only acceptance claim. Three subagents
+implemented/audited continuing orchestration, projected coordinator context, and the native
+Paperclip callback; the root integrated Admin, inline document editing, readable approvals,
+responsive Today, and the real human replay.
+
+| ID | Task | Evidence and practical limit | State |
+| --- | --- | --- | --- |
+| G21 | Make Admin and the requested goal team visible | Five real assistant records, briefs, scope, task state, model and actual outputs; owner setup/pause/resume; same team in Today. | Implemented; browser verified |
+| G22 | Read and edit the actual work documents inline | Canonical revision-aware editor, attributed cards, current typed packets, readable Paperclip review, responsive work/chat width. Ana's saved edit reached Research/Pen/Check. | Implemented; live edit and regression checks pass |
+| G23 | Continue beyond the email and beyond a human completion | Real Luna research → writing → checking → human correction/Done → two label options → adapted measurement sheet. Recovery failures and fixes remain in evidence. Final Now is the specific label decision. | Implemented; real-provider replay verified with disclosed manual recovery |
+
+Final Node 22.22.0 suite: **1,023 tests, 1,021 passed, 2 skipped, 0 failed**. Build and
+`git diff --check` pass, with the existing large bundle warning. Detailed replay and sanitized
+machine evidence are in `18_CONTINUITY_SIMULATION.md` and `evidence/continuity-live.json`.
+
+Paperclip also performed one native HTTP worker run with one real GPT-6 Luna preparation,
+then imported its attributed comment into an open proposed finding. See
+`19_PAPERCLIP_TEXT_WORKER.md` and `evidence/paperclip-worker-live-proof.md`. This supersedes
+only the earlier execution-disabled demo's zero-run limitation; it does not approve the result,
+complete its source Work, or claim customer replies.
+
+The final copied demo is running on port 5190, and the older 5189 copy was restarted on the
+same code without reseeding. The original workspace/5188 server and source feature worktrees
+remain preserved. The debugging replay consumed 48 light attempts and no heavy attempts; its
+explicit local limit increase and next-day reset are documented. G20 remains open because
+synthetic role-play cannot establish a second operator, a week of cache reuse or real outcomes.

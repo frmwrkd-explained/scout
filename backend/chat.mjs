@@ -310,7 +310,7 @@ export function appendSystemEvent(id, text) {
 // ASSISTANT message (it is the agent speaking) tagged meta.kind='conductor' with a dedupe key, so
 // a rule that fires twice in a day still posts once — e.g. the getToday poll runs the nudge rules
 // every 60s. Like appendSystemEvent it does not touch `updated`: a nudge is not user activity.
-export function postConductor(id, text, { key = null } = {}) {
+export function postConductor(id, text, { key = null, artifacts = [], assistant = null } = {}) {
   const clean = String(text || '').trim();
   if (!clean) return null;
   const loc = locate(id);
@@ -323,7 +323,9 @@ export function postConductor(id, text, { key = null } = {}) {
     if (seen) return null;
   }
   const msg = appendMessage(loc, id, session.project,
-    makeMessage('assistant', { text: clean, meta: { kind: 'conductor', ...(key ? { key } : {}) } }));
+    makeMessage('assistant', { text: clean, meta: { kind: 'conductor', ...(key ? { key } : {}),
+      ...(assistant ? { assistant: String(assistant) } : {}),
+      ...(artifacts.length ? { artifacts: artifacts.filter(a => typeof a?.path === 'string') } : {}) } }));
   broadcast(id, 'system-event', { message: msg });
   return msg;
 }
@@ -408,7 +410,15 @@ export async function runTurn(id, userText, attachments = []) {
   const needsContext = session.scope === 'project' && !session.understandingInjected;
   const projectContext = needsContext ? projectUnderstanding(session.project) : '';
 
-  const userMsg = appendMessage(loc, id, session.project, makeMessage('user', { turn, text: String(userText || ''), attachments }));
+  let workContext = null;
+  if (session.kind === 'today' || session.executor === 'today') {
+    const { conductorStatus } = await import('./conductor.mjs');
+    const team = conductorStatus();
+    if (team.enabled && team.goal_id && team.project) workContext = { goal_id: team.goal_id, project: team.project };
+  }
+  const userMsg = appendMessage(loc, id, session.project, makeMessage('user', {
+    turn, text: String(userText || ''), attachments, ...(workContext ? { meta: workContext } : {}),
+  }));
   broadcast(id, 'turn-started', { turn, userMessage: userMsg });
 
   // The executor sees the user's text PLUS a compact attachment-refs block (paths/ids the agent can

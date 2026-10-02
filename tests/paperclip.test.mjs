@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
+import { createHash } from 'node:crypto';
 import express from 'express';
 import { freshRoot } from './helpers.mjs';
 import { readMd, writeMd, getStorageRoot, saveSettings } from '../backend/store.mjs';
@@ -296,6 +297,35 @@ test('remote results go through canonical proposed findings; duplicated pulls do
   const again = await pullPaperclip('draft');
   assert.equal(again.imported.length, 0); assert.equal(listRecords('paperclip-result').total, 2);
   assert.equal(listProposals({ kind: 'question' }).length, 1);
+});
+
+test('result cards show the approved task title and draft while preserving raw-source identity', async t => {
+  const root = seed(); const remote = await mock(t);
+  const workFile = path.join(root, 'data/work/draft.md'), source = readMd(workFile);
+  writeMd(workFile, { ...source.data, project: 'onboarding', universe: 'public' }, source.content);
+  const preview = await approved();
+  await pushPaperclip('draft', { proposalId: preview.proposalId });
+  const marker = '[Scout worker result ' + 'a'.repeat(64) + ']';
+  const raw = marker + '\n\n# Onboarding comparison\n\nA clear, useful synthetic draft.';
+  remote.comments = [{ id: 'comment-1', issueId: 'issue-1', body: raw, createdByRunId: 'native-run-1' },
+    { id: 'comment-2', issueId: 'issue-1', body: 'Explain this literal example:\n' + marker + '\nKeep it as task content.' }];
+  const pulled = await pullPaperclip('draft');
+  const first = readRecord(pulled.imported[0].path), second = readRecord(pulled.imported[1].path);
+  assert.equal(first.data.title, 'Paperclip draft: Draft onboarding');
+  assert.equal(first.content.includes('Scout worker result'), false);
+  assert.match(first.content, /# Onboarding comparison/);
+  assert.equal(first.data.paperclip_source_hash, createHash('sha256').update(JSON.stringify(raw)).digest('hex'));
+  assert.equal(first.data.paperclip_run, 'native-run-1');
+  assert.equal(first.data.paperclip_comment, 'comment-1'); assert.equal(first.data.proposed, true);
+  assert.equal(first.data.goal_id, 'launch'); assert.equal(first.data.project, 'onboarding'); assert.equal(first.data.universe, 'public');
+  assert.match(second.content, /Explain this literal example/);
+  assert.match(second.content, /Scout worker result/);
+  assert.equal((await pullPaperclip('draft')).imported.length, 0);
+  writeMd(workFile, source.data, source.content + '\nChanged after approved export');
+  remote.comments.push({ id: 'comment-3', issueId: 'issue-1', body: 'A new result whose source has changed.' });
+  const later = await pullPaperclip('draft'), unassigned = readRecord(later.imported[0].path);
+  assert.equal(unassigned.data.goal_id, undefined); assert.equal(unassigned.data.project, undefined);
+  assert.equal(unassigned.data.universe, undefined); assert.equal(unassigned.data.proposed, true);
 });
 
 test('inclusive deployed comment cursors cannot re-import their anchor or stall pagination', async t => {

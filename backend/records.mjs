@@ -594,7 +594,7 @@ function upsertOne(input, { actor, via, rows, collection, openFindings = null, w
   // Work and reviews are occurrences, not named entities: "Follow up: campaign" must not
   // merge back into "campaign", and two dated reviews may have almost identical titles.
   // Their explicit IDs are identity; they still pass through this writer and its gate/log.
-  const occurrence = input.id && ['work', 'review', 'delivery', 'paperclip-result'].includes(collection.id);
+  const occurrence = input.id && ['work', 'review', 'delivery', 'paperclip-result', 'artifact'].includes(collection.id);
   const matches = direct || occurrence ? [] : matchAgainst({ ...fields, __title: title }, rows);
   const best = matches.length && matches[0].confidence >= MERGE_CONFIDENCE ? matches[0] : null;
   const target = direct || (best ? rows.find(r => r.path === best.path) : null);

@@ -31,7 +31,7 @@ function fuzzy(hay, q) {
 // only one list of "places in this app" (Law 10: Rail.jsx is the other reader of this same idea,
 // not a second one).
 const SCREENS = [
-  ['Today', 'today'], ['Needs you', 'decide'], ['Project', 'project'],
+  ['Today', 'today'], ['Admin', 'admin'], ['Needs you', 'decide'], ['Project', 'project'],
   ['Goals', 'goals'], ['Territory', 'territory'], ['Playbook', 'playbook'],
   ['What they know', 'knows'], ['Assistants', 'assistants'], ['Hire an assistant', 'hire'],
   ['Whiteboard', 'board'], ['Files on disk', 'files'], ['Settings', 'settings'],

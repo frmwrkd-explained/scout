@@ -1,0 +1,99 @@
+{
+  "verifiedAt": "2026-10-02T17:36:12.782Z",
+  "packageVersion": "2026.1001.0",
+  "workId": "paperclip-continuity-experiment",
+  "companyId": "54d9fff2-3039-45b6-bb83-1951ec5feb58",
+  "agentId": "24441152-0d3a-4fe6-9296-098dae2c5999",
+  "delegation": {
+    "key": "827843ff7344df7135facfea8b69d71c1e5976bc2df586559b4f71f0311c18f2",
+    "remoteId": "6a8a0871-2193-4afd-8aa1-143853da5cda",
+    "state": "delegated",
+    "proposalId": "paperclip-push-32ef6a903cda8326c5606b58446e088f",
+    "approvedHash": "32ef6a903cda8326c5606b58446e088f6629c3f91065cf3ef548d1b1313235c8"
+  },
+  "runs": [
+    {
+      "id": "ce0be144-7d9e-408f-80f8-73ee8ce05fa3",
+      "companyId": "54d9fff2-3039-45b6-bb83-1951ec5feb58",
+      "agentId": "24441152-0d3a-4fe6-9296-098dae2c5999",
+      "status": "succeeded",
+      "issueId": "6a8a0871-2193-4afd-8aa1-143853da5cda",
+      "startedAt": "2026-10-02T17:33:29.035Z",
+      "finishedAt": "2026-10-02T17:33:38.417Z",
+      "error": null,
+      "summary": "HTTP POST http://127.0.0.1:5190/api/paperclip/worker"
+    }
+  ],
+  "localWorker": {
+    "state": "completed",
+    "provider": "gpt",
+    "model": "gpt-6-luna",
+    "durationMs": "8358",
+    "commentId": "ed7c61e7-1ce5-422d-a7e7-7b70171cc181",
+    "runId": "ce0be144-7d9e-408f-80f8-73ee8ce05fa3",
+    "outputHash": "851b0b7bd861d401c082638bbd147feb6c1e7a20f1fe9e4dc8dbdeb95389efe8"
+  },
+  "brainAttempts": [
+    {
+      "ts": "2026-10-02T17:33:29.876Z",
+      "phase": "reserved",
+      "attemptId": "698f8104-1f55-4912-ab66-9a4885b572eb",
+      "provider": "gpt",
+      "model": null,
+      "purpose": "prep",
+      "ok": null
+    },
+    {
+      "ts": "2026-10-02T17:33:38.233Z",
+      "phase": "completed",
+      "attemptId": "698f8104-1f55-4912-ab66-9a4885b572eb",
+      "provider": "gpt",
+      "model": "gpt-6-luna",
+      "purpose": "prep",
+      "ok": true
+    }
+  ],
+  "resultRecords": [
+    {
+      "path": "data/paperclip-result/pc-61a1c6cf092621eb6ae01d7f4fcf108a194d1b3d.md",
+      "status": "found",
+      "proposed": true,
+      "provenance": "pipeline",
+      "sourceWork": "paperclip-continuity-experiment"
+    }
+  ],
+  "sourceWork": {
+    "path": "data/work/paperclip-continuity-experiment.md",
+    "status": "planned",
+    "goalId": "activation-demo"
+  },
+  "goal": {
+    "id": "activation-demo",
+    "current": 0,
+    "target": 3
+  },
+  "reviewProposals": [
+    {
+      "id": "finding-paperclip-result-paperclip-continuity-ex-mur8sw4s",
+      "status": "open",
+      "kind": "finding",
+      "title": "Paperclip result: paperclip-continuity-experiment \u00b7 ed7c61e7-1ce5-422d-a7e7-7b70171cc181",
+      "path": "proposals/finding-paperclip-result-paperclip-continuity-ex-mur8sw4s.md"
+    }
+  ],
+  "issue": {
+    "id": "6a8a0871-2193-4afd-8aa1-143853da5cda",
+    "status": "in_progress",
+    "title": "Prepare the local onboarding comparison experiment (Paperclip)",
+    "assigneeAgentId": "24441152-0d3a-4fe6-9296-098dae2c5999"
+  },
+  "comments": [
+    {
+      "id": "ed7c61e7-1ce5-422d-a7e7-7b70171cc181",
+      "createdByRunId": "ce0be144-7d9e-408f-80f8-73ee8ce05fa3",
+      "clientRequestId": "e9327157-77ac-422a-8aa8-63e909b2a713",
+      "resultMarker": "[Scout worker result 2fe55e6a6572c0bef13ecf6c2448176d4be75dff17065e600349a0dd3b4f8b48]",
+      "bodyChars": 1415
+    }
+  ]
+}

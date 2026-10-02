@@ -32,6 +32,7 @@ import ScoutSettings from './ScoutSettings';
 import CollectionView from './CollectionView';
 import Document from './Document';
 import Today from './Today';
+import Admin from './Admin';
 import Decide from './Decide';
 import Memory from './Memory';
 import Goals from './Goals';
@@ -524,6 +525,11 @@ export default class App extends React.Component {
       case 'today':
         return <Today onGo={this.go} onOpenPath={this.openPath} onWrote={this.reload} refreshKey={refreshKey} actor={HUMAN} onSendOut={this.sendOutAll}
           {...this.getWorkClockCallbacks()} />;
+
+      case 'admin':
+        return <Admin key={this.state.storageRoot || 'workspace'} actor={HUMAN} project={project} refreshKey={refreshKey}
+          onGo={this.go} onOpenPath={this.openPath} onWrote={this.reload}
+          onOpenProject={id => this.setState({ project: id, screen: 'project' })} />;
 
       case 'decide':
         return (

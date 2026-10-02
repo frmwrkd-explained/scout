@@ -162,5 +162,5 @@ test('an empty plan pulls the next backlog item; an empty backlog answers next:n
   const last = await req('POST', '/api/today/done', { id: 'backlog-next' });
   assert.equal(last.body.next, null);
   const s = getSession(todaySessionId(DAY()));
-  assert.ok(s.messages.some(mm => mm.meta && mm.meta.kind === 'conductor' && /backlog is empty|what today is for/i.test(mm.text)));
+  assert.ok(s.messages.some(mm => mm.meta && mm.meta.kind === 'conductor' && /queue is finished|backlog is empty|what today is for/i.test(mm.text)));
 });

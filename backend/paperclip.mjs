@@ -7,7 +7,7 @@ import { getStorageRoot, readMd, writeMd, getSettings, SECRET_SETTING_KEYS } fro
 import { redact } from '../shared/redact.mjs';
 import { DEFAULT_ACTOR, isAgentActor } from './actors.mjs';
 import { readRecord, upsertRecord } from './records.mjs';
-import { getCollection, saveCollection } from './collections.mjs';
+import { getCollection, saveCollection, addField } from './collections.mjs';
 import { getGoal } from './memory.mjs';
 import { workItems } from './today.mjs';
 import { workReadiness } from './workflow.mjs';
@@ -371,16 +371,34 @@ const RESULT_SCHEMA = {
   fields: [{ key: 'title', type: 'text', primary: true, required: true },
     { key: 'status', type: 'status', gate: true, options: ['found', 'shortlist', 'accepted', 'archived'] },
     { key: 'source_work', type: 'text' }, { key: 'paperclip_issue', type: 'text' }, { key: 'paperclip_comment', type: 'text' },
-    { key: 'goal_id', type: 'text' }, { key: 'evidence', type: 'text' }],
+    { key: 'paperclip_run', type: 'text' }, { key: 'paperclip_source_hash', type: 'text' },
+    { key: 'goal_id', type: 'text' }, { key: 'project', type: 'text' }, { key: 'universe', type: 'text' }, { key: 'evidence', type: 'text' }],
 };
 function importResult(receipt, comment, cfg) {
-  if (!getCollection(RESULT_SCHEMA.id)) saveCollection(RESULT_SCHEMA);
+  const collection = getCollection(RESULT_SCHEMA.id);
+  if (!collection) saveCollection(RESULT_SCHEMA);
+  else for (const field of RESULT_SCHEMA.fields) {
+    if (!(collection.fields || []).some(existing => existing.key === field.key)) addField(RESULT_SCHEMA.id, field);
+  }
   const recordId = 'pc-' + hash([receipt.key, comment.id]).slice(0, 40);
   const issueLink = cfg.url + '/issues/' + receipt.remoteId;
+  const rawBody = String(comment.body || '');
+  // The first line is a machine reconciliation marker, not part of the person's draft.
+  // Keep its original source fingerprint and native attribution in metadata instead.
+  const body = rawBody.replace(/^\[Scout worker result [a-f0-9]{64}\]\r?\n(?:\r?\n)?/, '');
+  let membership = {};
+  try {
+    const source = readRecord(receipt.workPath);
+    if (source.rev === receipt.sourceRev) membership = Object.fromEntries(['goal_id', 'project', 'universe']
+      .filter(field => typeof source.data[field] === 'string' && source.data[field].trim())
+      .map(field => [field, source.data[field]]));
+  } catch { /* Unavailable or changed source needs the owner to assign its membership. */ }
   const result = upsertRecord({ collection: RESULT_SCHEMA.id, id: recordId,
-    title: 'Paperclip result: ' + receipt.workId + ' · ' + String(comment.id),
+    title: 'Paperclip draft: ' + safeText(receipt.title || receipt.workId, cfg).slice(0, 240),
     source_work: receipt.workId, paperclip_issue: receipt.remoteId, paperclip_comment: String(comment.id),
-    evidence: issueLink, body: safeText(comment.body, cfg).slice(0, 32000) + '\n\nSource: ' + issueLink,
+    paperclip_source_hash: hash(rawBody), ...(comment.createdByRunId ? { paperclip_run: String(comment.createdByRunId) } : {}),
+    ...membership,
+    evidence: issueLink, body: safeText(body, cfg).slice(0, 32000) + '\n\nSource: ' + issueLink,
   }, { actor: 'paperclip', via: 'paperclip-pull' });
   return { ...result, commentId: String(comment.id) };
 }

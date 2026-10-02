@@ -55,7 +55,10 @@ import { registerDeliveryRoutes } from './delivery.mjs';
 import { registerWidgetRoutes } from './widgets.mjs';
 import { registerWorkerScope } from './workerScope.mjs';
 import { registerPaperclipRoutes } from './paperclip.mjs';
-import { registerWorkerRoutes, tickWorkers } from './workers.mjs';
+import { registerPaperclipWorkerRoutes } from './paperclipWorker.mjs';
+import { registerWorkerRoutes, tickWorkers, onWorkerSettled } from './workers.mjs';
+import { conductorStatus, configureConductor, wakeConductor, pauseConductor, resumeConductor } from './conductor.mjs';
+import { setupTeam } from './team.mjs';
 import { onSchedulerTick } from './dispatch.mjs';
 import { logEvent, readEvents } from './log.mjs';
 
@@ -222,8 +225,22 @@ registerOpsgraphRoutes(app);
 registerDeliveryRoutes(app);
 registerWidgetRoutes(app);
 registerPaperclipRoutes(app);
+registerPaperclipWorkerRoutes(app);
 registerWorkerRoutes(app);
 onSchedulerTick(now => tickWorkers({ now }));
+onSchedulerTick(() => wakeConductor({ reason: 'scheduler' }));
+onWorkerSettled(() => wakeConductor({ reason: 'worker-settled' }));
+// The owner runs a team through the same scoped assistants and canonical work queue.
+const conductorRoute = fn => async (req, res) => {
+  try { res.json(await fn(req)); }
+  catch (error) { res.status(error.status || 400).json({ error: error.message }); }
+};
+app.get('/api/conductor', conductorRoute(() => conductorStatus()));
+app.put('/api/conductor', conductorRoute(req => configureConductor(req.body || {}, { actor: req.body?.actor || 'crystal' })));
+app.post('/api/conductor/team', conductorRoute(req => setupTeam(req.body || {})));
+app.post('/api/conductor/wake', conductorRoute(req => wakeConductor({ reason: 'manual', force: true, actor: req.body?.actor || 'crystal' })));
+app.post('/api/conductor/pause', conductorRoute(req => pauseConductor({ reason: 'Paused by the owner', actor: req.body?.actor || 'crystal' })));
+app.post('/api/conductor/resume', conductorRoute(req => resumeConductor({ actor: req.body?.actor || 'crystal' })));
 
 // pid/scope route params become filesystem path segments — allow only slug charset
 // (project ids are kebab slugs; scope is 'library' or a project id). Blocks %2F traversal.

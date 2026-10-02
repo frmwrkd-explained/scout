@@ -129,8 +129,11 @@ concurrent duplicate suppression, unknown-create recovery, refusal of foreign-co
 proposed-only result imports, repeat-pull deduplication and cancellation/interrupt receipts using
 mock HTTP servers. The real local demo additionally proves board authentication, company/worker
 validation, create/read/update/comment routes, duplicate suppression, proposed result import
-and cancellation against `paperclipai@2026.1001.0`. Its run ledger stayed empty. Remote adapter
-containment, provider quota and live agent-produced artifacts remain deployment-specific checks.
+and cancellation against `paperclipai@2026.1001.0`. That first execution-disabled worker's run
+ledger stayed empty. A later dedicated HTTP worker executed one real GPT-6 Luna draft and imported
+it as a proposed finding, while source Work stayed planned and the goal stayed 0/3. See the
+[bounded text-worker setup](19_PAPERCLIP_TEXT_WORKER.md) and [actual execution proof](evidence/paperclip-worker-live-proof.md).
+Broader remote adapter containment and provider quota remain deployment-specific checks.
 
 Scout still requires Node 22+. The separately installed Paperclip package declares Node 24.11+;
 its demo uses the machine's existing Node 26.10.0 without changing Scout's Node 22 runtime.
