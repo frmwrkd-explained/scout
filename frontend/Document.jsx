@@ -57,7 +57,7 @@ import { Btn, Empty, Eyebrow, InlineEdit } from './ui';
 import { Cell } from './cells';
 import PropertyRows from './PropertyRows';
 import { Freshness } from './Freshness';
-import MarkdownEditor from './MarkdownEditor';
+import RichEditor, { MarkdownSourceEditor } from './RichEditor';
 import { ConflictNotification } from './Conflict';
 import AddField from './AddField';
 import { REJECT_REASONS } from './DecideCards';
@@ -359,6 +359,9 @@ export default function Document({
       const wire = sendBody === undefined ? patch : { ...patch, body: sendBody };
       const res = await api.patchRecord(path, wire, revRef.current, sendBody, actor);
       if (!aliveRef.current) return;
+      const bodyChangedDuringSave = sendBody === undefined
+        ? bodyDirtyRef.current
+        : bodyRef.current !== sendBody;
       // Clear only what we actually sent — a keystroke that landed mid-flight is still pending.
       for (const k of Object.keys(patch)) {
         if (JSON.stringify(pendingRef.current[k]) === JSON.stringify(patch[k])) delete pendingRef.current[k];
@@ -366,7 +369,7 @@ export default function Document({
       if (sendBody !== undefined && bodyRef.current === sendBody) bodyDirtyRef.current = false;
       if (res.rev !== undefined) revRef.current = res.rev;
       if (res.data) { dataRef.current = res.data; setData(res.data); }
-      if (res.content !== undefined) { bodyRef.current = res.content; setBody(res.content); setSummary(firstParagraph(res.content)); }
+      if (res.content !== undefined && !bodyChangedDuringSave) { bodyRef.current = res.content; setBody(res.content); setSummary(firstParagraph(res.content)); }
       setSavedAt(new Date());
       const stillDirty = Object.keys(pendingRef.current).length || bodyDirtyRef.current;
       setSave(stillDirty ? 'unsaved' : 'saved');
@@ -690,6 +693,12 @@ export default function Document({
       <div style={sx('flex:1;min-height:0;overflow-y:auto')}>
         {mode === 'raw' ? (
           <div style={sx('display:flex;flex-direction:column')}>
+            <div style={sx('padding:14px 22px 0')}>
+              <Eyebrow style={sx('display:block;margin-bottom:8px;font-size:9px;font-weight:800;letter-spacing:.16em')}>
+                EDIT NOTE AS MARKDOWN · SAVES AS YOU TYPE
+              </Eyebrow>
+              <MarkdownSourceEditor value={body} onChange={queueBody} />
+            </div>
             <div style={sx('display:flex;align-items:center;gap:10px;padding:14px 22px 0')}>
               <Eyebrow style={sx('font-size:9px;font-weight:800;letter-spacing:.16em')}>
                 {raw && raw.source === 'disk' ? 'THE FILE ON DISK' : 'RECONSTRUCTED'}
@@ -698,8 +707,8 @@ export default function Document({
                 {raw && raw.source === 'disk' ? path : path + ' — /api/files/read is not mounted yet, so this is rendered from what was read'}
               </span>
             </div>
-            {/* Read-only on purpose: only backend/records.mjs writes a document file (CLAUDE.md),
-                and a raw text box is a second writer that bypasses dedupe, provenance and the gate. */}
+            {/* The full file is a read-only inspection surface. Editing the body above uses
+                queueBody and the existing records API, including its gate and conflict check. */}
             <pre style={{ ...sx('margin:0;padding:14px 22px 30px;font-size:11.5px;font-weight:500;line-height:1.8;white-space:pre-wrap;word-break:break-word'), fontFamily: MONO, color: 'var(--fg-soft)' }}>
               {raw ? raw.text : ''}
             </pre>
@@ -821,7 +830,7 @@ export default function Document({
                       MARKDOWN · SAVES AS YOU TYPE
                     </span>
                   </div>
-                  <MarkdownEditor
+                  <RichEditor
                     key={path}
                     value={body}
                     onChange={queueBody}

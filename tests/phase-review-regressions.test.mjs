@@ -227,7 +227,7 @@ test('saveGoal keeps a created date the caller supplied', () => {
 // decay.mjs reads the dates to decide what is stale — so a no-op write does not merely add noise,
 // it tells the agent that everything was re-verified today.
 //
-// The editor no longer reports an adopted value as an edit (frontend/MarkdownEditor.jsx), and the
+// The editor no longer reports an adopted value as an edit (frontend/RichEditor.jsx), and the
 // server refuses the write regardless, because a surface that lies about an edit is exactly what
 // this guard exists to survive.
 test('D4 · a patch that changes nothing does not touch provenance and does not log', async () => {

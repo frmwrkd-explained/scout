@@ -1,50 +1,38 @@
-// frontend/Today.jsx — the 9am screen (GOAL §3, T13's other half).
+// frontend/Today.jsx — the Today loop (docs/09_TODAY_LOOP.md).
+//
+// This screen used to be "three lines + needs you + behind + running" — a morning dashboard. The
+// owner replaced it with the conductor loop: plan on the left, NOW + chat in the middle, TIME on
+// the right. The overnight three-lines summary did not die — it is the first line of the morning
+// plan message now, computed server-side (backend/today.mjs overnightLine) from the same sources
+// overnightLines() reads. The pure helpers stay exported because tests exercise them directly.
 //
 // PROPS
-//   actor       string    who is looking. Defaults to 'crystal'. Reserved for writes; this screen reads.
-//   onGo        fn(key)   navigate. Called with a screen key from 08_MODULE_CONTRACTS.md §10 —
-//                         'decide' from NEEDS YOU and from the D key, 'goals' from the goals panel.
-//   onOpenPath  fn(path)  open a raw .md (Law 8). Optional; links hide without it.
-//   onSendOut   fn()      reopen every blocked task and let whichever door the assistants come
-//                         through pick them up (App.putTeamToWork — the same control PROJECT's
-//                         "Put the team to work" calls). Optional; disabled with an honest label
-//                         when absent, never a button that looks live and does nothing.
-//   refreshKey  any       change it to force a reload (after a decision, after a run).
+//   actor       string    who is looking (reserved for writes; the routes default to the human)
+//   onGo        fn(key)   navigate — 'decide' from NEEDS YOU
+//   onOpenPath  fn(path)  open a raw .md — reviews and work items are real documents
+//   refreshKey  any       change it to force a reload
 //
-// WHAT IS ON IT, AND NOTHING ELSE
-//   1  THREE LINES — what the assistants did overnight.
-//   2  NEEDS YOU   — the count, and the one key that starts the queue.
-//   3  BEHIND      — the goals that are not going to make it.
-//   4  RUNNING     — who is out, who is blocked, and the goals in full (right column).
-// That is the whole screen. This is altitude 1 in its entirety: there is no reasoning here and no
-// evidence here, because every one of those lives on a card in DECIDE. If you are about to add a
-// section, ask whether it is a decision — if it is, it belongs in the queue, and if it is not, it
-// belongs on a screen she chose to open.
+// WHAT THE SCREEN DOES — and what it never does
+//   Every number arrives computed: GET /api/today answers plan, clock, nudges, stats and usage in
+//   one payload, because the 60s poll is the loop's heartbeat. The screen only ever calls the
+//   action routes (start/pause/resume/done/park/stuck/add/reorder) and chat — it does not re-derive
+//   minutes, it does not rank the plan, and it never writes a file.
 //
-// THE THREE LINES ARE COMPUTED FROM REAL DATA, OR THEY SAY SO
-// Sources: api.runs() · api.activity() · api.proposals() · api.goals() · api.assistants(). Every
-// figure on this screen is counted from one of those five. When a source is empty or its route is
-// not up yet, the line becomes a short mono uppercase statement of that fact — never a zero
-// dressed up as news, and never a placeholder number. A person who is trusting an agent overnight
-// has to be able to trust the morning summary absolutely.
+// IDLE: 5 minutes without input or a hidden window pauses the clock (the item stays "now"); the
+// next input resumes it. The human's intent is the item, not the mouse — so idle never parks.
 //
-// WHY THE DESIGN'S INLINE "YOUR AGENTS ARE ASKING" BAND IS NOT HERE
-// design/Today.dc.html answers agent questions in place with Yes/No/Later. T13 says EVERY approval
-// in the app flows through the one queue, and a second decision surface is exactly the second
-// implementation Law 10 forbids. Questions are counted here and answered in DECIDE.
+// KEYS: Enter in the composer sends · ⌘↩ marks the now item done.
 
 import React from 'react';
 import { sx } from './sx';
 import { MONO } from './tokens';
 import { api } from './api';
-import { Btn, Chip, Empty, Eyebrow } from './ui';
-import { KIND, normalizeCard, unwrap } from './DecideCards';
+import { Btn, Chip, Empty, Eyebrow, Input } from './ui';
+import { Markdown } from './Markdown';
 
 const mono = (extra = '') => ({ ...sx('font-variant-numeric:tabular-nums;' + extra), fontFamily: MONO });
 
 const first = (...vals) => vals.find(v => v !== undefined && v !== null && v !== '');
-// `Number(null)` is 0 and `Number('')` is 0, so the null guard comes first — without it a goal
-// with no deadline renders "0 DAYS LEFT", which is a lie with a number on it.
 const num = v => {
   if (v === undefined || v === null || v === '') return null;
   const n = Number(v);
@@ -52,20 +40,15 @@ const num = v => {
 };
 const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
 
-// "Overnight" starts at 18:00 the evening before today. She opens this at 9am; everything the
-// assistants did while she was away sits inside that window.
+// ── the old screen's pure helpers — kept: tests import them, and the server ports their maths ──
+// "Overnight" starts at 18:00 the evening before today.
 function overnightStart(now = new Date()) {
   const d = new Date(now);
   d.setHours(0, 0, 0, 0);
   return d.getTime() - 6 * 3600 * 1000;
 }
 
-// HH:MM from anything that is a moment. It takes a NUMBER as readily as a string, because every
-// caller on this screen hands it one: `normRun` converts `started`/`ended` to epoch ms the moment
-// they arrive, and `Date.parse(String(1756215600000))` is NaN. The panel header therefore printed
-// the literal string "null → NOW", and the overnight sentence silently dropped its window — for as
-// long as there were no runs to render, which was until dispatch.mjs landed. A formatter that only
-// speaks one of the two shapes its own file produces will always fail on the day data arrives.
+// HH:MM from anything that is a moment — a number or a string.
 export const clock = ts => {
   const t = ts instanceof Date ? ts.getTime() : (typeof ts === 'number' ? ts : Date.parse(String(ts)));
   if (!Number.isFinite(t)) return null;
@@ -73,20 +56,7 @@ export const clock = ts => {
   return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
 };
 
-// ── normalisers ───────────────────────────────────────────────────────────────────────────────
-// Same discipline as DecideCards.normalizeCard: the documented key first, the obvious aliases
-// after, and never a crash on a shape that has not landed yet.
 const body = r => (r && r.data && typeof r.data === 'object' ? r.data : r || {});
-
-function normEvent(r) {
-  const d = body(r);
-  return {
-    type: String(first(d.type, r.type) || ''),
-    actor: String(first(d.actor, r.actor) || ''),
-    target: first(d.target, r.target) || null,
-    at: Date.parse(String(first(d.at, d.ts, d.time, d.created, r.at) || '')) || null,
-  };
-}
 
 export function normRun(r) {
   const d = body(r);
@@ -100,54 +70,17 @@ export function normRun(r) {
   };
 }
 
-function normAssistant(r) {
-  const d = body(r);
-  return {
-    id: String(first(r.id, d.id, d.name, r.slug) || ''),
-    name: String(first(d.name, r.id, d.id) || 'unnamed'),
-    job: String(first(d.job, d.does, d.role, d.description, d.summary) || ''),
-    state: String(first(d.status, d.state) || 'idle').toLowerCase(),
-    parent: first(d.parent, d.parent_of, d.sub_agent_of) || null,
-  };
-}
 
-// backend/memory.mjs `shapeGoal` already computes `current`, `target`, `daysLeft` and `behind` —
-// `behind` deliberately so, because "a `behind:` someone typed months ago can never keep claiming
-// a goal is fine". The computed value wins; the frontmatter is only a fallback for a payload that
-// predates it. Never a second staleness or progress rule on this side of the wire (Law: decay.mjs
-// and shapeGoal decide, the frontend renders).
-function normGoal(r) {
-  const d = body(r);
-  const target = num(first(r.target, d.target, d.threshold));
-  const current = num(first(r.current, d.current, d.value)) ?? 0;
-  const unit = String(first(r.unit, d.unit, '') || '');
-  const deadline = Date.parse(String(first(d.deadline, d.due, d.by) || '')) || null;
-  const daysLeft = num(r.daysLeft) ?? (deadline === null ? null : Math.ceil((deadline - Date.now()) / 86400000));
-  return {
-    id: String(first(r.id, d.id, r.slug) || ''),
-    path: first(r.path, d.path) || null,
-    label: String(first(r.label, d.label, d.name, d.statement, r.id) || 'a goal'),
-    kind: String(first(d.kind, 'target')),
-    target, current, unit, daysLeft,
-    pct: target ? Math.max(0, Math.min(1, current / target)) : 0,
-    behind: typeof r.behind === 'boolean' ? r.behind : Boolean(d.behind),
-    figure: target === null
-      ? String(current) + (unit === 'percent' ? '%' : '')
-      : (unit === 'percent' ? current + '% / ' + target + '%' : current + ' / ' + target),
-    assistants: [].concat(d.assistants ?? []).filter(Boolean).map(String),
-  };
-}
 
-// ── the three lines ───────────────────────────────────────────────────────────────────────────
-// Each returns { text, honest } — `honest: true` means "there was nothing to report", and it
-// renders as a short mono uppercase status line rather than as prose with a fabricated number.
+// The overnight summary — the old screen's three lines. It lives on now as the first line of the
+// morning plan message (backend computes its own copy); kept here for tests and for any caller
+// that still wants the client-side shape.
 export function overnightLines({ runs, events, cards, goals, sources }) {
   const since = overnightStart();
   const nightRuns = runs.filter(r => r.started && r.started >= since);
   const nightEvents = events.filter(e => e.at && e.at >= since);
   const lines = [];
 
-  // 1 · who was out
   if (!sources.runs && !sources.activity) {
     lines.push({ text: 'NO RUN LOG AND NO EVENT LOG — NOTHING IS RECORDED YET', honest: true });
   } else if (nightRuns.length) {
@@ -166,7 +99,6 @@ export function overnightLines({ runs, events, cards, goals, sources }) {
     lines.push({ text: 'NO ASSISTANT RAN OVERNIGHT', honest: true });
   }
 
-  // 2 · what came of it
   const by = t => nightEvents.filter(e => e.type === t).length;
   const stored = by('store');
   const changed = by('update') + by('merge');
@@ -179,8 +111,6 @@ export function overnightLines({ runs, events, cards, goals, sources }) {
     if (stored) bits.push(plural(stored, 'new record', 'new records'));
     if (changed) bits.push(plural(changed, 'update', 'updates'));
     if (skipped) bits.push(plural(skipped, 'duplicate skipped', 'duplicates skipped'));
-    // Law 4 is only a guarantee if a refusal is visible the next morning — so a night whose only
-    // events were refusals still gets a sentence, not an empty one with a full stop on it.
     const gate = refused ? plural(refused, 'write was refused at the gate', 'writes were refused at the gate') : '';
     let text = bits.length
       ? bits.join(', ').replace(/, ([^,]*)$/, ' and $1') + '.' + (gate ? ' ' + gate + '.' : '')
@@ -190,7 +120,6 @@ export function overnightLines({ runs, events, cards, goals, sources }) {
     lines.push({ text: 'NOTHING WAS WRITTEN OVERNIGHT', honest: true });
   }
 
-  // 3 · what it means for her
   const behind = goals.filter(g => g.behind);
   if (!sources.proposals && !sources.goals) {
     lines.push({ text: 'THE QUEUE AND YOUR GOALS ARE NOT AVAILABLE', honest: true });
@@ -207,27 +136,60 @@ export function overnightLines({ runs, events, cards, goals, sources }) {
   return lines;
 }
 
-// ── panels ────────────────────────────────────────────────────────────────────────────────────
-// The design's section container: --surface, 1px --border, r8. It is not ui.jsx's Card (r10,
-// --border-2, 11/13 padding, a status dot in its header) — that one is the dense chat/list card
-// and forcing it here would mean overriding every value it owns. One container, declared once,
-// used by all four panels on this screen.
-function Panel({ label, right, headPad = '20px 22px 0', divider = false, grow = false, children, onLabelClick }) {
+// ── the loop's own helpers ────────────────────────────────────────────────────────────────────
+const fmtMin = m => {
+  const n = Math.round(m || 0);
+  const h = Math.floor(n / 60), r = n % 60;
+  return h ? h + 'h ' + String(r).padStart(2, '0') + 'm' : r + 'm';
+};
+const fmtTimer = ms => {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+};
+
+// The day chart draws the whole period, not just days that have segments — a Mon–Sun week with
+// one tracked Friday must still show seven columns, or the chart is a single slab.
+const parseLocalDay = d => { const [y, m, dd] = String(d).split('-').map(Number); return new Date(y, m - 1, dd); };
+const fmtLocalDay = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+export function fillDays(byDay, range, day) {
+  const map = new Map((byDay || []).map(d => [d.day, d]));
+  const today = parseLocalDay(day);
+  let start;
+  let end = new Date(today);
+  if (range === 'week') {
+    start = new Date(today);
+    start.setDate(today.getDate() - ((today.getDay() + 6) % 7)); // Monday
+    end = new Date(start);
+    end.setDate(start.getDate() + 6);                            // Sunday
+  } else {
+    start = new Date(today.getFullYear(), today.getMonth(), 1);
+    end.setDate(1); end.setMonth(end.getMonth() + 1); end.setDate(0); // last day of month
+  }
+  const out = [];
+  for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const key = fmtLocalDay(d);
+    out.push(map.get(key) || { day: key, minutes: 0, by_bucket: [] });
+  }
+  return out;
+}
+
+// Bucket fills use the NEUTRAL ramp only — accent is "click this" and ok/warn/danger/marked are
+// status channels, so a bucket can never wear either. Ranked by minutes within the visible range:
+// the biggest bucket is the darkest, in both the bar list and the day chart.
+const BUCKET_RAMP = ['var(--fg)', 'var(--fg-soft)', 'var(--fg-muted)', 'var(--fg-faint)', 'var(--border-3)', 'var(--border-2)'];
+const bucketTone = (bucket, rank) => {
+  const i = rank instanceof Map ? (rank.get(bucket) ?? BUCKET_RAMP.length - 1) : BUCKET_RAMP.length - 1;
+  return BUCKET_RAMP[Math.min(i, BUCKET_RAMP.length - 1)];
+};
+
+function Section({ label, right, children, grow = false }) {
   return (
     <section style={{
       ...sx('background:var(--surface);border:1px solid var(--border);border-radius:8px;display:flex;flex-direction:column;overflow:hidden'),
       ...(grow ? sx('flex:1;min-height:0') : sx('flex:none')),
     }}>
-      <div style={{
-        ...sx('flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px'),
-        padding: headPad,
-        ...(divider ? { borderBottom: '1px solid var(--line)' } : null),
-      }}>
-        {onLabelClick
-          ? <Btn variant="ghost" className="hFgL" onClick={onLabelClick} style={sx('padding:0;border:none;border-radius:0')}>
-              <Eyebrow style={sx('font-size:9.5px;font-weight:800;letter-spacing:.18em;color:var(--fg-muted)')}>{label}</Eyebrow>
-            </Btn>
-          : <Eyebrow style={sx('font-size:9.5px;font-weight:800;letter-spacing:.18em;color:var(--fg-muted)')}>{label}</Eyebrow>}
+      <div style={sx('flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px 0')}>
+        <Eyebrow style={sx('font-size:9.5px;font-weight:800;letter-spacing:.18em;color:var(--fg-muted)')}>{label}</Eyebrow>
         {right ? <span style={{ ...mono('font-size:10px;font-weight:500;color:var(--fg-faint)') }}>{right}</span> : null}
       </div>
       {children}
@@ -235,281 +197,572 @@ function Panel({ label, right, headPad = '20px 22px 0', divider = false, grow = 
   );
 }
 
-function GoalRow({ goal, onOpen }) {
-  const left = goal.daysLeft === null
-    ? (goal.kind === 'threshold' ? 'MEASURED CONTINUOUSLY' : 'NO DEADLINE')
-    : goal.daysLeft < 0 ? Math.abs(goal.daysLeft) + 'D OVERDUE' : goal.daysLeft + ' DAYS LEFT';
+// A plan row: state dot, bucket chip, title, estimate vs actual. Click starts it (the clock does
+// the switching); ↑/↓ nudge it in the order without a drag layer.
+function PlanRow({ it, ix, total, onStart, onMove, onOpen }) {
+  const done = it.status === 'done';
+  const now = it.status === 'now';
+  const marker = done ? '✓' : now ? '●' : '·';
+  const markerColor = done ? 'var(--ok)' : now ? 'var(--marked)' : 'var(--fg-faint)';
+  const tag = it.wait_reason ? 'waiting' : it.status === 'parked' ? 'parked' : it.status === 'stuck' ? 'stuck'
+    : it.prep && it.prep_state === 'preparing' ? 'preparing…' : null;
   return (
-    <div style={sx('padding:13px 16px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:9px')}>
-      <div style={sx('display:flex;align-items:flex-start;justify-content:space-between;gap:12px')}>
-        {goal.path && onOpen
-          ? <Btn variant="ghost" className="hFg" onClick={() => onOpen(goal.path)} style={sx('padding:0;border:none;border-radius:0;font-size:12.5px;font-weight:500;color:var(--fg-soft);line-height:1.35;text-align:left;display:block')}>{goal.label}</Btn>
-          : <span style={sx('font-size:12.5px;font-weight:500;color:var(--fg-soft);line-height:1.35')}>{goal.label}</span>}
-        <span style={{ ...mono('font-size:11.5px;font-weight:600;color:var(--fg);flex:none') }}>{goal.figure}</span>
-      </div>
-      <div style={sx('height:3px;background:var(--line);border-radius:2px')}>
-        <div style={{ ...sx('height:3px;border-radius:2px'), width: Math.round(goal.pct * 100) + '%', background: goal.behind ? 'var(--warn)' : 'var(--fg-soft)' }} />
-      </div>
-      <span style={{ ...mono('font-size:9.5px;font-weight:500;letter-spacing:.08em'), color: goal.behind ? 'var(--warn)' : 'var(--fg-faint)' }}>
-        {(goal.behind ? 'BEHIND / ' : '') + left + ((goal.assistants || []).length ? ' / ' + goal.assistants.join(', ').toUpperCase() : '')}
+    <div className="planRow" onClick={() => { if (!done && !it.wait_reason) onStart(it); }}
+      style={sx('display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);position:relative;cursor:' + (done ? 'default' : 'pointer'))}
+      title={done ? 'Done' : it.wait_reason || 'Click to start'}>
+      <span style={{ ...mono('font-size:11px;font-weight:700;width:14px;flex:none;text-align:center'), color: markerColor }}>{marker}</span>
+      <Chip label={String(it.bucket || 'admin')} style={sx('flex:none')} />
+      <span style={sx('flex:1;min-width:0;font-size:12px;font-weight:500;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:' + (done ? 'var(--fg-faint)' : 'var(--fg-soft)'))}>
+        {it.title}
+      </span>
+      {tag ? <span style={{ ...mono('font-size:9px;font-weight:700;letter-spacing:.08em;flex:none'), color: it.status === 'stuck' ? 'var(--warn)' : 'var(--fg-faint)' }}>{tag.toUpperCase()}</span> : null}
+      <span style={{ ...mono('font-size:10px;flex:none'), color: Number(it.min_today) > Number(it.estimate_min || 0) ? 'var(--warn)' : 'var(--fg-faint)' }}
+        onClick={e => { e.stopPropagation(); if (onOpen && it.path) onOpen(it.path); }}>
+        {it.min_today ? it.min_today + 'm/' : ''}{it.estimate_min || '—'}m
+      </span>
+      <span className="planMove" style={sx('flex:none;display:none;gap:2px')}>
+        <Btn size="sm" variant="ghost" disabled={ix === 0} title="Move up"
+          onClick={e => { e.stopPropagation(); onMove(it, -1); }} style={sx('padding:0 4px;font-size:9px;line-height:1.4')}>↑</Btn>
+        <Btn size="sm" variant="ghost" disabled={ix >= total - 1} title="Move down"
+          onClick={e => { e.stopPropagation(); onMove(it, +1); }} style={sx('padding:0 4px;font-size:9px;line-height:1.4')}>↓</Btn>
       </span>
     </div>
   );
 }
 
-const RUNNING = ['running', 'sweeping', 'working', 'checking', 'busy'];
-const STUCK = ['blocked', 'waiting', 'error', 'failed'];
-
-function AssistantRow({ a, run }) {
-  const state = RUNNING.includes(a.state) ? 'running' : STUCK.includes(a.state) ? 'blocked' : 'idle';
-  const dot = state === 'running' ? 'var(--ok)' : state === 'blocked' ? 'var(--warn)' : 'var(--border-3)';
-  const stateFg = state === 'running' ? 'var(--ok)' : state === 'blocked' ? 'var(--warn)' : 'var(--fg-faint)';
-  const stat = run
-    ? ['LAST RUN ' + (clock(run.started) || '—'), run.found === null ? null : run.found + ' FOUND'].filter(Boolean).join(' / ')
-    : 'NO RUN RECORDED';
-  return (
-    <div style={{ ...sx('display:flex;gap:11px;padding:11px 16px;border-bottom:1px solid var(--line)'), paddingLeft: a.parent ? 34 : 16 }}>
-      <span style={{ ...sx('flex:none;margin-top:5px;width:7px;height:7px;border-radius:9999px'), background: dot }} />
-      <div style={sx('flex:1;min-width:0;display:flex;flex-direction:column;gap:3px')}>
-        <div style={sx('display:flex;align-items:center;justify-content:space-between;gap:10px')}>
-          <span style={{ ...mono('font-size:12px;font-weight:600'), color: a.parent ? 'var(--fg-soft)' : 'var(--fg)' }}>{a.name}</span>
-          <span style={{ ...mono('font-size:9px;font-weight:800;letter-spacing:.12em'), color: stateFg }}>{a.state.toUpperCase()}</span>
+// One transcript entry. Conductor lines are the quiet system voice (a small eyebrow, no bubble);
+// user messages float right; agent replies left.
+function ChatMsg({ m }) {
+  const conductor = m.meta && m.meta.kind === 'conductor';
+  if (conductor) {
+    return (
+      <div style={sx('padding:10px 16px;border-bottom:1px solid var(--line)')}>
+        <Eyebrow style={sx('font-size:8.5px;font-weight:800;letter-spacing:.2em;color:var(--fg-faint);margin-bottom:5px')}>CONDUCTOR</Eyebrow>
+        <div style={sx('font-size:12px;line-height:1.5;color:var(--fg-muted)')}>
+          <Markdown text={m.text || ''} />
         </div>
-        {a.job ? <span style={sx('font-size:11.5px;font-weight:400;color:var(--fg-muted);line-height:1.4')}>{a.job}</span> : null}
-        <span style={{ ...mono('font-size:9.5px;font-weight:500;color:var(--fg-faint)') }}>{a.parent ? 'SUB-AGENT OF ' + String(a.parent).toUpperCase() + ' / ' : ''}{stat}</span>
+      </div>
+    );
+  }
+  if (m.role === 'system') {
+    return (
+      <div style={sx('padding:6px 16px;text-align:center')}>
+        <span style={{ ...mono('font-size:9.5px;letter-spacing:.06em;color:var(--fg-faint)') }}>{m.text}</span>
+      </div>
+    );
+  }
+  const mine = m.role === 'user';
+  return (
+    <div style={sx('display:flex;padding:5px 16px;justify-content:' + (mine ? 'flex-end' : 'flex-start'))}>
+      <div style={{
+        ...sx('max-width:82%;font-size:12.5px;line-height:1.5;padding:8px 12px;border-radius:10px'),
+        background: mine ? 'var(--accent-12)' : 'var(--surface-2)',
+        border: '1px solid ' + (mine ? 'var(--accent-35)' : 'var(--border)'),
+        color: 'var(--fg)',
+      }}>
+        {mine ? <span>{m.text}</span> : <Markdown text={m.text || (m.error ? '⚠ ' + m.error : '')} />}
       </div>
     </div>
   );
 }
 
-// A short mono uppercase status band. 05_UI_SPEC.md §6 — this is how the app says "nothing here",
-// everywhere, and it is the shape T13 names for the empty queue.
-function Band({ children, grow = false, tone }) {
-  return (
-    <div style={{
-      ...sx('display:flex;align-items:center;justify-content:center;text-align:center;border:1px dashed var(--border-2);border-radius:8px;padding:18px;min-height:96px'),
-      ...(grow ? sx('flex:1;min-height:150px') : sx('flex:none')),
-    }}>
-      <span style={{ ...mono('font-size:11px;font-weight:600;letter-spacing:.14em'), color: tone || 'var(--fg-faint)' }}>{children}</span>
-    </div>
-  );
-}
+export default function Today({ onGo, onOpenPath, refreshKey, actor, onWorkClockState, onWorkClockBusy, onWorkClockIntent }) {
+  const [data, setData] = React.useState(null);
+  const [loadErr, setLoadErr] = React.useState(null);
+  const [chat, setChat] = React.useState(null);
+  const [stream, setStream] = React.useState('');
+  const [turnBusy, setTurnBusy] = React.useState(false);
+  const [draft, setDraft] = React.useState('');
+  const [range, setRange] = React.useState('today');
+  const [doneOpen, setDoneOpen] = React.useState(false);
+  const [doneResult, setDoneResult] = React.useState('');
+  const [doneNote, setDoneNote] = React.useState('');
+  const [stuckOpen, setStuckOpen] = React.useState(false);
+  const [stuckReason, setStuckReason] = React.useState('');
+  const [addOpen, setAddOpen] = React.useState(false);
+  const [add, setAdd] = React.useState({ title: '', bucket: 'research', estimate_min: 30, goal_id: '', destination: '', done_when: '', not_before: '', follow_up_days: '' });
+  const [backlogOpen, setBacklogOpen] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
+  const [actionError, setActionError] = React.useState('');
+  const [, setTick] = React.useState(0);
 
-// ── the screen ────────────────────────────────────────────────────────────────────────────────
-export default class Today extends React.Component {
-  state = {
-    loading: true, sending: false,
-    cards: [], goals: [], assistants: [], runs: [], events: [],
-    sources: { proposals: false, goals: false, assistants: false, runs: false, activity: false },
-  };
+  const dataRef = React.useRef(data);
+  dataRef.current = data;
+  const busyRef = React.useRef(false);
+  const chatId = data && data.chat;
 
-  componentDidMount() {
-    this.mounted = true;
-    window.addEventListener('keydown', this.onKey);
-    this.load();
-  }
-
-  componentDidUpdate(prev) {
-    if (prev.refreshKey !== this.props.refreshKey) this.load();
-  }
-
-  componentWillUnmount() {
-    this.mounted = false;
-    window.removeEventListener('keydown', this.onKey);
-  }
-
-  // Five independent reads. One route being down must degrade one panel, never the morning —
-  // most of these land across M3 and M4 and this screen is the first thing anyone opens.
-  async load() {
-    const settled = await Promise.allSettled([
-      api.proposals('open'), api.goals(), api.assistants(), api.runs({ limit: 40 }), api.activity(300),
-    ]);
-    if (!this.mounted) return;
-    const [p, g, a, r, ev] = settled;
-    const ok = x => x.status === 'fulfilled';
-    this.setState({
-      loading: false,
-      cards: ok(p) ? unwrap(p.value, 'proposals', 'cards').map(normalizeCard).filter(Boolean) : [],
-      goals: ok(g) ? unwrap(g.value, 'goals').map(normGoal) : [],
-      assistants: ok(a) ? unwrap(a.value, 'assistants').map(normAssistant) : [],
-      runs: ok(r) ? unwrap(r.value, 'runs').map(normRun) : [],
-      events: ok(ev) ? unwrap(ev.value, 'events', 'activity').map(normEvent) : [],
-      sources: { proposals: ok(p), goals: ok(g), assistants: ok(a), runs: ok(r), activity: ok(ev) },
-    });
-  }
-
-  onKey = e => {
-    const t = e.target || document.activeElement;
-    const tag = String((t && t.tagName) || '').toLowerCase();
-    if ((t && t.isContentEditable) || tag === 'input' || tag === 'textarea' || tag === 'select') return;
-    if (e.metaKey || e.ctrlKey || e.altKey) return;
-    const k = String(e.key).toLowerCase();
-    if (k === 'd') { e.preventDefault(); if (this.props.onGo) this.props.onGo('decide'); }
-    else if (k === 'enter') { e.preventDefault(); this.send(); }
-  };
-
-  async send() {
-    if (!this.props.onSendOut || this.state.sending) return;
-    this.setState({ sending: true });
-    try { await this.props.onSendOut(); } finally { if (this.mounted) this.setState({ sending: false }); this.load(); }
-  }
-
-  render() {
-    const { loading, sending, cards, goals, assistants, runs, events, sources } = this.state;
-    const { onGo, onOpenPath, onSendOut } = this.props;
-
-    if (loading) {
-      return (
-        <div style={sx('flex:1;display:flex;align-items:center;justify-content:center;padding:40px')}>
-          <Empty size="page" style={sx('max-width:440px')} title="READING THE WORKSPACE" />
-        </div>
-      );
+  const load = React.useCallback(async () => {
+    try {
+      const d = await api.today();
+      setData(d); setLoadErr(null);
+      onWorkClockState?.(d);
+      if (d.chat) {
+        try { setChat(await api.chatSession(d.chat)); } catch { setChat(null); }
+      }
+    } catch (e) {
+      setLoadErr(e);
     }
+  }, [onWorkClockState]);
 
-    const lines = overnightLines({ runs, events, cards, goals, sources });
-    const behind = goals.filter(g => g.behind);
-    const since = overnightStart();
-    const nightRuns = runs.filter(r => r.started && r.started >= since);
-    // A defensive fallback on BOTH ends, not just the second — `clock()` now handles the type
-    // mismatch that caused the literal-"null" bug, but a run still out has no `ended`, and one
-    // whose `started` has no parseable time (a hand-edited file, a field name this screen does
-    // not know yet) must never print anything but the placeholder that says so.
-    const runWindow = nightRuns.length
-      ? ((clock(Math.min(...nightRuns.map(r => r.started))) || '—') + ' → '
-         + (clock(Math.max(...nightRuns.map(r => r.ended || r.started))) || 'NOW') + ' / ' + nightRuns.length + ' RUNS')
-      : (sources.runs ? 'NO RUNS RECORDED' : 'NO RUN LOG');
+  // The heartbeat — nudges, prep state, the clock all arrive through here. 3s while a morning
+  // plan is being written so the plan lands on screen promptly; 60s the rest of the day.
+  React.useEffect(() => {
+    let t;
+    let dead = false;
+    const tick = async () => {
+      await load();
+      if (dead) return;
+      t = setTimeout(tick, dataRef.current && dataRef.current.planning ? 3000 : 60 * 1000);
+    };
+    tick();
+    return () => { dead = true; clearTimeout(t); };
+  }, [load, refreshKey]);
 
-    // Breakdown of the queue by kind — the same six kinds, the same table, no second vocabulary.
-    const byKind = cards.reduce((m, c) => { m[c.kind] = (m[c.kind] || 0) + 1; return m; }, {});
-    const runningNow = assistants.filter(a => RUNNING.includes(a.state)).length;
-    const lastRunFor = id => runs.find(r => r.assistant === id) || null;
+  // App owns idle/visibility handling across navigation; this tick only paints the clock.
+  React.useEffect(() => {
+    const iv = setInterval(() => setTick(t => t + 1), 15 * 1000);
+    return () => clearInterval(iv);
+  }, []);
 
+  // The day's chat is a live SSE channel: conductor posts and replies arrive without a poll.
+  React.useEffect(() => {
+    if (!chatId) return undefined;
+    const es = new EventSource(api.chatStreamUrl(chatId));
+    const reload = () => api.chatSession(chatId).then(setChat).catch(() => {});
+    es.addEventListener('text-delta', ev => {
+      try { const d = JSON.parse(ev.data); setStream(s => s + (d.text || '')); } catch { /* partial frame */ }
+    });
+    es.addEventListener('turn-started', () => { setStream(''); setTurnBusy(true); });
+    es.addEventListener('turn-done', () => { setStream(''); setTurnBusy(false); reload(); load(); });
+    es.addEventListener('turn-cancelled', () => { setStream(''); setTurnBusy(false); reload(); });
+    es.addEventListener('error', () => { setTurnBusy(false); reload(); });
+    es.addEventListener('system-event', () => { reload(); });
+    return () => es.close();
+  }, [chatId, load]);
+
+  const act = React.useCallback(async fn => {
+    if (busyRef.current) return;
+    busyRef.current = true; setBusy(true);
+    onWorkClockBusy?.(true);
+    setActionError('');
+    try { await fn(); } catch (error) { setActionError(String(error.message || error)); }
+    busyRef.current = false; setBusy(false);
+    await load();
+    onWorkClockBusy?.(false);
+  }, [load, onWorkClockBusy]);
+
+  const start = it => act(() => { onWorkClockIntent?.('start'); return api.todayStart(it.id); });
+  const move = (it, dir) => act(() => {
+    const ids = (dataRef.current.plan || []).map(p => p.id);
+    const ix = ids.indexOf(it.id);
+    const jx = ix + dir;
+    if (ix < 0 || jx < 0 || jx >= ids.length) return Promise.resolve();
+    [ids[ix], ids[jx]] = [ids[jx], ids[ix]];
+    return api.todayReorder(ids);
+  });
+
+  const doDone = () => act(async () => {
+    const n = dataRef.current.now;
+    if (!n) return;
+    onWorkClockIntent?.('done');
+    await api.todayDone(n.id, doneResult === '' ? undefined : Number(doneResult), doneNote || undefined);
+    setDoneOpen(false); setDoneResult(''); setDoneNote('');
+  });
+  const doPark = it => act(() => { onWorkClockIntent?.('park'); return api.todayPark((it || dataRef.current.now).id); });
+  const doStuck = () => act(async () => {
+    const n = dataRef.current.now;
+    if (!n || !stuckReason.trim()) return;
+    onWorkClockIntent?.('stuck');
+    await api.todayStuck(n.id, stuckReason.trim());
+    setStuckOpen(false); setStuckReason('');
+  });
+  const doAdd = () => act(async () => {
+    if (!add.title.trim()) return;
+    await api.todayAdd({ ...add, title: add.title.trim(), estimate_min: Number(add.estimate_min) || 30, day: dataRef.current.day });
+    setAdd(a => ({ ...a, title: '' }));
+  });
+  const planBacklog = it => act(() => api.patchRecord(it.path, { day: dataRef.current.day, status: 'planned' }));
+  const endDay = () => act(() => { onWorkClockIntent?.('end'); return api.todayEndDay(); });
+
+  const sendChat = () => {
+    const text = draft.trim();
+    if (!text || !chatId || turnBusy) return;
+    setDraft('');
+    setTurnBusy(true); setStream('');
+    api.chatTurn(chatId, text).catch(error => {
+      setTurnBusy(false);
+      setDraft(current => current || text);
+      setActionError(String(error.message || error));
+    });
+  };
+
+  // ⌘↩ = Done on the now item (the result box stays a deliberate extra step on click).
+  React.useEffect(() => {
+    const onKey = e => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        const n = dataRef.current && dataRef.current.now;
+        if (n && !busyRef.current) {
+          e.preventDefault();
+          if (n.done_when) setDoneOpen(true);
+          else doDone();
+        }
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Prepared material lives in the item's body under `## Prepared` — fetched only while a now
+  // item is active, so the NOW card never waits on it.
+  const [nowDoc, setNowDoc] = React.useState(null);
+  const nowId = data && data.now && data.now.id;
+  const nowPrep = data && data.now && data.now.prep_state;
+  React.useEffect(() => {
+    setNowDoc(null);
+    if (!nowId) return undefined;
+    let dead = false;
+    const pull = () => api.document((dataRef.current.now || {}).path || '').then(d => { if (!dead) setNowDoc(d); }).catch(() => {});
+    pull();
+    const iv = setInterval(pull, 20 * 1000);
+    return () => { dead = true; clearInterval(iv); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nowId, nowPrep]);
+
+  if (loadErr && !data) {
     return (
-      <div style={sx('flex:1;min-height:0;display:flex;gap:16px;padding:20px;overflow:hidden')}>
+      <div style={sx('flex:1;display:flex;align-items:center;justify-content:center;padding:40px')}>
+        <Empty size="page" style={sx('max-width:440px')} title="TODAY DID NOT LOAD" body={String(loadErr.message || loadErr)} />
+      </div>
+    );
+  }
+  if (!data) {
+    return (
+      <div style={sx('flex:1;display:flex;align-items:center;justify-content:center;padding:40px')}>
+        <Empty size="page" style={sx('max-width:440px')} title="READING THE WORKSPACE" />
+      </div>
+    );
+  }
 
-        <div style={sx('flex:1;min-width:0;display:flex;flex-direction:column;gap:16px;overflow:hidden')}>
+  const now = data.now;
+  const next = data.next;
+  const stats = (data.stats || {})[range] || { total_min: 0, by_bucket: [], by_day: [] };
+  const usage = data.usage || {};
+  const dayChart = range === 'today' ? [] : fillDays(stats.by_day, range, data.day);
+  const maxBucket = Math.max(1, ...stats.by_bucket.map(b => b.minutes));
+  const maxDay = Math.max(1, ...dayChart.map(d => d.minutes));
+  // by_bucket arrives minutes-desc — its index IS the ramp rank, so the same bucket is the same
+  // tone in the bar list and inside every day column.
+  const bucketRank = new Map(stats.by_bucket.map((b, i) => [b.bucket, i]));
+  const elapsedMs = now && now.clock && now.clock.running ? Date.now() - now.clock.started : null;
+  const over = elapsedMs !== null && elapsedMs > (Number(now.estimate_min) || 0) * 60000;
+  const preparedText = (() => {
+    const m = /## Prepared\n([\s\S]*?)(?=\n## |$)/.exec((nowDoc && (nowDoc.content || nowDoc.body)) || '');
+    return m ? m[1].trim() : '';
+  })();
+  const messages = (chat && chat.messages) || [];
 
-          {/* ── 1 · three lines ───────────────────────────────────────────────────────────── */}
-          <Panel label="OVERNIGHT" right={runWindow}>
-            <div style={sx('padding:12px 22px 20px;display:flex;flex-direction:column;gap:7px')}>
-              {lines.map((l, i) => (l.honest
-                ? <span key={i} style={{ ...mono('font-size:11px;font-weight:600;letter-spacing:.14em;color:var(--fg-faint)') }}>{l.text}</span>
-                : <p key={i} style={sx('margin:0;font-size:16px;font-weight:400;line-height:1.45;color:var(--fg-soft);text-wrap:pretty')}>{l.text}</p>
+  const planLabel = data.day
+    ? new Date(data.day + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
+    : 'Today';
+
+  return (
+    <div style={sx('flex:1;min-height:0;display:flex;flex-direction:column;padding:18px 22px;gap:14px')}>
+      {/* ── header ── */}
+      <div style={sx('flex:none;display:flex;align-items:baseline;gap:16px')}>
+        <h1 style={sx('font-size:17px;font-weight:700;color:var(--fg);letter-spacing:-.01em')}>{planLabel}</h1>
+        <span style={{ ...mono('font-size:11.5px;color:var(--fg-muted)') }}>
+          Tracked today {fmtMin(((data.stats || {}).today || {}).total_min)}
+        </span>
+        {data.needs_you ? (
+          <Btn variant="ghost" className="hFg" onClick={() => onGo && onGo('decide')}
+            style={{ ...mono('font-size:11.5px;font-weight:600;color:var(--warn);padding:0;border:none') }}>
+            {data.needs_you} need you →
+          </Btn>
+        ) : null}
+        <span style={sx('flex:1')} />
+        {data.planning ? <span style={{ ...mono('font-size:10px;letter-spacing:.1em;color:var(--fg-faint)') }}>PLANNING…</span> : null}
+        <Btn size="sm" variant="ghost" busy={busy} onClick={endDay} title="Write today's review now">End day</Btn>
+      </div>
+
+      {actionError ? <div role="alert" style={sx('color:var(--warn);font-size:12px')}>{actionError}</div> : null}
+
+      <div style={sx('flex:1;min-height:0;display:flex;gap:14px')}>
+        {/* ── left: the plan ── */}
+        <div style={sx('flex:none;width:300px;min-height:0;display:flex;flex-direction:column;gap:12px')}>
+          <Section label="TODAY" right={plural((data.plan || []).filter(i => i.status === 'done').length, 'done', 'done') + ' / ' + (data.plan || []).length} grow>
+            <div style={sx('flex:1;min-height:0;overflow:auto;margin-top:8px')}>
+              {(data.plan || []).map((it, ix) => (
+                <PlanRow key={it.id} it={it} ix={ix} total={data.plan.length}
+                  onStart={start} onMove={move} onOpen={onOpenPath} />
               ))}
-            </div>
-          </Panel>
-
-          {/* ── 2 · what needs her ────────────────────────────────────────────────────────── */}
-          <Panel label="NEEDS YOU" right={sources.proposals ? null : 'THE QUEUE IS NOT AVAILABLE'} headPad="16px 22px 0">
-            <div style={sx('padding:10px 22px 16px;display:flex;flex-direction:column;gap:14px')}>
-              <div style={sx('display:flex;align-items:center;justify-content:space-between;gap:20px')}>
-                <div style={sx('display:flex;align-items:baseline;gap:8px;flex:none')}>
-                  <span style={{ ...mono('font-size:30px;font-weight:600;line-height:1;color:var(--fg)') }}>{cards.length}</span>
-                  <span style={sx('font-size:12.5px;font-weight:500;color:var(--fg-muted)')}>
-                    {cards.length === 1 ? 'decision waiting' : 'decisions waiting'}
+              {!data.plan.length ? (
+                <div style={sx('padding:16px')}>
+                  <span style={{ ...mono('font-size:10.5px;letter-spacing:.1em;color:var(--fg-faint)') }}>
+                    {data.planned === false ? 'NOT PLANNED YET — THE FIRST POLL OF THE DAY PLANS IT' : 'NOTHING PLANNED'}
                   </span>
                 </div>
-                {/* Outlined, not filled: the one solid accent on TODAY is "Put the team back to work". */}
-                <Btn variant="secondary" disabled={!cards.length || !onGo} onClick={() => onGo && onGo('decide')}
-                  style={sx('flex:none;height:40px;padding:0 18px;border-radius:6px;font-size:13px;gap:10px')}>
-                  <span>Start deciding</span>
-                  <span style={{ ...mono('font-size:10px;font-weight:600;border:1px solid var(--accent-35);border-radius:4px;padding:1px 5px') }}>D</span>
-                </Btn>
-              </div>
-              {cards.length ? (
-                <div style={sx('display:flex;flex-wrap:wrap;gap:6px;min-width:0')}>
-                  {Object.keys(byKind).map(k => {
-                    const n = byKind[k];
-                    const word = (KIND[k] || KIND.unknown).chip;
-                    return (
-                      <Chip
-                        key={k}
-                        onClick={() => onGo && onGo('decide')}
-                        title={(KIND[k] || KIND.unknown).effect}
-                        style={{
-                          ...sx('height:26px;display:inline-flex;align-items:center;gap:7px;padding:0 10px;border-radius:6px;background:var(--surface-2);border:1px solid var(--border);font-size:11px'),
-                          // Chip is mono by default; the figure stays mono and the word does not.
-                          fontFamily: 'inherit',
-                        }}
-                        label={<>
-                          <span style={{ ...mono('font-size:11px;font-weight:600;color:var(--fg-soft)') }}>{n}</span>
-                          <span style={sx('font-size:11px;font-weight:500;color:var(--fg-muted)')}>{n === 1 ? word.one : word.many}</span>
-                        </>}
-                      />
-                    );
-                  })}
+              ) : null}
+            </div>
+            <div style={sx('flex:none;border-top:1px solid var(--line);padding:10px 12px;display:flex;flex-direction:column;gap:8px')}>
+              {addOpen ? (
+                <div style={sx('display:flex;flex-direction:column;gap:6px')}>
+                  <div style={sx('display:flex;gap:6px;align-items:center')}>
+                  <Input value={add.title} placeholder="New item…" autoFocus
+                    onChange={e => setAdd(a => ({ ...a, title: e.target.value }))}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); doAdd(); } }}
+                    style={sx('flex:1;min-width:0;font-size:12px')} />
+                  <select value={add.bucket} onChange={e => setAdd(a => ({ ...a, bucket: e.target.value }))}
+                    style={{ ...mono('font-size:10px'), background: 'var(--raise)', color: 'var(--fg-soft)', border: '1px solid var(--border-2)', borderRadius: 6, padding: '4px 6px' }}>
+                    {(data.buckets || ['research', 'reading', 'seo', 'marketing', 'email', 'facebook-groups', 'reddit', 'admin']).map(b => <option key={b} value={b}>{b}</option>)}
+                  </select>
+                  <Input value={add.estimate_min} type="number" min="5" max="240" title="minutes"
+                    onChange={e => setAdd(a => ({ ...a, estimate_min: e.target.value }))}
+                    style={{ ...mono('font-size:11px;width:52px;flex:none') }} />
+                  <Btn size="sm" variant="secondary" onClick={doAdd} disabled={!add.title.trim()}>Add</Btn>
+                  </div>
+                  <select aria-label="Goal" value={add.goal_id} onChange={e => setAdd(a => ({ ...a, goal_id: e.target.value }))}
+                    style={sx('font-size:11px;background:var(--raise);color:var(--fg-soft);border:1px solid var(--border-2);border-radius:6px;padding:6px')}>
+                    <option value="">Goal (optional)</option>
+                    {(data.goals || []).map(goal => <option key={goal.id} value={goal.id}>{goal.label}</option>)}
+                  </select>
+                  <Input aria-label="Destination" value={add.destination} placeholder="Where does the output go?"
+                    onChange={e => setAdd(a => ({ ...a, destination: e.target.value }))} style={sx('font-size:11px')} />
+                  <Input aria-label="Done when" value={add.done_when} placeholder="What proves this is done?"
+                    onChange={e => setAdd(a => ({ ...a, done_when: e.target.value }))} style={sx('font-size:11px')} />
+                  <div style={sx('display:flex;gap:6px;align-items:center')}>
+                    <Input aria-label="Not before" title="Start on or after this date" type="date" value={add.not_before}
+                      onChange={e => setAdd(a => ({ ...a, not_before: e.target.value }))} style={sx('font-size:11px;min-width:0;flex:1')} />
+                    <Input aria-label="Follow up after days" title="Create a follow-up this many days after completion" type="number" min="1" max="365"
+                      placeholder="Follow-up days" value={add.follow_up_days}
+                      onChange={e => setAdd(a => ({ ...a, follow_up_days: e.target.value }))} style={sx('font-size:11px;width:110px')} />
+                  </div>
                 </div>
               ) : (
-                <Band>NO QUESTIONS — YOUR ASSISTANTS ARE CLEAR</Band>
+                <Btn variant="ghost" size="sm" onClick={() => setAddOpen(true)} style={sx('align-self:flex-start')}>+ Add</Btn>
               )}
-            </div>
-          </Panel>
-
-          {/* ── 3 · the goals that are not going to make it ───────────────────────────────── */}
-          <section style={sx('flex:1;min-height:0;display:flex;flex-direction:column;gap:10px')}>
-            <div style={sx('flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 2px')}>
-              <Eyebrow style={sx('font-size:9.5px;font-weight:800;letter-spacing:.18em;color:var(--fg-muted)')}>BEHIND SCHEDULE</Eyebrow>
-              <span style={{ ...mono('font-size:10px;font-weight:500;color:var(--fg-faint)') }}>
-                {sources.goals ? behind.length + ' OF ' + goals.length : 'GOALS NOT AVAILABLE'}
-              </span>
-            </div>
-            <div style={sx('flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:8px')}>
-              {!sources.goals ? (
-                <Band grow>THE GOALS ROUTE IS NOT UP YET</Band>
-              ) : !goals.length ? (
-                <Band grow>NO GOALS SET — TELL YOUR ASSISTANTS WHAT WINNING LOOKS LIKE</Band>
-              ) : !behind.length ? (
-                <Band grow>{'NOTHING IS BEHIND — ' + goals.length + ' ON TRACK'}</Band>
-              ) : behind.map(g => (
-                <div key={g.id} style={sx('flex:none;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;overflow:hidden')}>
-                  <GoalRow goal={g} onOpen={onOpenPath} />
+              <Btn variant="ghost" className="hFg" onClick={() => setBacklogOpen(o => !o)}
+                style={{ ...mono('font-size:10px;letter-spacing:.08em;padding:0;border:none;color:var(--fg-faint);align-self:flex-start') }}>
+                BACKLOG · {data.backlog_count || 0} {backlogOpen ? '▾' : '▸'}
+              </Btn>
+              {backlogOpen ? (
+                <div style={sx('max-height:180px;overflow:auto;display:flex;flex-direction:column;gap:2px')}>
+                  {(data.backlog || []).map(it => (
+                    <Btn key={it.id} variant="ghost" className="hBg" title="Plan it for today" onClick={() => planBacklog(it)}
+                      style={sx('text-align:left;padding:5px 8px;border-radius:6px;font-size:11.5px;color:var(--fg-muted);display:flex;gap:8px;align-items:center')}>
+                      <span style={{ ...mono('font-size:9px;color:var(--fg-faint);flex:none') }}>{it.bucket}</span>
+                      <span style={sx('overflow:hidden;text-overflow:ellipsis')}>
+                        {it.title}{it.wait_reason ? <span style={sx('display:block;color:var(--warn);font-size:10px')}>{it.wait_reason}</span> : null}
+                      </span>
+                    </Btn>
+                  ))}
+                  {!data.backlog_count ? <span style={{ ...mono('font-size:10px;color:var(--fg-faint)') }}>EMPTY</span> : null}
                 </div>
-              ))}
+              ) : null}
+            </div>
+          </Section>
+        </div>
+
+        {/* ── center: now + the conductor ── */}
+        <div style={sx('flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:12px')}>
+          <section style={sx('flex:none;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px 18px;display:flex;flex-direction:column;gap:10px')}>
+            {data.planning ? (
+              <span style={{ ...mono('font-size:10px;letter-spacing:.12em;color:var(--fg-faint)') }}>PLANNING YOUR DAY…</span>
+            ) : null}
+            {now ? (
+              <>
+                <div style={sx('display:flex;align-items:center;gap:10px')}>
+                  <span style={{ ...mono('font-size:9px;font-weight:800;letter-spacing:.2em;color:var(--fg-faint);flex:none') }}>NOW</span>
+                  <Chip label={String(now.bucket || 'admin')} />
+                  <span style={sx('flex:1')} />
+                  <span style={{ ...mono('font-size:15px;font-weight:700'), color: over ? 'var(--warn)' : 'var(--fg)' }}>
+                    {now.clock && now.clock.running ? fmtTimer(elapsedMs) : 'paused'} <span style={sx('font-size:10.5px;font-weight:500;color:var(--fg-faint)')}>/ {now.estimate_min || '—'}m</span>
+                  </span>
+                </div>
+                <div style={sx('font-size:15px;font-weight:600;color:var(--fg);line-height:1.3')}>{now.title}</div>
+                {now.why ? <div style={sx('font-size:11.5px;color:var(--fg-muted);line-height:1.4')}>{now.why}</div> : null}
+                {now.goal_id || now.destination || now.done_when ? (
+                  <div style={sx('display:flex;flex-direction:column;gap:4px;font-size:11.5px;color:var(--fg-muted)')}>
+                    {now.goal_id ? <Btn variant="ghost" size="sm" onClick={() => onOpenPath && onOpenPath('goals/' + now.goal_id + '.md')}
+                      style={sx('align-self:flex-start;padding:0;color:var(--fg-soft)')}>
+                      Goal: {(data.goals || []).find(goal => goal.id === now.goal_id)?.label || now.goal_id}
+                    </Btn> : null}
+                    {now.key_result ? <div>Measure: {now.key_result}</div> : null}
+                    {now.destination ? <div>Destination: {now.destination}</div> : null}
+                    {now.done_when ? <div>Done when: {now.done_when}</div> : null}
+                    {now.follow_up_days ? <div>Follow-up: {now.follow_up_days} days after completion</div> : null}
+                  </div>
+                ) : null}
+                {now.prep && now.prep_state === 'preparing' ? (
+                  <span style={{ ...mono('font-size:10px;letter-spacing:.08em;color:var(--fg-faint)') }}>PREPARING MATERIAL…</span>
+                ) : null}
+                {preparedText ? (
+                  <div style={sx('max-height:40vh;overflow:auto;border-top:1px solid var(--line);padding-top:8px;font-size:12px;color:var(--fg-soft)')}>
+                    <Markdown text={preparedText} />
+                  </div>
+                ) : null}
+                <div style={sx('display:flex;gap:8px;align-items:center;flex-wrap:wrap')}>
+                  {now.clock && now.clock.running ? (
+                    <Btn size="sm" variant="ghost" busy={busy} onClick={() => act(() => { onWorkClockIntent?.('pause'); return api.todayPause(); })}>Pause</Btn>
+                  ) : (
+                    <Btn size="sm" variant="secondary" busy={busy} onClick={() => act(() => { onWorkClockIntent?.('resume'); return api.todayResume(); })}>Resume</Btn>
+                  )}
+                  <Btn size="sm" variant="primary" busy={busy} onClick={() => setDoneOpen(o => !o)}>Done</Btn>
+                  <Btn size="sm" variant="ghost" busy={busy} onClick={() => doPark()}>Park</Btn>
+                  <Btn size="sm" variant="ghost" busy={busy} onClick={() => setStuckOpen(o => !o)}>Stuck</Btn>
+                  <span style={sx('flex:1')} />
+                  <span style={{ ...mono('font-size:9px;color:var(--fg-faint);letter-spacing:.08em') }}>⌘↩ DONE</span>
+                </div>
+                {doneOpen ? (
+                  <div style={sx('display:flex;gap:6px;align-items:center;border-top:1px solid var(--line);padding-top:10px')}>
+                    <Input value={doneResult} type="number" placeholder="Result?" title="optional — a number"
+                      onChange={e => setDoneResult(e.target.value)} style={{ ...mono('font-size:11px;width:90px;flex:none') }} />
+                    <Input value={doneNote} placeholder={now.done_when ? 'Completion evidence (required)' : 'note, optional'}
+                      onChange={e => setDoneNote(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); doDone(); } }}
+                      style={sx('flex:1;min-width:0;font-size:12px')} />
+                    <Btn size="sm" variant="primary" busy={busy} disabled={!!now.done_when && !doneNote.trim()} onClick={doDone}>Done</Btn>
+                  </div>
+                ) : null}
+                {stuckOpen ? (
+                  <div style={sx('display:flex;gap:6px;align-items:center;border-top:1px solid var(--line);padding-top:10px')}>
+                    <Input value={stuckReason} placeholder="What's blocking it? (required)" autoFocus
+                      onChange={e => setStuckReason(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); doStuck(); } }}
+                      style={sx('flex:1;min-width:0;font-size:12px')} />
+                    <Btn size="sm" variant="secondary" busy={busy} disabled={!stuckReason.trim()} onClick={doStuck}>Mark stuck</Btn>
+                  </div>
+                ) : null}
+              </>
+            ) : next ? (
+              <div style={sx('display:flex;align-items:center;gap:12px')}>
+                <div style={sx('flex:1;min-width:0')}>
+                  <span style={{ ...mono('font-size:9px;font-weight:800;letter-spacing:.2em;color:var(--fg-faint)') }}>UP NEXT</span>
+                  <div style={sx('font-size:14px;font-weight:600;color:var(--fg);margin-top:4px')}>{next.title}</div>
+                  <div style={{ ...mono('font-size:10px;color:var(--fg-faint);margin-top:2px') }}>{next.bucket} · ~{next.estimate_min || '—'}m</div>
+                </div>
+                <Btn variant="primary" busy={busy} onClick={() => start(next)}>Start</Btn>
+              </div>
+            ) : (
+              <div style={sx('display:flex;align-items:center;gap:12px')}>
+                <span style={sx('flex:1;font-size:12.5px;color:var(--fg-muted)')}>
+                  {data.planned === false ? 'The day isn’t planned yet — the first poll plans it.'
+                    : 'Nothing planned — ask me to plan, or add an item on the left.'}
+                </span>
+              </div>
+            )}
+          </section>
+
+          {/* the day's thread */}
+          <section style={sx('flex:1;min-height:0;background:var(--surface);border:1px solid var(--border);border-radius:8px;display:flex;flex-direction:column;overflow:hidden')}>
+            <div style={sx('flex:1;min-height:0;overflow:auto;padding:8px 0;display:flex;flex-direction:column;gap:2px')}>
+              {messages.map(m => <ChatMsg key={m.id} m={m} />)}
+              {stream || turnBusy ? (
+                <div style={sx('display:flex;padding:5px 16px')}>
+                  <div style={sx('max-width:82%;font-size:12.5px;line-height:1.5;padding:8px 12px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border);color:var(--fg)')}>
+                    {stream ? <Markdown text={stream} /> : <span style={{ ...mono('font-size:10px;letter-spacing:.12em;color:var(--fg-faint)') }}>THINKING…</span>}
+                  </div>
+                </div>
+              ) : null}
+              {!messages.length && !stream ? (
+                <div style={sx('flex:1;display:flex;align-items:center;justify-content:center')}>
+                  <span style={{ ...mono('font-size:10px;letter-spacing:.14em;color:var(--fg-faint)') }}>THE DAY’S THREAD — PLANS, NUDGES AND REPLIES LAND HERE</span>
+                </div>
+              ) : null}
+            </div>
+            <div style={sx('flex:none;border-top:1px solid var(--line);padding:10px 14px;display:flex;gap:8px;align-items:flex-end')}>
+              <textarea value={draft} rows={2} placeholder={chatId ? 'Tell the conductor…' : 'The thread starts when the day is planned'}
+                disabled={!chatId}
+                onChange={e => setDraft(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey) { e.preventDefault(); sendChat(); }
+                }}
+                style={sx('flex:1;resize:none;background:var(--raise);border:1px solid var(--border-2);border-radius:8px;color:var(--fg);font:inherit;font-size:12.5px;padding:8px 10px;line-height:1.4')} />
+              <Btn variant="secondary" busy={turnBusy} disabled={!chatId || !draft.trim()} onClick={sendChat}>Send</Btn>
             </div>
           </section>
         </div>
 
-        {/* ── 4 · what is running (388px, EXTRACT.md §3.2) ─────────────────────────────────── */}
-        <aside style={sx('width:388px;flex:none;display:flex;flex-direction:column;gap:16px;overflow:hidden')}>
-
-          {/* The one solid accent fill on this screen. Scout does not own the agent process
-              (04_AGENT_CONTRACT §1) — there is no runner to dispatch — so the label says what
-              this actually does: reopen blocked tasks and let whichever door the assistants come
-              through pick them up. Same control, same honest label, as PROJECT's. */}
-          <Btn
-            variant="primary"
-            busy={sending}
-            disabled={!onSendOut}
-            onClick={() => this.send()}
-            style={sx('flex:none;display:flex;align-items:center;justify-content:space-between;gap:14px;height:64px;padding:0 22px;border-radius:8px')}
-          >
-            <span style={sx('display:flex;flex-direction:column;gap:4px;align-items:flex-start')}>
-              <span style={sx('font-size:16px;font-weight:600')}>{sending ? 'Putting them back to work' : 'Put the team back to work'}</span>
-              <span style={{ ...mono('font-size:10px;font-weight:600;letter-spacing:.1em;opacity:.72') }}>
-                {!onSendOut ? 'NOT AVAILABLE YET'
-                  : sending ? plural(assistants.length, 'ASSISTANT', 'ASSISTANTS') + ' STARTING'
-                  : runningNow ? plural(runningNow, 'ASSISTANT', 'ASSISTANTS') + ' ALREADY RUNNING'
-                  : plural(assistants.length, 'ASSISTANT', 'ASSISTANTS') + ' IDLE'}
-              </span>
-            </span>
-            <span style={{ ...mono('font-size:11px;font-weight:600;border-radius:4px;padding:3px 8px;background:var(--accent-deep);color:var(--on-accent)') }}>&#8629;</span>
-          </Btn>
-
-          <Panel label="YOUR ASSISTANTS" right={sources.assistants ? runningNow + ' RUNNING' : 'NOT AVAILABLE'} headPad="12px 16px 10px" divider>
-            {assistants.length
-              ? assistants.map(a => <AssistantRow key={a.id || a.name} a={a} run={lastRunFor(a.id || a.name)} />)
-              : <div style={sx('padding:16px')}><Band>{sources.assistants ? 'NO ASSISTANTS HIRED YET' : 'THE ASSISTANTS ROUTE IS NOT UP YET'}</Band></div>}
-          </Panel>
-
-          <Panel label="GOALS" right="SET BY YOU" headPad="12px 16px 10px" divider grow onLabelClick={onGo ? () => onGo('goals') : null}>
-            <div style={sx('flex:1;min-height:0;overflow-y:auto')}>
-              {goals.length
-                ? goals.map(g => <GoalRow key={g.id} goal={g} onOpen={onOpenPath} />)
-                : <div style={sx('padding:16px')}><Band>{sources.goals ? 'NO GOALS SET' : 'THE GOALS ROUTE IS NOT UP YET'}</Band></div>}
+        {/* ── right: time ── */}
+        <div style={sx('flex:none;width:320px;min-height:0;display:flex;flex-direction:column;gap:12px')}>
+          <Section label="TIME" grow>
+            <div style={sx('flex:none;display:flex;gap:6px;padding:10px 16px 0')}>
+              {[['today', 'Today'], ['week', 'Week'], ['month', 'Month']].map(([k, l]) => (
+                <Chip key={k} label={l} on={range === k} onClick={() => setRange(k)} />
+              ))}
             </div>
-          </Panel>
-        </aside>
+            <div style={sx('flex:none;padding:10px 16px 0;display:flex;align-items:baseline;gap:10px')}>
+              <span style={{ ...mono('font-size:22px;font-weight:700;color:var(--fg)') }}>{fmtMin(stats.total_min)}</span>
+              <span style={{ ...mono('font-size:10px;color:var(--fg-faint);letter-spacing:.08em') }}>TRACKED</span>
+            </div>
+            <div style={sx('flex:none;padding:10px 16px 0;display:flex;flex-direction:column;gap:7px')}>
+              {stats.by_bucket.map(b => (
+                <div key={b.bucket} style={sx('display:flex;align-items:center;gap:8px')}>
+                  <span style={{ ...mono('font-size:9.5px;width:96px;flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--fg-muted)') }}>{b.bucket}</span>
+                  <div style={sx('flex:1;height:5px;background:var(--line);border-radius:3px;overflow:hidden')}>
+                    <div style={{ height: '100%', borderRadius: 3, width: Math.round(b.minutes / maxBucket * 100) + '%', background: bucketTone(b.bucket, bucketRank) }} />
+                  </div>
+                  <span style={{ ...mono('font-size:10px;flex:none;color:var(--fg-soft)') }}>
+                    {fmtMin(b.minutes)}{b.done ? ' · ' + b.done + '✓' : ''}{b.results ? ' · ' + b.results + ' results' : ''}
+                  </span>
+                </div>
+              ))}
+              {!stats.by_bucket.length ? (
+                <span style={{ ...mono('font-size:10px;letter-spacing:.1em;color:var(--fg-faint)') }}>NO TRACKED TIME IN THIS RANGE</span>
+              ) : null}
+            </div>
+            {range !== 'today' && dayChart.length ? (
+              <div style={sx('flex:1;min-height:0;padding:12px 16px;display:flex;flex-direction:column;gap:4px')}>
+                <div style={sx('flex:1;min-height:0;display:flex;align-items:flex-end;gap:3px')}>
+                  {dayChart.map(d => (
+                    <div key={d.day} title={d.day + ' · ' + fmtMin(d.minutes)}
+                      style={sx('flex:1;display:flex;flex-direction:column-reverse;gap:1px;height:100%;min-width:0')}>
+                      {(d.by_bucket || []).map(b => (
+                        <div key={b.bucket} style={{ flex: 'none', height: Math.max(2, Math.round(b.minutes / maxDay * 100)) + '%', background: bucketTone(b.bucket, bucketRank), borderRadius: 1 }} />
+                      ))}
+                    </div>
+                  ))}
+                </div>
+                {/* one label row — a label must never ride on top of a bar it belongs under */}
+                <div style={sx('flex:none;display:flex;gap:3px')}>
+                  {dayChart.map(d => (
+                    <span key={d.day} style={{ ...mono('font-size:8px;flex:1;min-width:0;text-align:center;color:var(--fg-faint)') }}>
+                      {range === 'week' ? 'MTWTFSS'[parseLocalDay(d.day).getDay() === 0 ? 6 : parseLocalDay(d.day).getDay() - 1] : parseLocalDay(d.day).getDate()}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : <span style={sx('flex:1')} />}
+            <div style={sx('flex:none;border-top:1px solid var(--line);padding:9px 16px;display:flex;flex-direction:column;gap:5px')}>
+              <span style={{ ...mono('font-size:9.5px;letter-spacing:.06em;color:var(--fg-faint)') }}>
+                AGENTS TODAY: {['gemini', 'devin', 'claude', 'codex', 'stub'].filter(p => usage[p]).map(p => p + ' ' + usage[p]).join(' · ') || 'none'}
+              </span>
+              {data.budget ? <span style={{ ...mono('font-size:9px;color:var(--fg-faint)') }}>
+                Calls left: light {data.budget.light.remaining}/{data.budget.light.limit} · heavy {data.budget.heavy.remaining}/{data.budget.heavy.limit}
+              </span> : null}
+              {(data.providers || []).filter(provider => provider.installed && provider.textOnlyAvailable === false).map(provider => (
+                <span key={provider.id} title={provider.textOnlyReason} style={{ ...mono('font-size:9px;color:var(--warn)') }}>
+                  {provider.label}: Today unavailable
+                </span>
+              ))}
+            </div>
+          </Section>
+
+          {(data.reviews || []).length ? (
+            <Section label="REVIEWS">
+              <div style={sx('padding:8px 8px 12px;display:flex;flex-direction:column')}>
+                {data.reviews.map(r => (
+                  <Btn key={r.id} variant="ghost" className="hBg" onClick={() => onOpenPath && onOpenPath(r.path)}
+                    style={sx('text-align:left;padding:6px 8px;border-radius:6px;display:flex;gap:8px;align-items:center')}>
+                    <span style={{ ...mono('font-size:9px;color:var(--fg-faint);flex:none;width:44px') }}>{String(r.kind || '').toUpperCase()}</span>
+                    <span style={sx('flex:1;min-width:0;font-size:11.5px;color:var(--fg-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{r.title}</span>
+                  </Btn>
+                ))}
+              </div>
+            </Section>
+          ) : null}
+        </div>
       </div>
-    );
-  }
+    </div>
+  );
 }

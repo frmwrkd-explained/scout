@@ -49,6 +49,7 @@ import { registerTaskRoutes } from './tasks.mjs';
 import { registerProposalRoutes } from './proposals.mjs';
 import { registerInboxRoutes, startInboxWatch, ensureInbox, refreshAgentFiles } from './inbox.mjs';
 import { registerDispatchRoutes, startScheduler, stopScheduler, stopAll as stopAllRuns } from './dispatch.mjs';
+import { registerTodayRoutes } from './today.mjs';
 import { logEvent, readEvents } from './log.mjs';
 
 const APP_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -207,6 +208,8 @@ registerInboxRoutes(app, { logEvent });
 // The one button (GOAL §3). Mounted AFTER tasks.mjs so `POST /api/assistants/:id/run` sits beside
 // the routes that own assistants, and so the Index reads both in one pass.
 registerDispatchRoutes(app, { logEvent });
+// The Today loop — the chat+plan surface, the clock, the brain calls (docs/09_TODAY_LOOP.md).
+registerTodayRoutes(app, { logEvent });
 
 // pid/scope route params become filesystem path segments — allow only slug charset
 // (project ids are kebab slugs; scope is 'library' or a project id). Blocks %2F traversal.

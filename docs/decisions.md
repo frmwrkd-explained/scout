@@ -1145,3 +1145,80 @@ Range requests are answered with 206 because Safari will not play a video at all
 is refused server-side, and a NAMED PLATE says *"this file is not here"* where a broken-image glyph
 says *"this app is broken"*.
 
+
+---
+
+## Today is the loop, not the dashboard
+
+The Today screen was the "three lines + needs you + behind + running" morning summary. The owner replaced it with the **Today loop**: a chat + plan hybrid that captures time programmatically, pushes the next item, nudges, and closes with a daily/weekly review (docs/09_TODAY_LOOP.md, backend/today.mjs).
+
+Decisions made where the spec left room:
+
+- **The clock is events, not fields.** `start|pause|resume|stop` land as `work` events in the append-only log; minutes are derived by replaying them (midnight-split per local day). Buckets freeze into event meta at start, so re-bucketing later does not rewrite history. No "started_at" column exists to lie.
+- **Code drives, models only write.** Ordering, timing, stats, nudges and the weekly automation rule are arithmetic. The brain (backend/brain.mjs) is the ONE place a model call is made; light tier = Gemini CLI → Devin CLI → none, and heavy providers are never a light fallback unless `allowHeavyFallback` is on. A no-brain day still plans — deterministically, and the plan message says so.
+- **The overnight three lines did not die** — they became the first line of the morning plan message, computed server-side from the same sources (runs, event log, open queue, goals). `overnightLines` stays exported from Today.jsx because tests exercise it.
+- **Reviews' numbers are the rollup's, never the model's.** The daily review's table and the `minutes`/`done` fields are computed before the narrative is written; the model only narrates and proposes learnings (which land `status: proposed` — the DECIDE gate still applies).
+- **The day session is one chat per local day** (`chat/today-<day>.md`, kind `today`, executor `today`) — conductor lines are assistant messages tagged `meta.kind:'conductor'` with a dedupe key, so the 60s poll can re-check nudge rules without reposting.
+- **`week` is Monday–Sunday in local time.** The log names files by UTC day, so range reads fetch one file either side and filter by real timestamp.
+
+---
+
+## The document editor is Tiptap, not CodeMirror
+
+Owner's call. CodeMirror gave a live-preview *text* editor — markup hidden on lines the caret
+is not on. Tiptap gives a ProseMirror document, so the note is edited as the rendered thing:
+a checklist is boxes, a table is a table, a callout is a box.
+
+The port is from OpsGraph's `features/editor/rich/` — the sibling app that already runs this
+editor over the same "file on disk is Markdown" contract. What came across: the core editor
+loop (`contentType: 'markdown'` in, `getMarkdown()` out), the extension list minus the
+OpsGraph-only nodes (wikilink, embed, structured rows, AI cards — Scout's document has no
+records to link or files to embed *in this surface*), the slash menu and its DOM popup, the
+bubble menu, the drag handle, the table kit, and the callout as Obsidian's `> [!note]`. What
+did not: lucide icons (Scout ships no icon font — the bar keeps the glyph labels it had) and
+Tailwind (the CSS moved to `frontend/rich/rich.css` on tokens only; the floating pieces reuse
+`.glassPop`).
+
+Two behaviours are non-negotiable and stayed: an adopted external value never reports as an
+edit (`emitUpdate: false` — D4's client half), and a save echo is never re-adopted while
+focused (`value === emitted || editor.isFocused` → skip).
+
+**The accepted normalisation:** `*` bullets become `-`, wrapped paragraphs join, a stray `_`
+earns a backslash, task boxes get standard `[ ]`/`[x]` round-trip. It is idempotent and
+text-lossless — `tests/rich-editor-roundtrip.test.mjs` proves both over every workspace-demo
+body, headless, through the same `richExtensions()` list the editor runs.
+
+**The escape hatch stays:** anything Tiptap cannot represent survives in Raw mode — the
+header's Editor / Raw toggle is untouched.
+
+## Goal-loop integration: explicit handoffs and verified provider limits
+
+The two uncommitted feature worktrees were combined on `codex/goal-loop-integration` without
+changing the originals. The user asked for the full task list, Paperclip research and parallel
+agent work; `docs/11_GOAL_LOOP_TASKS.md` records completed slices and external dependencies.
+
+Work records gain goal, destination, completion condition, prerequisites and delayed follow-ups
+through `backend/workflow.mjs`; the existing records writer remains canonical. Explicit IDs in
+Work/Review represent occurrences and skip fuzzy title merging. Otherwise a follow-up can merge
+into its completed parent or two dated reviews can merge. Other entity collections retain dedupe.
+
+The editor preserves unsupported Markdown with an editable source fallback, and Raw body edits
+use the same save/conflict path. Code block whitespace is literal. Opening/adopting text does not
+write, and an older autosave response cannot replace newer local edits.
+
+Today records paused outcomes separately from time, freezes completion results, assigns midnight
+outcomes to the actual completion segment, and keeps one Now item across concurrent requests.
+Plan and chat changes validate before applying. End day closes the clock before reviewing.
+
+Paperclip remains a research recommendation for orchestration contracts and an optional future
+bridge, preserving Scout's local-first files. No second database/server is installed. Gemini plan,
+Devin auto and Codex read-only were not valid no-tools guarantees. Today uses only verified
+text-only invocations, with durable daily attempt limits and an explicit heavy fallback boundary.
+See `docs/10_PAPERCLIP_RESEARCH.md` for primary sources and installed-runtime qualifications.
+
+
+Idle detection is owned by the app so it survives navigation; manual pauses are never automatically
+resumed. Workspace switches invalidate pending clock callbacks. Scheduler closure uses the intended
+cutoff even when the tick is late. Generic Work status edits are refused by the canonical writer
+unless they carry Today's internal transition token, keeping clock/evidence/follow-ups together.
+Ordinary planned ingestion and property/body edits remain available through the normal pipeline.

@@ -24,6 +24,10 @@ FrameForge's own `CLAUDE.md`, `README.md` and `ISSUES.md` are preserved as `docs
 | Decay | `backend/decay.mjs` | One function decides staleness for every object type. Never inline a second rule. |
 | Territory scoring | `backend/territory.mjs` | Sole writer of `yield` / `hit_rate` — never set by hand |
 | The agent's view of the app | `backend/agentIndex.mjs` | Adding a capability is a new Index line, never a router-skill edit |
+| Human work and reviews | `backend/today.mjs` | Plan, one Now item, event-derived time, nudges and review lifecycle. |
+| Work prerequisites and follow-ups | `backend/workflow.mjs` | Goal/destination/evidence fields, readiness, cycle validation and one dated follow-up per source. Uses the records writer. |
+| Text-only Today models and call budgets | `backend/brain.mjs` + `backend/agentProviders.mjs` | Verified invocation descriptors, tier boundary and durable daily attempt reservations. |
+| Idle work clock | `frontend/workClock.js` | App-lifetime activity/visibility controller; only server events count time. |
 | Sending an assistant out (the local-CLI door) | `backend/dispatch.mjs` | `sendOut` / `sendOutAll` / `stopRun`. Composes `agentRunner` + `agentHome` + `tasks`; it spawns nothing itself and writes no document. A run's figures are **counted from the log**, never taken from the agent's reply. |
 | Serving a file's bytes | `backend/files.mjs` `rawFile` | `GET /api/files/raw`. Media types are an allowlist served inline; everything else is an attachment, because the UI and the API share an origin. |
 | HTTP contract | `backend/index.mjs` route handlers | A field a route does not destructure does not exist |

@@ -408,5 +408,21 @@ export const api = {
   proposeCollection: card => fetch('/api/collections/propose', { method: 'POST', ...opts({ ...card, actor: 'scout' }) }).then(j),
 
   inboxSweep: () => fetch('/api/inbox/sweep', { method: 'POST', ...opts({}) }).then(j),
-  inboxStatus: () => fetch('/api/inbox').then(j)
+  inboxStatus: () => fetch('/api/inbox').then(j),
+
+  // ── the today loop (backend/today.mjs · docs/09_TODAY_LOOP.md) ────────────────────────────
+  // getToday is the whole screen in one payload — plan, clock, nudges, stats, usage — because
+  // the 60s poll is the loop's heartbeat and must never be a fan-out of six requests.
+  today: () => fetch('/api/today').then(j),
+  todayStart: id => fetch('/api/today/start', { method: 'POST', ...opts({ id }) }).then(j),
+  todayPause: () => fetch('/api/today/pause', { method: 'POST', ...opts({}) }).then(j),
+  todayResume: () => fetch('/api/today/resume', { method: 'POST', ...opts({}) }).then(j),
+  todayDone: (id, result, result_note) => fetch('/api/today/done', { method: 'POST', ...opts({ id, result, result_note }) }).then(j),
+  todayPark: id => fetch('/api/today/park', { method: 'POST', ...opts({ id }) }).then(j),
+  todayStuck: (id, reason) => fetch('/api/today/stuck', { method: 'POST', ...opts({ id, reason }) }).then(j),
+  todayAdd: body => fetch('/api/today/add', { method: 'POST', ...opts(body || {}) }).then(j),
+  todayReorder: ids => fetch('/api/today/reorder', { method: 'POST', ...opts({ ids }) }).then(j),
+  todayPrep: id => fetch('/api/today/prep', { method: 'POST', ...opts({ id }) }).then(j),
+  todayEndDay: () => fetch('/api/today/end', { method: 'POST', ...opts({}) }).then(j),
+  todayReviewWeek: body => fetch('/api/today/review-week', { method: 'POST', ...opts(body || {}) }).then(j)
 };

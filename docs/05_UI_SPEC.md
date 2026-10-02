@@ -121,3 +121,29 @@ Its value here is exactly what you said: *understanding the relationships, and p
 - **Freshness is a form**, not only a colour — one mechanism, used identically everywhere.
 - **Empty states speak in short mono uppercase**: `NO QUESTIONS — YOUR ASSISTANTS ARE CLEAR`.
 - **Every record shows its path** (`data/guests/maria-santos.md`) and it is clickable.
+
+## 7. The Today screen — the loop
+
+Today is no longer a morning dashboard of three lines — it is the day's working surface, a chat +
+plan hybrid (docs/09_TODAY_LOOP.md). One screen, three columns, one solid accent button:
+
+```
+┌────────────┬──────────────────────────────────┬──────────────────┐
+│ TODAY      │  NOW  · title · why · 18:32/30m  │  TIME            │
+│  ● now     │  [Pause] [Done] [Park] [Stuck]   │   Today|Wk|Mo    │
+│  · planned │  prepared material (scroll ≤40vh)│   bucket bars    │
+│  ✓ done    │──────────────────────────────────│   per-day cols   │
+│  + Add     │  the day's thread (conductor     │   agents today   │
+│  BACKLOG N │   lines, user bubbles, replies)  │   REVIEWS        │
+│            │  composer — Enter sends          │                  │
+└────────────┴──────────────────────────────────┴──────────────────┘
+```
+
+- **Every number is the server's.** `GET /api/today` answers plan, clock, nudges and stats in one payload; the screen only calls the action routes.
+- Click a plan row to start it — the clock switches for you. ↑/↓ on hover reorders; `+ Add` is inline; Backlog expands and a click pulls an item into today.
+- The **Done** button records a result and note. An item with a completion condition requires an evidence note; `⌘↩` opens that field. Finishing starts the next ready item and schedules any delayed follow-up.
+- Conductor messages are quiet system lines with a CONDUCTOR eyebrow — the morning plan, nudges, review summaries. Nudges post once a day each, keyed.
+- Five idle minutes or a hidden window pauses the clock across all screens; activity resumes only automatically paused work. Manual Pause remains paused. The item stays "now".
+- Now names the goal, measure, destination and completion condition. Prerequisite and future-dated items stay visible as waiting; they cannot start or complete early.
+- The footer shows daily model attempts and remaining tier budgets. Installed providers with unverified text-only restrictions are labelled unavailable for Today, with a reason.
+- The old three-lines overnight summary is the first line of the morning plan message.

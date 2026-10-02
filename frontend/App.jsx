@@ -19,6 +19,7 @@ import { sx } from './sx';
 import { api } from './api';
 import { Empty } from './ui';
 import { initTheme } from './theme';
+import { createWorkClock } from './workClock';
 
 import Rail from './Rail';
 import Inspector from './Inspector';
@@ -65,7 +66,7 @@ export default class App extends React.Component {
     referencedBy: [], refsFor: null, external: null,
     assistants: [], memoryCounts: {}, needsYou: 0, project: null, projects: [],
     activityOpen: false, nonce: 0, refreshKey: 0, findings: null,
-    firstRun: false, paletteOpen: false,
+    firstRun: false, paletteOpen: false, storageRoot: null,
     loading: true, error: null, toast: null, toastDanger: false,
   };
 
@@ -76,16 +77,50 @@ export default class App extends React.Component {
     // the OS happened to be at first paint, and a second ⌥⌘L binding in this file would have
     // toggled twice and changed nothing.
     initTheme();
+    this.workClock = createWorkClock({
+      pause: () => api.todayPause(),
+      resume: () => api.todayResume(),
+      onChanged: () => this.setState(s => ({ refreshKey: s.refreshKey + 1 })),
+      onError: (_error, action) => this.showToast('Could not ' + action + ' the work timer. Scout will retry.'),
+    });
     this.boot();
     this.watchRuns();
     window.addEventListener('keydown', this.onGlobalKey);
   }
 
   componentWillUnmount() {
+    this.workClock?.dispose();
     clearInterval(this.runWatch);
     window.removeEventListener('keydown', this.onGlobalKey);
     clearTimeout(this._toastTimer);
   }
+
+  componentDidUpdate(_props, previous) {
+    if (previous.storageRoot !== this.state.storageRoot) this.workClock?.reset();
+  }
+
+  // Stable for one workspace, so Today's loader does not restart on each render. A loader
+  // from the previous workspace can still resolve after navigation; its callbacks are inert.
+  getWorkClockCallbacks = () => {
+    const root = this.state.storageRoot;
+    if (this._clockCallbacks?.root === root) return this._clockCallbacks.props;
+    const callbacks = { root };
+    const current = () => this._clockCallbacks === callbacks && this.state.storageRoot === root;
+    callbacks.props = {
+      onWorkClockState: today => { if (current()) this.workClock?.update(today); },
+      onWorkClockBusy: value => { if (current()) this.workClock?.setBusy(value); },
+      onWorkClockIntent: action => { if (current()) this.workClock?.manualAction(action); },
+    };
+    this._clockCallbacks = callbacks;
+    return callbacks.props;
+  };
+  onStorageRootChanged = storageRoot => {
+    // The server has already switched roots. Stop using the old snapshot immediately,
+    // including the interval before React commits the storageRoot state change.
+    this.workClock?.reset();
+    this._clockCallbacks = null;
+    this.setState({ storageRoot }, () => this.boot());
+  };
 
   // ── while anybody is out ───────────────────────────────────────────────────────────────────
   // A run answers before it finishes — that is the design (backend/dispatch.mjs) — so the card that
@@ -135,6 +170,10 @@ export default class App extends React.Component {
   clearToast = () => { clearTimeout(this._toastTimer); this.setState({ toast: null, toastDanger: false }); };
 
   async boot() {
+    try {
+      const workspace = await api.state();
+      this.setState({ storageRoot: workspace.storageRoot ?? null });
+    } catch { /* older backends may not expose their storage root */ }
     // Law 9 — the workspace is built WITH the person. A brand-new install has no `me.md` and no
     // collections, and putting an empty table in front of someone is how a tool teaches them it is
     // not for them. The interview owns the whole window until it is done; it is not a screen in
@@ -483,7 +522,8 @@ export default class App extends React.Component {
 
     switch (screen) {
       case 'today':
-        return <Today onGo={this.go} onOpenPath={this.openPath} refreshKey={refreshKey} actor={HUMAN} onSendOut={this.sendOutAll} />;
+        return <Today onGo={this.go} onOpenPath={this.openPath} refreshKey={refreshKey} actor={HUMAN} onSendOut={this.sendOutAll}
+          {...this.getWorkClockCallbacks()} />;
 
       case 'decide':
         return (
@@ -543,7 +583,7 @@ export default class App extends React.Component {
         );
 
       case 'files':  return <Files path={arg || docPath || ''} onOpenPath={this.openPath} />;
-      case 'settings': return <ScoutSettings onToast={(m, tone) => this.showToast(m, tone)} />;
+      case 'settings': return <ScoutSettings onToast={(m, tone) => this.showToast(m, tone)} onRootChanged={this.onStorageRootChanged} />;
       case 'board':
         // Whiteboard's own PROPS block names `board` / `onOpenDocument` / `onToast` — it was being
         // handed `project` / `onOpenPath` / `onOpen`, so `board` was undefined and `boardId()` fell

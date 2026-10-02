@@ -39,6 +39,7 @@ import { listAssistants, getAssistant, saveAssistant, listTasks, appendRun, list
 import { cliExecutor } from './agentRunner.mjs';
 import { selfApiBase } from './agentHome.mjs';
 import { resolveBin } from './jobs.mjs';
+import { providerById } from './agentProviders.mjs';
 import { getSettings, listProjects } from './store.mjs';
 import { logEvent, readEvents } from './log.mjs';
 import { hubConfig, pushToHub } from './hub.mjs';
@@ -198,6 +199,22 @@ function blockedByTask(assistantId, project) {
   } catch { return false; }
 }
 
+// ── which CLI a run uses ───────────────────────────────────────────────────────────────────────
+// Order: an explicit override (tests) → the assistant's own `provider:` → the global setting.
+// An assistant pinned to `provider: devin` runs Devin even while Settings points at claude —
+// the field on HER card of the assistant is the truth, the global setting is only the default.
+// `provider` may be a registry id ('codex', 'gemini') or a bare command/path, and an unknown id
+// degrades to being used as the command itself — resolveBin below is the check either way.
+export function commandFor(assistant = {}, override = null) {
+  if (override) return override;
+  const pin = String(assistant.provider || '').trim();
+  if (pin) {
+    const p = providerById(pin);
+    return p ? p.bin : pin;
+  }
+  return getSettings().agentCommand || 'claude';
+}
+
 // ── send one out ───────────────────────────────────────────────────────────────────────────────
 // Returns { run, done } as soon as the run record exists. `done` resolves with the finished run.
 export function sendOut(id, { project = null, actor = 'crystal', agentCommand = null, deps = {} } = {}) {
@@ -208,7 +225,7 @@ export function sendOut(id, { project = null, actor = 'crystal', agentCommand = 
   // The one pre-flight check. Done HERE rather than inside the executor so that a workspace with no
   // agent CLI never accumulates blocked run records nobody asked for: a run that never started is
   // not a run. The app is fully usable in this state — doors 2 and 3 do not need a local CLI at all.
-  const command = agentCommand || getSettings().agentCommand || 'claude';
+  const command = commandFor(a, agentCommand);
   if (!resolveBin(command)) {
     throw new DispatchError(
       'No agent CLI is connected (' + command + ' was not found). Connect one in Settings → Agent, '
@@ -431,8 +448,22 @@ export function dueAssistants(now = new Date()) {
 
 let timer = null;
 
+// Non-assistant duties that must run on EVERY tick, `autoRun` or not — the Today loop's wake
+// hook (backend/today.mjs) registers here, and a day whose plan only exists when autoRun is on
+// is a day the feature silently did not happen. Hooks MAY be async (the morning plan spawns a
+// brain); they run detached so the tick stays synchronous, and a hook's failure is its own —
+// it never stops the schedule. `tickHooksSettled()` lets a test await the detached work.
+const TICK_HOOKS = [];
+const PENDING_HOOKS = [];
+export function onSchedulerTick(fn) { if (typeof fn === 'function') TICK_HOOKS.push(fn); }
+export function tickHooksSettled() { return Promise.allSettled(PENDING_HOOKS); }
+
 // One tick. Returns what it sent, so the caller (and a test) can see rather than infer.
 export function schedulerTick({ actor = 'schedule', deps = {}, now = new Date() } = {}) {
+  for (const h of TICK_HOOKS) {
+    try { PENDING_HOOKS.push(Promise.resolve(h(now)).catch(() => {})); }
+    catch { /* a hook's failure is not the schedule's */ }
+  }
   if (!getSettings().autoRun) return [];
   const sent = [];
   for (const a of dueAssistants(now)) {

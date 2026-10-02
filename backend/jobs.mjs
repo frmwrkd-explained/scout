@@ -241,7 +241,15 @@ export async function agentStatus(which) {
   const v = await runOnce(bin, provider.versionArgs, 10_000);
   if (v.code !== 0) return { ...base, path: bin, error: 'the command exists but did not start' + (v.err ? ' — ' + v.err.slice(0, 160) : '') };
   const st = { ...base, installed: true, path: bin, version: v.out.trim().split('\n')[0].slice(0, 120) };
-  if (!provider.authStatusArgs) return st; // custom CLI — we cannot probe its auth
+  if (!provider.authStatusArgs) {
+    // A provider with no auth command may still carry an authProbe() — a local check like
+    // Gemini's `~/.gemini/oauth_creds.json`. A CLI with NEITHER reports unknown, not signed-out.
+    if (typeof provider.authProbe === 'function') {
+      try { return { ...st, signedIn: !!(await provider.authProbe()) }; }
+      catch { return st; }
+    }
+    return st; // custom CLI — we cannot probe its auth
+  }
   const a = await runOnce(bin, provider.authStatusArgs, 20_000);
   const parsed = provider.parseAuth(a) || {};
   return {

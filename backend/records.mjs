@@ -76,6 +76,15 @@ export { DEFAULT_ACTOR, isAgentActor, actorRegistry, slugify };
 export const ARCHIVE_REASONS = ['off-target', 'bad-data', 'duplicate', 'wrong-tone', 'already-contacted'];
 export const AGENT_MAX_STAGE = 'shortlist';   // index into the gate field's options
 export const MERGE_CONFIDENCE = 60;           // >= this merges into the existing record (T06 step 3)
+// Today owns work transitions: each one also updates the clock, validates evidence and
+// schedules any follow-up. A module token keeps generic API writes on that same path.
+export const WORK_TRANSITION = Symbol('work-transition');
+
+function checkWorkTransition(collection, status, previous, token) {
+  if (collection?.id !== 'work' || status === undefined || status === previous || token === WORK_TRANSITION) return;
+  if (previous === undefined && status === 'planned') return;
+  throw new RecordError('Change work status from Today so time, completion evidence and follow-ups stay in sync', 400);
+}
 
 export class RecordError extends Error {
   constructor(message, status = 400, extra = {}) { super(message); this.status = status; Object.assign(this, extra); }
@@ -503,7 +512,7 @@ function raiseFindingCard(input, { actor, collection, relPath, title, seen: give
 
 // ── the four verbs ─────────────────────────────────────────────────────────────────────────────
 
-function upsertOne(input, { actor, via, rows, collection, openFindings = null }) {
+function upsertOne(input, { actor, via, rows, collection, openFindings = null, workTransition = null }) {
   const agent = isAgentActor(actor);
   const gate = gateInfo(collection);
   const prim = primaryField(collection);
@@ -547,9 +556,14 @@ function upsertOne(input, { actor, via, rows, collection, openFindings = null })
   // file directly — that is an `update`. `merge` is reserved for the fuzzy case, so the verdict
   // tells the reader HOW the record was identified, which is the thing they would ask next.
   const direct = rows.find(r => r.path === directPath) || null;
-  const matches = direct ? [] : matchAgainst({ ...fields, __title: title }, rows);
+  // Work and reviews are occurrences, not named entities: "Follow up: campaign" must not
+  // merge back into "campaign", and two dated reviews may have almost identical titles.
+  // Their explicit IDs are identity; they still pass through this writer and its gate/log.
+  const occurrence = input.id && ['work', 'review'].includes(collection.id);
+  const matches = direct || occurrence ? [] : matchAgainst({ ...fields, __title: title }, rows);
   const best = matches.length && matches[0].confidence >= MERGE_CONFIDENCE ? matches[0] : null;
   const target = direct || (best ? rows.find(r => r.path === best.path) : null);
+  checkWorkTransition(collection, input.status, target?.status, workTransition);
 
   if (!target) {
     const data = orderFrontmatter(collection, {
@@ -565,7 +579,10 @@ function upsertOne(input, { actor, via, rows, collection, openFindings = null })
     const result = { verdict: 'store', id: slug, path: directPath, confidence: matches.length ? matches[0].confidence : 0 };
     emit({ type: 'store', actor, target: directPath, detail: { collection: collection.id, via, confidence: result.confidence } });
     // What an agent found lands in front of the human as one card, not only as a file (GOAL §3).
-    if (agent) {
+    // Only for collections that HAVE a gate — findings are the pipeline's vocabulary. A status
+    // collection like `work` (plan items, not findings) would otherwise earn a 'proposed' card for
+    // every item the conductor creates, since the write stamps proposed:true.
+    if (agent && gate) {
       const card = raiseFindingCard(input, { actor, collection, relPath: directPath, title, seen: openFindings });
       if (card) result.card = card.id;
     }
@@ -604,16 +621,16 @@ function upsertOne(input, { actor, via, rows, collection, openFindings = null })
   return result;
 }
 
-export function upsertRecord(input = {}, { actor = DEFAULT_ACTOR, via = 'api' } = {}) {
+export function upsertRecord(input = {}, { actor = DEFAULT_ACTOR, via = 'api', workTransition = null } = {}) {
   const collectionId = input.collection;
   if (!collectionId) throw new RecordError('upsert needs a collection', 400);
   const { collection, rows } = candidateRows(collectionId);
-  return upsertOne(input, { actor, via, rows, collection, openFindings: isAgentActor(actor) ? openFindingRecords() : null });
+  return upsertOne(input, { actor, via, rows, collection, workTransition, openFindings: isAgentActor(actor) ? openFindingRecords() : null });
 }
 
 // ONE near-match pass for the batch (T06 step 4): the candidate set is loaded once and each stored
 // record joins it, so a batch that contains the same person twice dedupes against itself.
-export function batchUpsert(items = [], { actor = DEFAULT_ACTOR, via = 'api' } = {}) {
+export function batchUpsert(items = [], { actor = DEFAULT_ACTOR, via = 'api', workTransition = null } = {}) {
   const list = [].concat(items || []);
   if (!list.length) return { tally: { store: 0, update: 0, merge: 0, skip: 0 }, results: [] };
   const byCollection = new Map();
@@ -629,7 +646,7 @@ export function batchUpsert(items = [], { actor = DEFAULT_ACTOR, via = 'api' } =
       if (!id) throw new RecordError('every item needs a collection', 400);
       if (!byCollection.has(id)) byCollection.set(id, candidateRows(id));
       const { collection, rows } = byCollection.get(id);
-      const r = upsertOne(item, { actor, via, rows, collection, openFindings });
+      const r = upsertOne(item, { actor, via, rows, collection, openFindings, workTransition });
       tally[r.verdict] = (tally[r.verdict] || 0) + 1;
       results.push(r);
     } catch (e) {
@@ -821,7 +838,7 @@ async function patchDelegated(doc, patch, { actor, current, hit }) {
 
 // The document surface's save. Unlike ingest this OVERWRITES, on purpose — a human editing a field
 // means it — and the rev check is what stops a concurrent agent write from being clobbered.
-export async function patchRecord(relPath, patch = {}, { actor = DEFAULT_ACTOR, rev = null } = {}) {
+export async function patchRecord(relPath, patch = {}, { actor = DEFAULT_ACTOR, rev = null, workTransition = null } = {}) {
   const doc = loadDoc(relPath);
   const current = revOf(doc.data, doc.content);
   // The rev check happens HERE for every path, delegated or not: no memory writer takes a `rev`,
@@ -841,6 +858,7 @@ export async function patchRecord(relPath, patch = {}, { actor = DEFAULT_ACTOR, 
     return out;
   }
   const collection = collectionOf(doc.path, doc.data, doc.content);
+  checkWorkTransition(collection, patch.status, doc.data.status, workTransition);
   const gate = gateInfo(collection);
   const agent = isAgentActor(actor);
   if (gate && patch[gate.key] !== undefined && agent && pastGate(gate, patch[gate.key])) {

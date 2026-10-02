@@ -142,6 +142,23 @@ export function slugify(s) {
 const DEFAULT_SKILL_REPOS = [
   { name: 'Claude skills', paths: [path.join(os.homedir(), '.claude', 'skills')] }
 ];
+export const DEFAULT_BRAIN_DAILY_LIMITS = Object.freeze({ light: 40, heavy: 4 });
+
+// A hand-edited invalid cap must not become unlimited. Missing tiers inherit their defaults;
+// explicit zero disables the tier. saveSettings refuses invalid values before writing.
+export function brainDailyLimits(value) {
+  const limits = { ...DEFAULT_BRAIN_DAILY_LIMITS };
+  if (value == null) return limits;
+  if (typeof value !== 'object' || Array.isArray(value)) throw new Error('brainDailyLimits must be an object');
+  for (const tier of Object.keys(limits)) {
+    if (value[tier] === undefined) continue;
+    if (!Number.isSafeInteger(value[tier]) || value[tier] < 0) {
+      throw new Error('brainDailyLimits.' + tier + ' must be a nonnegative integer');
+    }
+    limits[tier] = value[tier];
+  }
+  return limits;
+}
 const DEFAULT_SETTINGS = {
   budget: 60,
   showHints: true,
@@ -174,6 +191,17 @@ const DEFAULT_SETTINGS = {
   // Push the counted numbers at the end of every run. Off, like `autoRun` and for the same
   // reason: an outbound request nobody pressed is a surprise, and `npm run hub:push` is the press.
   hubPushAfterRun: false,
+  // ── the Today loop (backend/today.mjs · docs/09_TODAY_LOOP.md) ──
+  // The day's bounds in LOCAL "HH:MM" — the morning plan runs at/after dayStart, the daily review
+  // at/after dayEnd. `dayMinutes` caps how much a plan may book. `tiers` overrides the brain's
+  // provider order per tier ({light:[], heavy:[]}; null → backend/brain.mjs TIERS). The light
+  // tier never falls back to the heavy (subscription) CLIs unless allowHeavyFallback is on.
+  dayStart: '08:30',
+  dayEnd: '17:30',
+  dayMinutes: 360,
+  tiers: null,
+  allowHeavyFallback: false,
+  brainDailyLimits: DEFAULT_BRAIN_DAILY_LIMITS,
 };
 // Raw read: defaults + whatever is on disk, with NO migration side-effect. Both getSettings()
 // (which may persist a migration) and saveSettings() (which must not re-enter it) read through
@@ -242,6 +270,7 @@ export function saveSettings(patch) {
     throw e;
   }
   patch = { ...patch };
+  if (Object.hasOwn(patch, 'brainDailyLimits')) patch.brainDailyLimits = brainDailyLimits(patch.brainDailyLimits);
   for (const k of SECRET_SETTING_KEYS) if (patch[k] === REDACTED) delete patch[k];
   // readSettings(), never getSettings() — the latter can persist a migration and would recurse
   // back into here. The migration still happens, folded into this same write.

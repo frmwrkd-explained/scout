@@ -839,7 +839,7 @@ function sinceLines(m, level) {
     if (reason) row.reasons.push(String(reason));
     groups.set(k, row);
   }
-  const VERB = { store: 'added', update: 'updated', merge: 'merged', skip: 'skipped', move: 'moved', archive: 'rejected', refused: 'was refused on', quarantine: 'quarantined', accept: 'accepted', propose: 'proposed', decide: 'decided', claim: 'claimed', inbox: 'dropped in', schema: 'changed the schema', cache: 'regenerated the cache' };
+  const VERB = { store: 'added', update: 'updated', merge: 'merged', skip: 'skipped', move: 'moved', archive: 'rejected', refused: 'was refused on', quarantine: 'quarantined', accept: 'accepted', propose: 'proposed', decide: 'decided', claim: 'claimed', inbox: 'dropped in', schema: 'changed the schema', cache: 'regenerated the cache', work: 'worked on', run: 'ran' };
   const rows = [...groups.values()].sort((a, b) => b.n - a.n);
   for (const row of rows.slice(0, SINCE_MAX_LINES)) {
     const why = row.reasons.length ? ': ' + tally(row.reasons) : '';

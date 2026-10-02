@@ -185,10 +185,13 @@ export function getSession(id) {
   return { ...s, messages: readMessages(loc.dir, id) };
 }
 
-export function createSession({ project, title, mode, executor, agentCommand, kind } = {}) {
+export function createSession({ project, title, mode, executor, agentCommand, kind, id: wantId } = {}) {
   const scope = project ? 'project' : 'standalone';
   const pid = project ? safeScope(project) : null;
-  const id = newId();
+  // `wantId` lets a caller pin the id — the Today loop keeps exactly one session per day named
+  // `today-<YYYY-MM-DD>`, and a second create for the same day must find the same session, not
+  // spawn a twin under a fresh random id.
+  const id = wantId ? safe(String(wantId)) : newId();
   const dir = chatDirFor(scope, pid);
   const now = Date.now();
   const s = {
@@ -197,8 +200,10 @@ export function createSession({ project, title, mode, executor, agentCommand, ki
     mode: mode === 'manual' ? 'manual' : 'agent',
     // What the session IS, fixed at birth and never patchable (unlike `mode`, which the user flips).
     // 'toolsmith' makes prepareAgentHome mount the tool-builder skill — the whole force-load
-    // mechanism behind the "+ New tool" button. Anything else is an ordinary chat.
-    kind: kind === 'toolsmith' ? 'toolsmith' : 'chat',
+    // mechanism behind the "+ New tool" button. 'today' is the Today loop's per-day conductor
+    // thread — kept out of the ordinary chat list by listSessions' default kind filter. Anything
+    // else is an ordinary chat.
+    kind: ['toolsmith', 'today'].includes(kind) ? kind : 'chat',
     // executor selection is the ticket-09 seam (cli | simulate)
     executor: chooseExecutor(executor),
     agentCommand: agentCommand || getSettings().agentCommand || 'claude',
@@ -255,6 +260,7 @@ function makeMessage(role, extra = {}) {
     turn: extra.turn ?? 0, text: extra.text || '',
     directives: extra.directives || [], attachments: extra.attachments || [],
     cost: extra.cost || 0,
+    ...(extra.meta ? { meta: extra.meta } : {}),
     ...(extra.error ? { error: String(extra.error) } : {}),
     ...(extra.cancelled ? { cancelled: true } : {})
   };
@@ -296,6 +302,28 @@ export function appendSystemEvent(id, text) {
   const session = readSession(loc.dir, id);
   if (!session) return null;
   const msg = appendMessage(loc, id, session.project, makeMessage('system', { text: clean }));
+  broadcast(id, 'system-event', { message: msg });
+  return msg;
+}
+
+// The conductor's line in a session — the morning plan, a nudge, a review summary. It is an
+// ASSISTANT message (it is the agent speaking) tagged meta.kind='conductor' with a dedupe key, so
+// a rule that fires twice in a day still posts once — e.g. the getToday poll runs the nudge rules
+// every 60s. Like appendSystemEvent it does not touch `updated`: a nudge is not user activity.
+export function postConductor(id, text, { key = null } = {}) {
+  const clean = String(text || '').trim();
+  if (!clean) return null;
+  const loc = locate(id);
+  if (!loc) return null;
+  const session = readSession(loc.dir, id);
+  if (!session) return null;
+  if (key) {
+    const seen = readMessages(loc.dir, id)
+      .some(m => m.meta && m.meta.kind === 'conductor' && m.meta.key === key);
+    if (seen) return null;
+  }
+  const msg = appendMessage(loc, id, session.project,
+    makeMessage('assistant', { text: clean, meta: { kind: 'conductor', ...(key ? { key } : {}) } }));
   broadcast(id, 'system-event', { message: msg });
   return msg;
 }

@@ -106,7 +106,7 @@ export async function loadJsx(relPath) {
   await esbuild.build({
     entryPoints: [src], outfile: out, bundle: true, format: 'esm', platform: 'neutral',
     jsx: 'automatic', logLevel: 'silent',
-    external: ['react', 'react-dom', 'react/jsx-runtime', '@codemirror/*', '@lezer/*', 'codemirror'],
+    external: ['react', 'react-dom', 'react/jsx-runtime', '@tiptap/*'],
   });
   return import(out);
 }

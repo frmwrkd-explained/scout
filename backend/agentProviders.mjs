@@ -5,14 +5,16 @@
 // executor, threed.mjs) resolves its argv through here rather than hardcoding flags, so adding a
 // third CLI is one entry in PROVIDERS and nothing else.
 //
-// SUBSCRIPTION ONLY. Both providers ship an API-key login path (`claude auth login --console`,
-// `codex login --api-key`); Scout deliberately does not expose either. loginArgs always
-// selects the subscription flow, and no code in this repo ever writes an agent API key. If you are
-// adding a provider, it needs a subscription login or it does not belong here.
+// SUBSCRIPTION / ACCOUNT ONLY. Claude and Codex ship API-key login paths (`claude auth login
+// --console`, `codex login --api-key`); Scout deliberately does not expose either. loginArgs
+// always selects the subscription flow, and no code in this repo ever writes an agent API key.
+// The same rule covers the newer entries: Gemini signs in with a Google account, Devin with a
+// Devin account — a provider without an account login does not belong here.
 //
-// Both CLIs expose a FREE auth probe (`claude auth status --json`, `codex login status`), which is
-// why the setup wizard no longer needs to burn a paid round-trip prompt to know whether you are
-// connected — it polls authStatusArgs instead. promptArgs is still used for the real work.
+// Each CLI exposes a FREE auth probe — `claude auth status --json`, `codex login status`,
+// `devin auth status`, or (when no probe command exists) an `authProbe()` filesystem check like
+// Gemini's `~/.gemini/oauth_creds.json` — which is why the setup wizard no longer needs to burn a
+// paid round-trip prompt to know whether you are connected. promptArgs is still used for the real work.
 
 // A provider descriptor:
 //   id            stable key, also the settings.agentCommand value when the bin is on PATH
@@ -22,9 +24,15 @@
 //   runner        which agentRunner.mjs shape drives it ('claude' streams, others are one-shot)
 //   versionArgs   argv that prints a version and exits 0
 //   loginArgs     argv that starts the interactive SUBSCRIPTION sign-in
-//   authStatusArgs argv for the free "am I signed in?" probe
+//   authStatusArgs argv for the free "am I signed in?" probe — null when the CLI has none
+//   authProbe     async () => boolean — used INSTEAD of authStatusArgs (e.g. a creds-file check)
 //   parseAuth     ({ code, out, err }) => { signedIn, detail }
 //   promptArgs    (prompt, { allowedTools }) => argv for one non-interactive prompt
+//   textOnly      separately verified Today invocation; normal assistant argv is independent
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
 export const PROVIDERS = [
   {
     id: 'claude',
@@ -62,7 +70,25 @@ export const PROVIDERS = [
       };
     },
     promptArgs: (prompt, { allowedTools = '' } = {}) =>
-      ['--output-format', 'text', '--allowedTools', allowedTools, '-p', String(prompt ?? '')]
+      ['--output-format', 'text', '--allowedTools', allowedTools, '-p', String(prompt ?? '')],
+    // --allowedTools changes approvals, not availability. Today disables the built-in tools,
+    // denies every tool (including MCP), and suppresses ambient context/customizations. Keep
+    // auth in the normal home: --bare would require API-key auth on current Claude versions.
+    // Administrator-managed policy is still enforced by Claude; this is not an OS sandbox.
+    // https://code.claude.com/docs/en/cli-reference · https://code.claude.com/docs/en/hooks
+    textOnly: {
+      available: true,
+      requiredFlags: ['--safe-mode', '--tools', '--disallowedTools', '--strict-mcp-config',
+        '--mcp-config', '--setting-sources', '--settings', '--disable-slash-commands',
+        '--no-session-persistence', '--no-chrome'],
+      promptArgs: prompt => [
+        '--safe-mode', '--tools', '', '--disallowedTools', '*',
+        '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}', '--setting-sources', '',
+        '--settings', '{"disableAllHooks":true,"disableClaudeAiConnectors":true}',
+        '--disable-slash-commands', '--no-session-persistence', '--no-chrome',
+        '--output-format', 'text', '-p', String(prompt ?? '')
+      ],
+    }
   },
   {
     id: 'codex',
@@ -100,7 +126,57 @@ export const PROVIDERS = [
     // `-p` is codex's --profile flag, NOT a prompt flag; non-interactive runs go through `exec`.
     // read-only sandbox + skip-git-repo-check keep it safe to run from the app's storage root.
     promptArgs: prompt =>
-      ['exec', '--skip-git-repo-check', '--sandbox', 'read-only', '--color', 'never', String(prompt ?? '')]
+      ['exec', '--skip-git-repo-check', '--sandbox', 'read-only', '--color', 'never', String(prompt ?? '')],
+    textOnly: { available: false, reason: 'Read-only sandbox permits tools and ambient context; a prompt-only Codex invocation has not been verified.' }
+  },
+  {
+    // The Today loop's light tier (backend/brain.mjs). `gemini` is a Google-account login, not a
+    // subscription CLI — a bare `gemini` run opens the OAuth flow, so loginArgs stays empty and the
+    // free "am I signed in?" probe is the creds file OAuth leaves behind.
+    id: 'gemini',
+    label: 'Gemini CLI',
+    bin: 'gemini',
+    npm: '@google/gemini-cli',
+    runner: 'generic',
+    signInHint: 'Run `gemini` in a terminal once and sign in with your Google account.',
+    versionArgs: ['--version'],
+    loginArgs: [],
+    authStatusArgs: null,
+    authProbe: () => {
+      try { return fs.existsSync(path.join(os.homedir(), '.gemini', 'oauth_creds.json')); }
+      catch { return false; }
+    },
+    parseAuth: () => ({ signedIn: false, detail: '' }),
+    models: [],
+    efforts: [],
+    sessionArgs: ({ model } = {}) => (model ? ['-m', String(model)] : []),
+    // Plan mode still permits reading/search tools; it is for normal assistants, not Today.
+    promptArgs: prompt => ['-p', String(prompt ?? ''), '-o', 'text', '--approval-mode', 'plan'],
+    textOnly: { available: false, reason: 'Gemini plan mode permits tools. Gemini 0.46 cannot suppress global GEMINI.md with context.fileName=[] while retaining existing OAuth without copying credentials.' }
+  },
+  {
+    id: 'devin',
+    label: 'Devin CLI',
+    bin: 'devin',
+    npm: '',
+    runner: 'generic',
+    signInHint: 'Run `devin auth login` and sign in with your Devin account.',
+    versionArgs: ['--version'],
+    loginArgs: ['auth', 'login'],
+    authStatusArgs: ['auth', 'status'],
+    parseAuth: ({ code, out, err }) => {
+      const all = String(out || '') + String(err || '');
+      if (/not logged in/i.test(all) || code !== 0) return { signedIn: false, detail: '' };
+      return { signedIn: true, detail: '' };
+    },
+    models: [
+      { id: 'swe', label: 'SWE (fast/cheap)' }
+    ],
+    efforts: [],
+    sessionArgs: ({ model } = {}) => (model ? ['--model', String(model)] : []),
+    // auto is an alias for normal permissions, not a tools-off mode.
+    promptArgs: prompt => ['-p', String(prompt ?? ''), '--permission-mode', 'auto'],
+    textOnly: { available: false, reason: 'Devin auto uses normal permissions; disabling every tool, MCP server, hook and ambient context has not been verified.' }
   }
 ];
 

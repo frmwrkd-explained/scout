@@ -32,6 +32,10 @@ export const EVENT_TYPES = [
   // `run` is the local-CLI door opening and closing: one event when an assistant is sent out and
   // one when it comes back, with what it actually wrote counted from the events in between.
   'run',
+  // `work` is the Today loop's own clock: the human's start/pause/resume/stop segments and the
+  // conductor's plan marker. Time is derived by replaying these, so the log stays the only clock
+  // the app keeps (docs/09_TODAY_LOOP.md).
+  'work',
 ];
 
 // One separator, three spaces of it, used nowhere inside a path. The JSON tail is re-joined on the

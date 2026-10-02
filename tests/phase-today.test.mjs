@@ -14,7 +14,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadJsx } from './helpers.mjs';
 
-const { clock, normRun, overnightLines } = await loadJsx('frontend/Today.jsx');
+const { clock, normRun, overnightLines, fillDays } = await loadJsx('frontend/Today.jsx');
 
 // TODAY's date, never a fixed one. `overnightStart()` is relative to the current day (00:00
 // minus six hours), so a hard-coded calendar date passes on the afternoon it is written and
@@ -70,4 +70,21 @@ test('with no runs and no events it says so, and never invents a figure', () => 
   const [blind] = overnightLines({ runs: [], events: [], cards: [], goals: [], sources: { ...sources, runs: false, activity: false } });
   assert.equal(blind.honest, true);
   assert.match(blind.text, /NOTHING IS RECORDED YET/);
+});
+
+test('fillDays draws the whole period — a one-day week still renders seven columns', () => {
+  // 2026-10-02 is a Friday; its Mon–Sun week is 2026-09-28 → 2026-10-04.
+  // The bug this guards: setDate(start.getDate()+6) on TODAY's date overflowed the month
+  // and the "week" chart drew ~37 columns.
+  const days = fillDays([{ day: '2026-10-02', minutes: 56, by_bucket: [{ bucket: 'email', minutes: 56 }] }], 'week', '2026-10-02');
+  assert.equal(days.length, 7);
+  assert.equal(days[0].day, '2026-09-28');
+  assert.equal(days[6].day, '2026-10-04');
+  assert.equal(days[4].minutes, 56);
+  assert.equal(days[0].minutes, 0);
+
+  const month = fillDays([], 'month', '2026-10-02');
+  assert.equal(month.length, 31);
+  assert.equal(month[0].day, '2026-10-01');
+  assert.equal(month[30].day, '2026-10-31');
 });

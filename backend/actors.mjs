@@ -46,8 +46,15 @@ function declares(raw) {
   return s && !s.startsWith('__') ? s : null;
 }
 
+// `conductor` is the Today loop's agent (backend/today.mjs): it writes planned items, prepared
+// material and review narratives, and every one of those is an agent write — proposed, never
+// promoted (a learning it files lands `proposed` through the same gate as every other agent's).
+// It is built in because it exists on every workspace whether or not `.scout/actors.md` or an
+// `assistants/conductor.md` ever does — it is part of the app, not a hire.
+const BUILTIN_AGENTS = ['conductor'];
+
 export function actorRegistry() {
-  const reg = { humans: new Set([DEFAULT_ACTOR]), agents: new Set(), declared: false };
+  const reg = { humans: new Set([DEFAULT_ACTOR]), agents: new Set(BUILTIN_AGENTS), declared: false };
   try {
     const { data } = readMd(path.join(R(), '.scout', 'actors.md'));
     for (const h of [].concat(data.humans || [])) { reg.humans.add(String(h)); reg.declared = true; }
