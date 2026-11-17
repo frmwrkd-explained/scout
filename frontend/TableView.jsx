@@ -19,7 +19,7 @@
 import React from 'react';
 import { sx } from './sx';
 import { MONO } from './tokens';
-import { Cell } from './cells';
+import { Cell, Editor, isDerived } from './cells';
 import { Empty, OpenRecord } from './ui';
 import { GroupHeader } from './ListView';
 import { sizeOf, wrapOf, shownFields, primaryOf, groupRows, groupFieldOf, fieldLabel } from './viewDisplay';
@@ -31,7 +31,7 @@ const MIN_COL = 72;
 const MENU_W = 284;
 const ADD_COL = 44;
 
-export default function TableView({ collection, view, rows, selected, onSelect, onOpen, onFollow, onPick, onSaveView, onSchemaChanged, actor }) {
+export default function TableView({ collection, view, rows, selected, onSelect, onOpen, onFollow, onPick, onPatch, onSaveView, onSchemaChanged, actor }) {
   const z = sizeOf(view);
   const wrap = wrapOf(view);
   const defs = shownFields(collection, view, { title: true });
@@ -50,6 +50,8 @@ export default function TableView({ collection, view, rows, selected, onSelect, 
   // The open header menu: { key, mode: 'menu' | 'edit' | 'delete', align } — or { key: '+' } for
   // the add column. One at a time; opening another closes this one.
   const [menu, setMenu] = React.useState(null);
+  // The one cell being edited — { path, key }.
+  const [editing, setEditing] = React.useState(null);
   const closeMenu = React.useCallback(() => setMenu(null), []);
   const scroller = React.useRef(null);
   const toggleMenu = (key, e) => {
@@ -85,6 +87,19 @@ export default function TableView({ collection, view, rows, selected, onSelect, 
   };
   const resetWidths = () => { if (onSaveView && view.widths) onSaveView({ ...view, widths: undefined }); };
 
+  // EDITING IN PLACE. A choice and a yes/no change on one click (Cell does that itself). Anything
+  // else that a person types or picks — text, a number, a date, a link, tags, a linked record —
+  // becomes its editor when its cell is clicked, with the caret already in it. What can NOT be
+  // edited here says so by not reacting: computed values, files, and structured lists, which are
+  // edited on the record's own page.
+  const canType = f => !!onPatch && !isDerived(f) && !f.auto && ['text', 'number', 'date', 'url', 'email', 'phone', 'multiselect', 'relation'].includes(f.type);
+  const cellRef = React.useRef(null);
+  React.useEffect(() => {
+    if (!editing || !cellRef.current) return;
+    const input = cellRef.current.querySelector('input, textarea');
+    if (input) { input.focus(); try { input.select && input.type !== 'date' && input.select(); } catch { /* not selectable */ } }
+  }, [editing && editing.path, editing && editing.key]);
+
   const body = r => {
     const on = selected === r.path;
     return (
@@ -99,9 +114,19 @@ export default function TableView({ collection, view, rows, selected, onSelect, 
                 <OpenRecord onOpen={() => onOpen(r)} />
               </span>
             ) : (
-              <div className={'tvCell' + (wrap ? ' wrap' : '')} style={{ zoom: z.zoom }}>
-                <Cell field={f} value={r.fields[f.key]} onFollow={onFollow} onPick={onPick} />
-              </div>
+              editing && editing.path === r.path && editing.key === f.key ? (
+                // A double-click inside a field selects a word; it must not open the record.
+                <div ref={cellRef} className="tvCell editing" onDoubleClick={e => e.stopPropagation()}>
+                  <Editor field={f} value={r.fields[f.key]} onChange={v => onPatch(r, f.key, v)} onFollow={onFollow} onPick={onPick} />
+                </div>
+              ) : (
+                <div className={'tvCell' + (wrap ? ' wrap' : '') + (canType(f) ? ' can' : '')} style={{ zoom: z.zoom }}
+                  title={canType(f) ? 'Click to edit' : undefined}
+                  onClick={canType(f) ? () => setEditing({ path: r.path, key: f.key }) : undefined}>
+                  <Cell field={f} value={r.fields[f.key]} onFollow={onFollow} onPick={onPick}
+                    onChange={onPatch ? v => onPatch(r, f.key, v) : undefined} />
+                </div>
+              )
             )}
           </td>
         ))}

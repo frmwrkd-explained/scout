@@ -78,14 +78,14 @@ export function ContextMenu({ at, items, onClose }) {
             onMouseDown={e => e.preventDefault()}
             onClick={() => { if (it.disabled) return; onClose(); it.onClick && it.onClick(); }}
             style={{
-              ...sx('display:flex;align-items:center;gap:9px;width:100%;box-sizing:border-box;border:none;background:none;text-align:left;padding:5px 12px'),
+              ...sx('display:flex;align-items:center;gap:9px;width:100%;box-sizing:border-box;border:none;background:none;text-align:left;padding:7px 12px'),
               cursor: it.disabled ? 'default' : 'pointer',
-              fontFamily: MONO, fontSize: 10.5, lineHeight: 1.5,
+              fontFamily: 'inherit', fontSize: 'var(--t-small)', lineHeight: 1.4,
               color: it.disabled ? 'var(--fg-faint)' : it.danger ? 'var(--danger)' : 'var(--fg-soft)',
             }}
           >
             <span style={sx('flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{it.label}</span>
-            {it.hint ? <span style={{ ...sx('flex:none'), fontSize: 9, color: 'var(--border-3)' }}>{it.hint}</span> : null}
+            {it.hint ? <span style={{ ...sx('flex:none'), fontSize: 'var(--t-data)', color: 'var(--fg-faint)' }}>{it.hint}</span> : null}
           </button>
         ))}
       </div>

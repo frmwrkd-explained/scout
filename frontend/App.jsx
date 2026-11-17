@@ -398,8 +398,11 @@ export default class App extends React.Component {
   // at once and is written through the one record route (`PATCH /api/records`, the same writer the
   // record's own page uses, with the gate and the log). If the write is refused the row goes back
   // to what is on disk and the refusal is said out loud.
-  patchSelected = async (key, value) => {
-    const path = this.state.selected;
+  patchSelected = (key, value) => this.patchRow(this.state.selected, key, value);
+
+  // One property of one row, changed where it is shown — a cell in the table, a chip on a card,
+  // the Details panel. Shown at once, saved through the record route, put back if the save fails.
+  patchRow = async (path, key, value) => {
     const row = this.state.rows.find(r => r.path === path);
     if (!row) return;
     const primary = ((this.state.collections.find(c => c.id === this.state.active) || {}).fields || []).find(f => f.primary);
@@ -413,6 +416,10 @@ export default class App extends React.Component {
     try {
       const res = await api.patchRecord(path, { [key]: value }, undefined, undefined, HUMAN);
       if (res && res.data) this.setState(put({ ...before, ...res.data, [key]: res.data[key] }));
+      // The change may have moved the row out of a filtered view, changed a count, or raised a
+      // card (an automation). Re-read once things settle, not on every keystroke.
+      clearTimeout(this._afterPatch);
+      this._afterPatch = setTimeout(() => this.reload(), 900);
     } catch (e) {
       this.setState(put(before));
       this.showToast(e.message, 'danger');
@@ -776,6 +783,7 @@ export default class App extends React.Component {
             onOpen={r => this.openPath(r.path)}
             onFollow={this.openRelation}
             onPickView={id => this.pickCollection(active, id, { navigate: false })}
+            onPatch={(row, key, value) => this.patchRow(row.path, key, value)}
             startQuick={this.state.startQuick}
             onSaveView={this.saveView}
             onDeleteView={this.deleteView}

@@ -41,7 +41,7 @@ function Plate({ label }) {
   );
 }
 
-export default function GalleryView({ collection, view, rows, selected, onSelect, onOpen, onFollow, onPick }) {
+export default function GalleryView({ collection, view, rows, selected, onSelect, onOpen, onFollow, onPick, onPatch }) {
   // Everything about how a card looks is the saved view's: its size, its picture and how the
   // picture fits, the properties under the name, whether the note's opening lines show.
   const z = sizeOf(view);
@@ -74,7 +74,7 @@ export default function GalleryView({ collection, view, rows, selected, onSelect
         <div className="galleryFields" style={{ zoom: z.zoom }}>
           {/* `onFollow`, not `onOpen`. Cell's relation chip hands back (collection, id); the row
               handler takes a row. One prop name, one meaning. */}
-          {defs.map(f => <Cell key={f.key} field={f} value={r.fields[f.key]} onFollow={onFollow} onPick={onPick} />)}
+          {defs.map(f => <Cell key={f.key} field={f} value={r.fields[f.key]} onFollow={onFollow} onPick={onPick} onChange={onPatch ? v => onPatch(r, f.key, v) : undefined} />)}
         </div>
       ) : null}
     </div>
@@ -98,7 +98,7 @@ export default function GalleryView({ collection, view, rows, selected, onSelect
               {defs.map(f => {
                 const v = r.fields[f.key];
                 if (v === undefined || v === null || v === '' || (Array.isArray(v) && !v.length)) return null;
-                return <Cell key={f.key} field={f} value={v} onFollow={onFollow} onPick={onPick} />;
+                return <Cell key={f.key} field={f} value={v} onFollow={onFollow} onPick={onPick} onChange={onPatch ? nv => onPatch(r, f.key, nv) : undefined} />;
               })}
             </div>
           ) : null}

@@ -169,6 +169,38 @@ test('only the operator reshapes collections', async () => {
   assert.equal(getCollection('company').subtables, undefined);
 });
 
+test('a person arranges the collections, and the order is the order they are listed in', async () => {
+  freshRoot();
+  for (const label of ['Alpha', 'Beta', 'Gamma']) assert.equal((await create(label)).status, 200);
+  const ids = async () => (await req('GET', '/api/collections')).body.collections.map(c => c.id).filter(id => ['alpha', 'beta', 'gamma', 'delta'].includes(id));
+  assert.deepEqual(await ids(), ['alpha', 'beta', 'gamma'], 'unarranged: alphabetical, as before');
+
+  const moved = await req('POST', '/api/collections/order', { ids: ['gamma', 'alpha', 'beta'], actor: 'crystal' });
+  assert.equal(moved.status, 200);
+  assert.deepEqual(await ids(), ['gamma', 'alpha', 'beta']);
+  // The order lives in each collection's own file, so it travels with the workspace.
+  assert.match(readFileSync(path.join(getStorageRoot(), '.scout/collections/gamma.md'), 'utf8'), /^order: 0$/m);
+
+  // A collection made afterwards has no place yet: it goes last, and is not hidden.
+  await create('Delta');
+  assert.deepEqual(await ids(), ['gamma', 'alpha', 'beta', 'delta']);
+
+  // Sub-collections are arranged inside their parent: the order of its `subtables`.
+  await nest('alpha', { label: 'One' });
+  await nest('alpha', { label: 'Two' });
+  const subs = async () => subtablesOf((await req('GET', '/api/collections')).body.collections.find(c => c.id === 'alpha')).map(x => x.collection);
+  assert.deepEqual(await subs(), ['one', 'two']);
+  assert.equal((await req('POST', '/api/collections/order', { ids: ['two', 'one'], parent: 'alpha', actor: 'crystal' })).status, 200);
+  assert.deepEqual(await subs(), ['two', 'one']);
+  assert.equal((await req('POST', '/api/collections/order', { ids: ['beta'], parent: 'alpha', actor: 'crystal' })).status, 400, 'beta is not under alpha');
+
+  // Arranging changes no field and no record, and is the operator's alone.
+  assert.equal((await req('POST', '/api/collections/order', { ids: ['nope'], actor: 'crystal' })).status, 404);
+  assert.equal((await req('POST', '/api/collections/order', { ids: [], actor: 'crystal' })).status, 400);
+  assert.equal((await req('POST', '/api/collections/order', { ids: ['beta', 'gamma'], actor: 'scout' })).status, 403);
+  assert.deepEqual(await ids(), ['gamma', 'alpha', 'beta', 'delta'], 'a refused request moved nothing');
+});
+
 test('a company\'s page asks for its people and gets exactly them', async () => {
   freshRoot();
   await create('Company');

@@ -198,4 +198,46 @@ export function removeSubcollection(parentId, childId, { actor = DEFAULT_ACTOR }
   return saved;
 }
 
-export default { createCollection, setCollectionMeta, addSubcollection, removeSubcollection, idFromLabel, HUES };
+// The order collections are listed in — the sidebar, the pickers, the agent's index.
+//
+// `ids` is the collections in their new order. With no `parent` they are top-level ones and each
+// file gets an `order` number (the named ones first, in the order given, then every other
+// collection where it already was). With a `parent` they are that collection's sub-collections,
+// whose order IS the order of the parent's `subtables` list — so that is what is rewritten, and
+// nothing else. Reordering changes no record and no field. → { order, parent, skipped }.
+export function reorderCollections({ ids, parent = null } = {}, { actor = DEFAULT_ACTOR } = {}) {
+  owner(actor);
+  if (!Array.isArray(ids) || !ids.length) fail('ids must be the collections, in their new order');
+  const want = [...new Set(ids.map(String))];
+
+  if (parent) {
+    const above = getCollection(parent);
+    if (!above) fail('no collection "' + parent + '"', 404);
+    const subs = Array.isArray(above.subtables) ? above.subtables : [];
+    const idOf = s => (s && typeof s === 'object' ? String(s.collection || '') : '');
+    for (const id of want) if (!subs.some(s => idOf(s) === id)) fail('"' + id + '" is not a sub-collection of ' + parent);
+    const rank = s => { const i = want.indexOf(idOf(s)); return i < 0 ? want.length : i; };
+    const next = subs.map((s, i) => [s, i]).sort((a, b) => (rank(a[0]) - rank(b[0])) || (a[1] - b[1])).map(x => x[0]);
+    const order = next.map(idOf).filter(Boolean);
+    if (JSON.stringify(next) === JSON.stringify(subs)) return { parent, order, skipped: [] };
+    saveCollection({ ...above, subtables: next });
+    log(actor, parent, { change: 'order', subcollections: order });
+    return { parent, order, skipped: [] };
+  }
+
+  for (const id of want) if (!getCollection(id)) fail('no collection "' + id + '"', 404);
+  const full = [...want, ...listCollections().map(c => c.id).filter(id => !want.includes(id))];
+  const skipped = [];
+  let wrote = 0;
+  full.forEach((id, place) => {
+    const current = getCollection(id);
+    if (!current || current.order === place) return;
+    // A collection file an older Scout wrote may not pass today's validation. Its place is then
+    // left as it was rather than failing the whole arrangement.
+    try { saveCollection({ ...current, order: place }); wrote++; } catch { skipped.push(id); }
+  });
+  if (wrote) logEvent({ type: 'schema', actor, target: '.scout/collections', detail: { change: 'order', order: full } });
+  return { parent: null, order: full, skipped };
+}
+
+export default { createCollection, setCollectionMeta, addSubcollection, removeSubcollection, reorderCollections, idFromLabel, HUES };

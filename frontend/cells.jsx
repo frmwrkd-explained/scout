@@ -269,11 +269,7 @@ const RENDERERS = {
   date: (v, f) => <DateCell value={v} field={f} />,
   multiselect: (v, f, onPick) => <TagList value={v} field={f} onPick={onPick} />,
   select: (v, f, onPick) => <StatusChip value={v} field={f} onPick={onPick} />,
-  checkbox: v => (
-    <span style={{ ...mono('font-size:var(--t-label);font-weight:700;letter-spacing:.1em'), color: v ? 'var(--ok)' : 'var(--fg-faint)' }}>
-      {v ? 'YES' : 'NO'}
-    </span>
-  ),
+  checkbox: v => <span className={'chip' + (v ? '' : ' plain')} style={v ? { '--chip': 'var(--ok)' } : undefined}><span className="chipDot" aria-hidden="true" />{v ? 'Yes' : 'No'}</span>,
   url: v => <LinkCell value={v} kind="url" />,
   email: v => <LinkCell value={v} kind="email" />,
   phone: v => <LinkCell value={v} kind="phone" />,
@@ -283,7 +279,16 @@ const RENDERERS = {
 
 // `onPick(field, value)` — optional. Given, a choice or a tag becomes a button that asks for "only
 // these" (see StatusChip). It is passed by the collection layouts and by nothing else.
-export function Cell({ field, value, onFollow, onPick }) {
+//
+// `onChange(value)` — optional. Given, a CHOICE (select · status) and a YES/NO are changed right
+// where they stand: clicking the chip opens its choices. Without it a click on a choice could only
+// narrow the view ("show only Lead"), so in a table the most obvious gesture — click the stage to
+// change the stage — filtered the table instead. Narrowing is still there, as the menu's last item.
+export function Cell({ field, value, onFollow, onPick, onChange }) {
+  if (onChange && field && !isDerived(field) && !field.auto) {
+    if (field.type === 'select' || field.type === 'status') return <ChoiceEditor field={field} value={value} onChange={onChange} onPick={onPick} showGroup={field.type === 'status'} bare />;
+    if (field.type === 'checkbox') return <CheckboxEditor value={value} onChange={onChange} />;
+  }
   if (field?.type === 'relation') return <RelationCell value={value} field={field} onFollow={onFollow} />;
   const render = RENDERERS[field?.type];
   if (render) return render(value, field, onPick);
@@ -508,20 +513,29 @@ function NumberEditor({ field, value, onChange }) {
 // and the formatted one echoed next to it — which read as two different amounts.
 function NumberInput({ value, onChange }) {
   const raw = value == null || value === '' ? '' : String(value);
-  const [focus, setFocus] = React.useState(false);
-  const [draft, setDraft] = React.useState(raw);
-  React.useEffect(() => { if (!focus) setDraft(raw); }, [raw, focus]);
-  const n = Number(raw);
-  const shown = focus ? draft : raw === '' || Number.isNaN(n) ? raw : n.toLocaleString('en-US', { maximumFractionDigits: 6 });
+  const pretty = text => { const n = Number(text); return text === '' || Number.isNaN(n) ? text : n.toLocaleString('en-US', { maximumFractionDigits: 6 }); };
+  // What is in the box is always `draft`, so typing works whether or not a focus event arrived
+  // (it does not in a window that is not the front one). Focus only swaps the formatted text for
+  // the bare digits; blur commits and formats again.
+  const [draft, setDraft] = React.useState(pretty(raw));
+  const focused = React.useRef(false);
+  const cancelled = React.useRef(false);
+  React.useEffect(() => { if (!focused.current) setDraft(pretty(raw)); }, [raw]);
+  const commit = () => {
+    focused.current = false;
+    const next = cancelled.current ? raw : draft.replace(/[,\s]/g, '');
+    cancelled.current = false;
+    if (next !== raw) onChange(next); else setDraft(pretty(raw));
+  };
   return (
-    <input className="numInput hBd" inputMode="decimal" value={shown} placeholder="—" aria-label="Number"
-      onFocus={e => { setFocus(true); setDraft(raw); requestAnimationFrame(() => { try { e.target.select(); } catch { /* gone */ } }); }}
+    <input className="numInput hBd" inputMode="decimal" value={draft} placeholder="—" aria-label="Number"
+      onFocus={e => { focused.current = true; setDraft(raw); const el = e.target; requestAnimationFrame(() => { try { el.select(); } catch { /* gone */ } }); }}
       onChange={e => setDraft(e.target.value)}
-      onBlur={() => { setFocus(false); const next = draft.replace(/[,\s]/g, ''); if (next !== raw) onChange(next); }}
+      onBlur={commit}
       onKeyDown={e => {
         e.stopPropagation();
-        if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); }
-        else if (e.key === 'Escape') { e.preventDefault(); setDraft(raw); setFocus(false); e.currentTarget.blur(); }
+        if (e.key === 'Enter') { e.preventDefault(); commit(); e.currentTarget.blur(); }
+        else if (e.key === 'Escape') { e.preventDefault(); cancelled.current = true; commit(); e.currentTarget.blur(); }
       }} />
   );
 }
@@ -530,22 +544,22 @@ function NumberInput({ value, onChange }) {
 // One picker, two skins. `status` carries the gate and the board grouping, so its menu prints the
 // group beside each option — that is the whole difference the data model insists on, made visible
 // at the moment of choosing.
-function ChoiceEditor({ field, value, onChange, showGroup, onPick }) {
+function ChoiceEditor({ field, value, onChange, showGroup, onPick, bare }) {
   const menu = useContextMenu();
-  const browse = onPick && value != null && value !== ''
-    ? [{ label: 'Show all with ' + String(value).replace(/-/g, ' '), onClick: () => onPick(field, value) }, { sep: true }] : [];
+  const has = value != null && value !== '';
   const items = optionsOf(field).map(o => ({
-    label: String(o.value).replace(/-/g, ' '),
-    hint: showGroup && o.group ? o.group : undefined,
-    onClick: () => onChange(o.value),
+    label: chipText(o.value),
+    hint: String(o.value) === String(value) ? '✓' : showGroup && o.group ? o.group : undefined,
+    onClick: () => { if (String(o.value) !== String(value)) onChange(o.value); },
   }));
-  if (value != null && value !== '') items.push({ sep: true }, { label: 'Clear', onClick: () => onChange(null) });
+  if (has) items.push({ sep: true }, { label: 'Clear', onClick: () => onChange(null) });
+  if (onPick && has) items.push({ sep: true }, { label: 'Show all with “' + chipText(value) + '”', onClick: () => onPick(field, value) });
   return (
     <>
-      <button type="button" onClick={menu.open([...browse, ...items])} style={{ ...BARE, ...sx('gap:8px;border-radius:9999px') }}
-        title={field?.gate ? 'Choose a stage. This is the gate: an assistant may not move a record past shortlist.' : 'Choose'}>
-        {value == null || value === '' ? <SetChip /> : <StatusChip value={value} field={field} />}
-        <Caret />
+      <button type="button" className={'choiceBtn' + (bare ? ' bare' : '')} onClick={menu.open(items)} onDoubleClick={e => e.stopPropagation()}
+        title={field?.gate ? 'Change the stage. This is the gate: an assistant may not move a record past shortlist.' : 'Change'}>
+        {has ? <StatusChip value={value} field={field} /> : <span className="chip plain chipEmpty">{bare ? 'Set' : 'Set…'}</span>}
+        {bare ? null : <Caret />}
       </button>
       {menu.render()}
     </>
@@ -651,13 +665,10 @@ function DateEditor({ field, value, onChange }) {
 function CheckboxEditor({ value, onChange }) {
   const on = !!value;
   return (
-    <button type="button" className="hBd" onClick={() => onChange(!on)}
-      style={{
-        ...BARE, ...mono('font-size:var(--t-label);font-weight:600;letter-spacing:.08em;height:22px;padding:0 9px;border-radius:6px'),
-        border: '1px solid var(--border-2)', color: on ? 'var(--ok)' : 'var(--fg-faint)',
-      }}>
-      <span style={{ ...sx('width:5px;height:5px;border-radius:9999px'), background: on ? 'var(--ok)' : 'var(--fg-faint)' }} />
-      <span>{on ? 'YES' : 'NO'}</span>
+    <button type="button" role="switch" aria-checked={on} className={'chip' + (on ? '' : ' plain')} style={on ? { '--chip': 'var(--ok)' } : undefined}
+      title={on ? 'Yes. Click to change to No' : 'No. Click to change to Yes'}
+      onClick={e => { e.stopPropagation(); onChange(!on); }} onDoubleClick={e => e.stopPropagation()}>
+      <span className="chipDot" aria-hidden="true" />{on ? 'Yes' : 'No'}
     </button>
   );
 }

@@ -14,7 +14,7 @@ import { storeAttachment } from './attachments.mjs';
 import { isAgentActor } from './actors.mjs';
 import { currentWorkerIdentity } from './workerScope.mjs';
 import { logEvent } from './log.mjs';
-import { createCollection, setCollectionMeta, addSubcollection, removeSubcollection } from './subcollections.mjs';
+import { createCollection, setCollectionMeta, addSubcollection, removeSubcollection, reorderCollections } from './subcollections.mjs';
 import { DEFAULT_ACTOR } from './actors.mjs';
 
 export function registerCollectionRoutes(app) {
@@ -40,6 +40,8 @@ export function registerCollectionRoutes(app) {
   });
 
   app.post('/api/collections/create', route(req => createCollection({ label: req.body && req.body.label }, who(req))));
+  // The order the sidebar lists them in. `parent` names whose sub-collections these are.
+  app.post('/api/collections/order', route(req => reorderCollections({ ids: req.body && req.body.ids, parent: (req.body && req.body.parent) || null }, who(req))));
 
   app.patch('/api/collections/:id/meta', route(req => {
     const { label, colour, header, page } = req.body || {};

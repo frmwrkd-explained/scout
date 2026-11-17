@@ -116,7 +116,7 @@ export function activityOf(collection, row) {
 // Selected is the neutral raised chip treatment (docs/05_UI_SPEC.md §6) — a --raise bed with a
 // --border-3 edge, exactly the ui.jsx Chip vocabulary. Never an accent fill: the accent is the one
 // primary action on a screen, and a selected card is state, not an action.
-function BoardCard({ collection, row, defs, look, selected, dragging, draggable, onSelect, onOpen, onFollow, onPick, onDragStart, onDragEnd }) {
+function BoardCard({ collection, row, defs, look, selected, dragging, draggable, onSelect, onOpen, onFollow, onPick, onPatch, onDragStart, onDragEnd }) {
   const { z, cover, fit, summary } = look;
   return (
     <div
@@ -146,7 +146,7 @@ function BoardCard({ collection, row, defs, look, selected, dragging, draggable,
           {defs.map(f => {
             const v = row.fields[f.key];
             if (v === undefined || v === null || v === '' || (Array.isArray(v) && !v.length)) return null;
-            return <Cell key={f.key} field={f} value={v} onFollow={onFollow} onPick={onPick} />;
+            return <Cell key={f.key} field={f} value={v} onFollow={onFollow} onPick={onPick} onChange={onPatch ? nv => onPatch(row, f.key, nv) : undefined} />;
           })}
         </div>
       ) : null}
@@ -158,7 +158,7 @@ function BoardCard({ collection, row, defs, look, selected, dragging, draggable,
 }
 
 // ── the board ──────────────────────────────────────────────────────────────────────────────────
-export default function BoardView({ collection, view, views, rows, counts, selected, onSelect, onOpen, onFollow, onPick, onPickView, onMove }) {
+export default function BoardView({ collection, view, views, rows, counts, selected, onSelect, onOpen, onFollow, onPick, onPatch, onPickView, onMove }) {
   const [drag, setDrag] = React.useState(null);   // { path, from } — the card in flight
   const [over, setOver] = React.useState(null);   // the status value under the cursor
 

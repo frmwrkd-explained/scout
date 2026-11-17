@@ -19,6 +19,8 @@ const at = id => '/api/collections/' + encodeURIComponent(id);
 
 export const collectionsApi = {
   create: (label, actor) => fetch('/api/collections/create', { method: 'POST', ...json({ label, actor }) }).then(read),
+  // The new order of the top-level collections, or of `parent`'s sub-collections.
+  reorder: (ids, parent, actor) => fetch('/api/collections/order', { method: 'POST', ...json({ ids, parent: parent || null, actor }) }).then(read),
   setMeta: (id, patch, actor) => fetch(at(id) + '/meta', { method: 'PATCH', ...json({ ...patch, actor }) }).then(read),
   // `{ label }` makes a new sub-collection; `{ collection }` nests one that already exists.
   addSub: (parent, what, actor) => fetch(at(parent) + '/subcollections', { method: 'POST', ...json({ ...what, actor }) }).then(read),

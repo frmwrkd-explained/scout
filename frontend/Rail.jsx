@@ -91,10 +91,16 @@ function Row({ label, count, countTone, on, mono: isMono, onClick, dot, right })
 // A collection in the rail: its dot, its name, its count — and on hover a ⋯ that opens the panel
 // where it is renamed, recoloured and given sub-collections. The row is a wrapper holding TWO
 // buttons side by side, because a button inside a button is not a thing a keyboard can reach.
-function CollectionRow({ collection, depth, count, on, menuOpen, onPick, onMore, onContextMenu }) {
+// `drag` — optional { dragging, mark, onStart, onOver, onDrop, onEnd }. Given, the row can be
+// picked up and dropped among its siblings (Rail's reorder, below); `mark` is where the dragged
+// row would land relative to this one ('before' | 'after'), drawn as a line.
+function CollectionRow({ collection, depth, count, on, menuOpen, onPick, onMore, onContextMenu, drag }) {
   const ref = React.useRef(null);
   return (
-    <div ref={ref} className={'colRow' + (on ? ' on' : '')} onContextMenu={e => onContextMenu(e, ref.current)}>
+    <div ref={ref} className={'colRow' + (on ? ' on' : '') + (drag && drag.dragging ? ' dragging' : '') + (drag && drag.mark ? ' drop-' + drag.mark : '')}
+      draggable={!!drag} onDragStart={drag ? drag.onStart : undefined} onDragEnd={drag ? drag.onEnd : undefined}
+      onDragOver={drag ? e => drag.onOver(e, ref.current) : undefined} onDrop={drag ? drag.onDrop : undefined}
+      onContextMenu={e => onContextMenu(e, ref.current)}>
       {Array.from({ length: depth }, (_, i) => <span key={i} className="colRowNest" aria-hidden="true" />)}
       <button type="button" className="colRowMain" onClick={onPick} title={collection.id}>
         <CollectionDot collection={collection} />
@@ -180,6 +186,40 @@ export default function Rail({
   const changed = React.useCallback(async () => { if (onCollectionsChanged) await onCollectionsChanged(); }, [onCollectionsChanged]);
   const tree = collectionTree(collections);
 
+  // REORDER BY DRAGGING. A collection is dragged among its SIBLINGS: top-level ones among the
+  // top-level ones, a sub-collection among the others of the same parent. It only changes the order
+  // they are listed in — nothing about what a collection contains or belongs to; nesting stays the
+  // deliberate "Add sub-collection" in the ⋯ menu, because it adds a property to the records.
+  const [dragging, setDragging] = React.useState(null);   // { id, parent }
+  const [dropAt, setDropAt] = React.useState(null);       // { id, where: 'before' | 'after' }
+  const [orderNote, setOrderNote] = React.useState(null);
+  const sameGroup = parent => dragging && (dragging.parent || null) === (parent || null);
+  const dragFor = (c, parent) => ({
+    dragging: !!dragging && dragging.id === c.id && sameGroup(parent),
+    mark: dropAt && dropAt.id === c.id && sameGroup(parent) && dragging.id !== c.id ? dropAt.where : null,
+    onStart: e => { setDragging({ id: c.id, parent: parent || null }); setOrderNote(null); try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', c.id); } catch { /* some shells refuse */ } },
+    onEnd: () => { setDragging(null); setDropAt(null); },
+    onOver: (e, el) => {
+      if (!sameGroup(parent) || dragging.id === c.id || !el) return;
+      e.preventDefault();
+      const box = el.getBoundingClientRect();
+      const where = e.clientY < box.top + box.height / 2 ? 'before' : 'after';
+      setDropAt(at => (at && at.id === c.id && at.where === where ? at : { id: c.id, where }));
+    },
+    onDrop: async e => {
+      e.preventDefault();
+      const moved = dragging, at = dropAt;
+      setDragging(null); setDropAt(null);
+      if (!moved || !at || !sameGroup(parent) || moved.id === at.id) return;
+      const siblings = tree.filter(n => (n.parent || null) === (moved.parent || null)).map(n => n.collection.id).filter(id => id !== moved.id);
+      const i = siblings.indexOf(at.id);
+      if (i < 0) return;
+      siblings.splice(at.where === 'before' ? i : i + 1, 0, moved.id);
+      try { await collectionsApi.reorder(siblings, moved.parent, actor); await changed(); }
+      catch (err) { setOrderNote(err.message || String(err)); }
+    },
+  });
+
   // The rail's width is the person's (drag its right edge), and it folds away with ⌘\ for the
   // moments a wide table or a wall of cards wants the whole window.
   const [width, setWidth, resetWidth] = usePanelWidth('scout.rail.w', RAIL_W, { min: 180, max: 460 });
@@ -253,6 +293,7 @@ export default function Rail({
                 const openPanel = (anchorEl, focus) => setPanel({ key, id: c.id, parent, focus, anchor: anchorEl ? anchorEl.getBoundingClientRect() : null });
                 return (
                   <CollectionRow key={key} collection={c} depth={depth} count={counts[c.id] ?? '·'}
+                    drag={dragFor(c, parent)}
                     on={(screen === 'collection' || screen === 'document') && c.id === activeCollection}
                     menuOpen={!!panel && panel.key === key}
                     onPick={() => onPickCollection && onPickCollection(c.id)}
@@ -268,6 +309,7 @@ export default function Rail({
                 );
               })
             : <NoneYet>None yet</NoneYet>}
+          {orderNote ? <p className="colOrderNote" role="alert">{orderNote}</p> : null}
           <NewCollection actor={actor} onCreated={async made => { await changed(); if (made && made.id && onPickCollection) onPickCollection(made.id); }} />
         </Group>
 

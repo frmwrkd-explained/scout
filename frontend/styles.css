@@ -772,3 +772,14 @@ button.chip:hover{border-color:color-mix(in srgb,var(--chip) 55%,transparent);co
 .bvTitle{min-width:0;font-weight:600;line-height:1.35;color:var(--fg);overflow-wrap:anywhere}
 .bvFields{display:flex;align-items:center;gap:6px 8px;flex-wrap:wrap;font-size:var(--t-small);color:var(--fg-muted)}
 .vbEmpty{display:block;padding:8px 10px;font-size:var(--t-small);line-height:1.5;color:var(--fg-muted)}
+
+/* ── changing a value where it stands (cells.jsx ChoiceEditor / TableView.jsx) ── */
+.choiceBtn{display:inline-flex;align-items:center;gap:7px;max-width:100%;margin:0;padding:0;border:none;border-radius:6px;background:none;cursor:pointer;font:inherit;color:inherit}
+.choiceBtn:hover .chip{border-color:color-mix(in srgb,var(--chip) 55%,transparent);color:var(--fg)}
+.choiceBtn:focus-visible{outline:2px solid var(--border-3);outline-offset:2px}
+.chipEmpty{border:1px dashed var(--border-2);background:none;color:var(--fg-faint);font-weight:500}
+.tvRow .chipEmpty{opacity:0;transition:opacity 120ms ease}
+.tvRow:hover .chipEmpty,.choiceBtn:focus-visible .chipEmpty{opacity:1}
+.tvCell.can{cursor:text;border-radius:6px;margin:-3px -6px;padding:3px 6px;transition:background 120ms ease}
+.tvRow:hover .tvCell.can:hover{background:var(--raise)}
+.tvCell.editing{margin:-4px -8px;min-width:140px}

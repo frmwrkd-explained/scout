@@ -70,7 +70,7 @@ export function GroupHeader({ label, count, field, value, onFollow }) {
   );
 }
 
-export default function ListView({ collection, view, rows, selected, onSelect, onOpen, onFollow, onPick }) {
+export default function ListView({ collection, view, rows, selected, onSelect, onOpen, onFollow, onPick, onPatch }) {
   const z = sizeOf(view);
   const cover = coverOf(collection, view);
   const fit = fitOf(view);
@@ -97,7 +97,7 @@ export default function ListView({ collection, view, rows, selected, onSelect, o
   const props = (r, where) => (defs.length ? (
     <div className={'lvProps ' + where} style={{ zoom: z.zoom }}>
       {defs.map(f => (
-        <span key={f.key} className="lvProp"><Cell field={f} value={r.fields[f.key]} onFollow={onFollow} onPick={onPick} /></span>
+        <span key={f.key} className="lvProp"><Cell field={f} value={r.fields[f.key]} onFollow={onFollow} onPick={onPick} onChange={onPatch ? v => onPatch(r, f.key, v) : undefined} /></span>
       ))}
     </div>
   ) : null);

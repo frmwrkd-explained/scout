@@ -186,8 +186,13 @@ export function getCollection(id) {
   }
 }
 
+// In the order the person arranged them (`order` in each file, written by
+// subcollections.mjs `reorderCollections`), then everything not yet placed — a new collection, or a
+// workspace nobody has arranged — alphabetically, as before.
 export function listCollections() {
-  return listCollectionIds().map(getCollection).filter(Boolean);
+  const all = listCollectionIds().map(getCollection).filter(Boolean);
+  const rank = c => (Number.isFinite(c.order) ? c.order : Infinity);
+  return all.map((c, i) => [c, i]).sort((a, b) => (rank(a[0]) - rank(b[0])) || (a[1] - b[1])).map(x => x[0]);
 }
 
 // The ONE writer of a collection file. Both doors below validate their own way and land here, so

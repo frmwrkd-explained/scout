@@ -80,7 +80,7 @@ export default function RecordHeader({ schema, data, options = {}, onChange, onF
           <span className="recordPropsLine">
             {filled.length ? filled.map(f => (
               <span key={f.key} className="recordPropsValue" title={propertyLabel(f)}>
-                <Cell field={f} value={data[f.key]} onFollow={onFollow} onPick={onPick} />
+                <Cell field={f} value={data[f.key]} onFollow={onFollow} onPick={onPick} onChange={onChange ? v => onChange(f.key, v) : undefined} />
               </span>
             )) : <span className="recordPropsEmpty">No properties filled in yet</span>}
           </span>

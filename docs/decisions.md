@@ -1560,3 +1560,31 @@ control on a board.
   card worked out itself ("2 all deals · 1 deals · 12 messages") is gone, as are the band labels
   when no stage declares a band.
 
+## A value is changed where it stands (2026-11-17)
+
+Owner: "the simplest things are not working — I can't even change the stage, it just filters."
+A chip in a row could only narrow the view ("show only Lead"); changing it meant opening the
+record or the Details panel. That inverted the obvious gesture.
+
+- **Click a choice to change it**, in the table, list, cards, board and the folded line on a
+  record: the chip opens its choices (current one ticked), then Clear, then "Show all with …" —
+  narrowing is still there, last. A yes/no flips on a click. Tags keep click-to-narrow.
+- **The table edits in place.** Text, numbers, dates, links, tags and linked records become their
+  editor when the cell is clicked, caret already in it. Computed and automatic values, files and
+  structured lists do not react; they are edited on the record's page.
+- **One save path**: `App.patchRow` → `PATCH /api/records`, optimistic, restored on failure, then
+  a re-read once things settle (the row may have left a filtered view, or raised a card).
+- The number field always shows its draft, so typing works even when no focus event arrives.
+
+## Collections are arranged by dragging (2026-11-17)
+
+Owner: "I'd like to move it up — if I create a new collection I can just drag and drop it
+somewhere." The sidebar listed collections alphabetically by id, with no way to change it.
+
+- A collection is dragged among its siblings. Top-level order is `order` in each collection's
+  file (`POST /api/collections/order`, `subcollections.reorderCollections`); a sub-collection's
+  order is the order of its parent's `subtables`. `listCollections` returns them arranged, then
+  anything not yet placed alphabetically — so the pickers and the agent's index follow too.
+- Dragging does NOT nest. Nesting adds a property to the child's records, so it stays the
+  deliberate "Add sub-collection" in the ⋯ menu. Only the operator may arrange (403 otherwise).
+
