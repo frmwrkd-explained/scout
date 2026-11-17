@@ -66,6 +66,20 @@ const touched = () => {
   bumpCache();
 };
 
+// AFTER A RECORD IS WRITTEN. The same shape as store.mjs `onMdWrite`: a notification, not a second
+// writer. Every verb below that changes a record's frontmatter tells its listeners what the record
+// said before and what it says now — `before: null` means the file is new. Automations
+// (backend/automations.mjs) are the one listener: "a field BECAME a value" can only be known here,
+// where the old value is still in hand. A listener is told after the file and its log line exist,
+// and a listener that throws never fails the write.
+function recordWriteListeners() { return recordWriteListeners.set || (recordWriteListeners.set = new Set()); }
+export function onRecordWrite(listener) { recordWriteListeners().add(listener); return () => recordWriteListeners().delete(listener); }
+function wrote(event) {
+  for (const listener of recordWriteListeners()) {
+    try { listener(event); } catch { /* a listener is never a reason for a write to fail */ }
+  }
+}
+
 // Identity lives in ONE place now (backend/actors.mjs) — this module used to define it, and
 // memory.mjs defined a second copy that disagreed with it. Re-exported here so every existing
 // importer, and every test, keeps reaching for it where it has always been.
@@ -594,7 +608,10 @@ function upsertOne(input, { actor, via, rows, collection, openFindings = null, w
   // Work and reviews are occurrences, not named entities: "Follow up: campaign" must not
   // merge back into "campaign", and two dated reviews may have almost identical titles.
   // Their explicit IDs are identity; they still pass through this writer and its gate/log.
-  const occurrence = input.id && ['work', 'review', 'delivery', 'paperclip-result', 'artifact'].includes(collection.id);
+  // `references` is the same case for a different reason: an imported library carries its source's
+  // id, and its titles are descriptions ("Centered product on a white ground") that repeat across
+  // genuinely different images — a name match there would fold two references into one file.
+  const occurrence = input.id && ['work', 'review', 'delivery', 'paperclip-result', 'artifact', 'references'].includes(collection.id);
   const matches = direct || occurrence ? [] : matchAgainst({ ...fields, __title: title }, rows);
   const best = matches.length && matches[0].confidence >= MERGE_CONFIDENCE ? matches[0] : null;
   const target = direct || (best ? rows.find(r => r.path === best.path) : null);
@@ -623,6 +640,7 @@ function upsertOne(input, { actor, via, rows, collection, openFindings = null, w
       if (card) result.card = card.id;
     }
     touched();
+    wrote({ path: directPath, collection: collection.id, before: null, after: data, actor, via });
     rows.push({ id: slug, path: directPath, title, __title: title, ...data });   // visible to the rest of the batch
     return result;
   }
@@ -654,6 +672,7 @@ function upsertOne(input, { actor, via, rows, collection, openFindings = null, w
   const result = { verdict, id: target.id, path: target.path, matched: target.id, confidence, changed: [...changed, ...(merged.changed ? ['body'] : [])] };
   emit({ type: verdict, actor, target: target.path, detail: { collection: collection.id, via, confidence, changed: result.changed } });
   touched();
+  wrote({ path: target.path, collection: collection.id, before: onDisk, after: data, actor, via });
   Object.assign(rows.find(r => r.path === target.path), data);
   return result;
 }
@@ -750,6 +769,7 @@ export function moveRecord(relPath, { to, actor = DEFAULT_ACTOR, reason = null }
   writeMd(doc.abs, data, doc.content);
   emit({ type: 'move', actor, target: doc.path, detail: { field: gate.key, from, to, reason: reason || undefined } });
   touched();
+  wrote({ path: doc.path, collection: collection ? collection.id : null, before: doc.data, after: data, actor, via: 'move' });
   return { path: doc.path, from, to };
 }
 
@@ -815,6 +835,7 @@ export function acceptRecord(relPath, { actor = DEFAULT_ACTOR } = {}) {
   writeMd(doc.abs, data, doc.content);
   emit({ type: 'accept', actor, target: doc.path, detail: { was: 'quarantined' } });
   touched();
+  wrote({ path: doc.path, collection: collection ? collection.id : null, before: doc.data, after: data, actor, via: 'accept' });
   return readRecord(doc.path);
 }
 
@@ -942,6 +963,7 @@ export async function patchRecord(relPath, patch = {}, { actor = DEFAULT_ACTOR, 
   if (body !== doc.content) changed.push('body');
   emit({ type: 'update', actor, target: doc.path, detail: { changed, via: 'surface' } });
   touched();
+  wrote({ path: doc.path, collection: collection ? collection.id : null, before: doc.data, after: data, actor, via: 'surface' });
   return { path: doc.path, rev: revOf(data, body), data, content: body };
 }
 

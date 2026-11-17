@@ -239,6 +239,147 @@ export function addField(id, field) {
   return warnings.length ? { ...saved, warnings } : saved;
 }
 
+// ── changing and retiring a field ──────────────────────────────────────────────────────────────
+// `docs/04_AGENT_CONTRACT.md` §4 says never change a field's type on live data, and that stays true
+// for AGENTS: an agent proposes a schema change and it lands as a card. These two are the human's
+// door (`backend/schemaRoutes.mjs` refuses an agent), and both keep the rule §2 already states for
+// adding a field: **a schema change never rewrites a document.** That is what makes them safe:
+//
+//   · the KEY never changes. A "rename" changes the `label`. Changing the key would orphan the
+//     value in every file that already carries it, silently, in one write;
+//   · a type change re-reads the same stored value through a different renderer. Nothing on disk
+//     moves, so changing it back is always possible;
+//   · removing a field removes it from the SCHEMA. The value stays in every file's frontmatter and
+//     still shows on the record, as an undeclared key (Law 8, and "never delete a user file").
+//
+// What a field of one type may become. Only pairs where the stored value still reads sensibly:
+// a string stays a string, one choice can become many. A type that is not listed cannot change —
+// a relation is a link, a file is a path, a rollup is computed; none of them is "just a value".
+export const TYPE_CHANGES = {
+  text: ['select', 'multiselect', 'number', 'date', 'url', 'email', 'phone'],
+  number: ['text'],
+  select: ['multiselect', 'status', 'text'],
+  multiselect: ['select', 'text'],
+  status: ['select'],
+  date: ['text'],
+  checkbox: ['text'],
+  url: ['text', 'email', 'phone'],
+  email: ['text', 'url', 'phone'],
+  phone: ['text', 'url', 'email'],
+};
+
+// Keys every field may carry whatever its type — the same list validateField allows.
+const COMMON_FIELD_KEYS = ['key', 'type', 'label', 'required', 'primary', 'description'];
+
+function locateField(id, key) {
+  const c = getCollection(id);
+  if (!c) throw Object.assign(new SchemaError('no collection "' + id + '"'), { status: 404 });
+  const fields = [...(c.fields || [])];
+  const at = fields.findIndex(f => f && f.key === key);
+  if (at < 0) throw Object.assign(new SchemaError('no field "' + key + '" on ' + id), { status: 404 });
+  return { c, fields, at, field: fields[at] };
+}
+
+// Same rule as addField: the field being written is validated in full; a neighbour that was
+// already invalid is NAMED in `warnings` rather than allowed to block a write not aimed at it.
+function neighbourWarnings(fields, skip, collectionIds) {
+  const warnings = [];
+  fields.forEach((f, i) => {
+    if (i === skip) return;
+    try { validateField(f, i, { collectionIds }); }
+    catch (e) { warnings.push('existing field `' + ((f && f.key) || i) + '` is invalid: ' + e.message); }
+  });
+  return warnings;
+}
+
+// `patch` is the keys to change. `null` (or '') removes an optional key — that is how a label is
+// cleared back to the key. Anything the resulting type does not allow is dropped when the TYPE
+// changes (select → text loses `options`), and is refused by validateField when it does not.
+export function updateField(id, key, patch = {}) {
+  if (!patch || typeof patch !== 'object' || Array.isArray(patch)) throw new SchemaError('a field change is an object: { label, type, options, … }');
+  const { c, fields, at, field } = locateField(id, key);
+
+  if (patch.key !== undefined && patch.key !== key) {
+    throw new SchemaError('a field\'s key cannot change — every document already stores its value under "' + key + '". Change its label instead.');
+  }
+  if (patch.primary !== undefined && !!patch.primary !== !!field.primary) {
+    throw new SchemaError('the title field is set when a collection is made and cannot be moved here');
+  }
+  if (patch.gate !== undefined && !!patch.gate !== !!field.gate) {
+    throw new SchemaError('the gate is what the promotion rule guards — it cannot be switched on or off here');
+  }
+
+  const type = patch.type || field.type;
+  if (type !== field.type) {
+    if (field.primary) throw new SchemaError('the title field stays text');
+    if (field.gate) throw new SchemaError('"' + key + '" is the gate field — its type cannot change');
+    if (!FIELD_TYPES[type]) {
+      throw new SchemaError('unknown field type "' + type + '". Legal types are: ' + FIELD_TYPE_NAMES.join(' · '));
+    }
+    const allowed = TYPE_CHANGES[field.type] || [];
+    if (!allowed.includes(type)) {
+      throw new SchemaError('a ' + field.type + ' field cannot become ' + type + '. '
+        + (allowed.length ? 'It can become: ' + allowed.join(' · ') + '.' : 'Its type is fixed — add a new property instead.'));
+    }
+  }
+
+  const next = { ...field, ...patch, key, type };
+  for (const [k, v] of Object.entries(patch)) if (v === null || v === undefined || (k === 'label' && String(v).trim() === '')) delete next[k];
+  if (typeof next.label === 'string') next.label = next.label.trim();
+  if (type !== field.type) {
+    const keep = new Set([...FIELD_TYPES[type].opts, ...COMMON_FIELD_KEYS]);
+    for (const k of Object.keys(next)) if (!keep.has(k)) delete next[k];
+  }
+
+  const collectionIds = knownCollectionIds(id);
+  validateField(next, at, { collectionIds });
+  const schema = { ...c, fields: fields.map((f, i) => (i === at ? next : f)) };
+  validateInvariants(schema);
+
+  const warnings = neighbourWarnings(schema.fields, at, collectionIds);
+  const saved = writeCollection(schema);
+  return warnings.length ? { ...saved, warnings } : saved;
+}
+
+// Removes the field from the schema and nothing else. Saved views that name it are scrubbed by the
+// caller (`views.mjs` `scrubFieldFromViews`, called from `schemaRoutes.mjs`) — that lives there
+// because views.mjs already imports this module, and the other direction would be a cycle.
+// Other collections that point at this field are NOT rewritten: they are listed in `warnings`, so
+// the person sees what now dangles instead of having three schemas change under one click.
+export function removeField(id, key) {
+  const { c, fields, at, field } = locateField(id, key);
+  if (field.primary) throw new SchemaError('"' + key + '" is the title of every record in this collection — it cannot be removed');
+  if (field.gate) throw new SchemaError('"' + key + '" is the gate field — the promotion rule depends on it, so it cannot be removed');
+
+  const schema = { ...c, fields: fields.filter((_, i) => i !== at) };
+  validateInvariants(schema);
+
+  const warnings = [];
+  for (const f of schema.fields) {
+    if (f.type === 'rollup' && f.via === key) warnings.push('`' + f.key + '` rolls up through `' + key + '` and now has nothing to walk');
+  }
+  for (const other of listCollections()) {
+    if (other.broken) continue;
+    for (const f of other.fields || []) {
+      if (other.id !== id && f.type === 'relation' && f.target === id && f.inverse === key) {
+        warnings.push('#' + other.id + ' `' + f.key + '` names `' + key + '` as its inverse');
+      }
+      const via = f.type === 'rollup' ? (other.fields || []).find(x => x.key === f.via) : null;
+      if (via && via.type === 'relation' && via.target === id && f.target_field === key) {
+        warnings.push('#' + other.id + ' `' + f.key + '` rolls up `' + key + '`');
+      }
+    }
+    for (const sub of other.subtables || []) {
+      if (sub && sub.collection === id && sub.bind && Object.prototype.hasOwnProperty.call(sub.bind, key)) {
+        warnings.push('#' + other.id + ' lists these records as "' + (sub.label || sub.id) + '" through `' + key + '`');
+      }
+    }
+  }
+
+  const saved = writeCollection(schema);
+  return warnings.length ? { ...saved, warnings } : saved;
+}
+
 export function fieldOf(collection, key) {
   return (collection.fields || []).find(f => f.key === key) || null;
 }

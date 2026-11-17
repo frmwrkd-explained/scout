@@ -19,8 +19,8 @@
 //     not because this file checks anything, but because it cannot reach around the thing that does.
 //
 //  3. **It does not need the API to be running.** An MCP host launches this process standalone. It
-//     talks to the modules directly; nothing here opens a socket or fetches a URL. The one
-//     exception is the unbound-capability fallback at the bottom, which is honest about being one.
+//     talks to the modules directly; nothing here opens a socket or fetches a URL. Every Index
+//     line is bound today; a line added without a binding still becomes a tool that says so.
 //
 // TRANSPORT. Newline-delimited JSON-RPC 2.0 on stdin/stdout. **Anything written to stdout that is
 // not a JSON-RPC frame corrupts the stream** — every log line goes to stderr. `handleMessage` is
@@ -31,7 +31,8 @@ import fs from 'node:fs';
 
 import { INDEX_CAPABILITIES, renderIndex } from './agentIndex.mjs';
 import { selfApiBase } from './agentHome.mjs';
-import { getStorageRoot } from './store.mjs';
+import { getStorageRoot, safe, slugify } from './store.mjs';
+import { isAgentActor } from './actors.mjs';
 import { listCollections, FIELD_TYPE_NAMES } from './collections.mjs';
 import { documentsFor, documentAt, collectionsOf, allDocuments, viewFor } from './documents.mjs';
 import { getView, defaultView, saveView, applyView } from './views.mjs';
@@ -40,9 +41,11 @@ import {
   upsertRecord, batchUpsert, moveRecord, nearMatches, excludeQuarantined, resolveTarget } from './records.mjs';
 import { readCache, cacheVersion, getPlaybook, saveLearning } from './memory.mjs';
 import { listTerritories, saveTerritory, proposeTerritory } from './territory.mjs';
+import { listAutomations } from './automations.mjs';
+import { describeBoard } from './scoutBoard.mjs';
 import { listProposals, propose } from './proposals.mjs';
 import { listAssistants, listTasks, findTask, saveTask, claimTask, appendRun } from './tasks.mjs';
-import { readEvents, EVENT_TYPES } from './log.mjs';
+import { readEvents, logEvent, EVENT_TYPES } from './log.mjs';
 
 // ── identity ───────────────────────────────────────────────────────────────────────────────────
 
@@ -103,7 +106,16 @@ function need(args, key, what) {
   return v;
 }
 function str(v, fallback = null) { return v === undefined || v === null ? fallback : String(v); }
-function actorOf(args) { return str(args.actor, null) || defaultActor(); }
+// THIS DOOR IS FOR AGENTS, so the actor it hands the pipeline is always one. `actor` is a string
+// the client types: without this, an MCP client that typed the person's own name would be treated
+// as the person, and the gate (no promotion past `shortlist`, human-owned memory) would be a rule
+// an agent could switch off by asking. A name the border rule calls a person falls back to the
+// plain MCP agent id; an agent may still name ITSELF, which is how colleagues are told apart.
+export const MCP_AGENT = 'scout-mcp';
+function actorOf(args) {
+  const named = str(args.actor, null) || defaultActor();
+  return isAgentActor(named) ? named : MCP_AGENT;
+}
 
 // frontend/api.js sends PATCHes as { patch, actor }; agents and curl send the fields flat. Both
 // route handlers accept both shapes, so this door does too — a tool that only took one of them
@@ -263,6 +275,22 @@ const BINDINGS = {
     run: a => moveRecord(resolveTarget(a.path || a.id), {
       to: need(a, 'to'), actor: actorOf(a), reason: str(a.reason),
     }),
+  },
+
+  // ── the whiteboard, in words ──
+  'GET /api/scout/board/:id/describe': {
+    note: 'What a person has laid out on the project whiteboard, as text: the records on it, the relations between them, the texts and shapes they wrote, and every arrow they drew as "A → B: label". Read it to understand how they see the work; pen strokes are only counted.',
+    schema: S.obj({ id: S.s('Board id — the project id, or "main".') }),
+    run: a => describeBoard(String((a && a.id) || 'main')),
+  },
+
+  // ── automations ──
+  // Read-only here. A rule is a person's standing instruction; an agent that wants one proposes it
+  // over HTTP (POST /api/automations), where it arrives switched off for a person to turn on.
+  'GET /api/automations': {
+    note: 'The rules a person has set — "when a Deal\'s stage becomes won, create the invoice". Each has `when`, `do`, `mode` (ask | auto), `enabled` and its last runs. Read them before doing by hand what a rule already does.',
+    schema: S.obj({}),
+    run: () => ({ automations: listAutomations({ archived: false }) }),
   },
 
   // ── territory ──
@@ -495,6 +523,74 @@ const BINDINGS = {
       types: EVENT_TYPES,
     }),
   },
+
+  // ── the owner's surfaces, read-only ──
+  // Loaded on first use, not at start: an MCP host launches this process for one short session, and
+  // the team, worker and Paperclip modules are a long import for a tool most sessions never call.
+  'GET /api/conductor': {
+    note: 'Read-only. The goal team as the owner sees it: who is assigned what, which drafts exist and what is waiting on a person. Nothing here is yours to change.',
+    schema: S.obj({}),
+    run: async () => (await import('./conductor.mjs')).conductorStatus(),
+  },
+
+  'GET /api/workers': {
+    note: 'Read-only. Which assistants are set up as workers, what the open tasks need, and the day\u2019s remaining model-call budget.',
+    schema: S.obj({}),
+    run: async () => (await import('./workers.mjs')).workerStatus(),
+  },
+
+  'GET /api/paperclip': {
+    note: 'Read-only. Whether Paperclip delegation is on, and the receipts of what was handed over. The access token is never included.',
+    schema: S.obj({}),
+    run: async () => (await import('./paperclip.mjs')).paperclipStatus(),
+  },
+
+  'POST /api/widgets/propose': {
+    note: 'Suggest a widget for the Today screen. It lands as a card in DECIDE and is not shown until a person accepts it. `evidence` is required: say what you observed that makes it worth their screen.',
+    schema: S.open({
+      widget: { type: 'object', description: 'One catalog widget: { id, type, title, … }. The type must be one the catalog knows; an unknown type is refused with the list.' },
+      why: S.s('One sentence: what this keeps in view.'),
+      evidence: S.arr(S.s('A store path or a counted fact.'), 'What you observed. At least one entry.'),
+      actor: ACTOR,
+    }, ['widget', 'evidence']),
+    run: async a => (await import('./widgets.mjs')).proposeWidget(need(a, 'widget'), {
+      actor: actorOf(a), why: str(a.why) || undefined, evidence: Array.isArray(a.evidence) ? a.evidence : [],
+    }),
+  },
+
+  'POST /api/deliveries/preview': {
+    note: 'Propose the exact output to deliver for one work item. This only creates the approval card — a person approves it, and sending is a separate action that is never yours.',
+    schema: S.obj({
+      workId: S.s('The work item id (the file name under data/work/, without .md).'),
+      destinationId: S.s('A configured destination id. Default: local-artifact.'),
+      message: S.s('The exact output, at most 50000 characters. What is approved is this text, to the letter.'),
+      actor: ACTOR,
+    }, ['workId', 'message']),
+    run: async a => (await import('./delivery.mjs')).previewDelivery({
+      workId: String(need(a, 'workId')), destinationId: str(a.destinationId, 'local-artifact'),
+      message: String(need(a, 'message')), actor: actorOf(a),
+    }),
+  },
+
+  'POST /api/goals': {
+    note: 'Goals belong to the person. This tool exists so you learn that from the refusal instead of from a missing tool: it answers 403. To suggest a goal, call scout_post_proposals with kind "question".',
+    schema: S.open({
+      label: S.s('The goal in one line.'),
+      target: S.n('The number to reach.'),
+      by: S.s('The date, YYYY-MM-DD.'),
+      actor: ACTOR,
+    }, ['label']),
+    // Refused HERE, not by calling the goal writer. That writer's rule is the owned-memory rule
+    // (actors.mjs), which on a workspace that has declared nobody yet treats an unknown name as
+    // the person — right for the app's own screens on day one, wrong for a door that only agents
+    // use. The refusal is logged like every other one, so the attempt shows in Activity.
+    run: a => {
+      const target = 'goals/' + safe(slugify(String(a.id || need(a, 'label')))) + '.md';
+      logEvent({ type: 'refused', actor: actorOf(a), target, detail: { why: 'human-owned', via: VIA } });
+      throw new McpError(target + ' is human-owned — an agent may only propose a change to it. Ask with scout_post_proposals, kind "question".',
+        JSONRPC_ERRORS.SERVER, { status: 403 });
+    },
+  },
 };
 
 // ── generation ─────────────────────────────────────────────────────────────────────────────────
@@ -707,6 +803,77 @@ export function createServer({ log = () => {} } = {}) {
     // next run a `v` it can trust. Safe to call twice.
     close: () => settleCache(),
   };
+}
+
+// ── HTTP (the "Streamable HTTP" transport, without the stream) ─────────────────────────────────
+//
+// For an agent that connects by ADDRESS instead of starting a program: `POST /api/mcp` on the
+// app's own local server, registered in backend/connectorRoutes.mjs. Same `handleMessage`, so the
+// same tools, the same gate and the same actor rule as stdio — this function adds a transport and
+// nothing else.
+//
+// What it deliberately is not:
+//   · not a stream. A request gets one JSON reply (the spec allows that); a GET, which would open
+//     a server-to-client stream, is answered 405 as the spec asks.
+//   · not reachable from the network. The peer must be this computer, and the Host and Origin
+//     headers must be local — the spec's own requirement against a web page reaching a local
+//     server (DNS rebinding). `SCOUT_ALLOW_LAN` opens the app's other routes to the LAN; it does
+//     not open this one.
+//   · not a session. No `Mcp-Session-Id` is issued; every request stands alone.
+
+const LOCAL_HOSTS = ['localhost', '127.0.0.1', '::1', '[::1]'];
+const hostOf = value => {
+  const v = String(value || '').trim().toLowerCase();
+  if (v.startsWith('[')) return v.slice(0, v.indexOf(']') + 1);
+  return v.split(':')[0];
+};
+const isLoopback = address => {
+  const a = String(address || '');
+  return a === '127.0.0.1' || a === '::1' || a === '::ffff:127.0.0.1';
+};
+
+// Why a request is refused before any message is read, or null. Exported for the tests: the
+// header rules are the security of this door, so they are checked as a function, not by eye.
+export function httpRefusal({ method, host, origin, remoteAddress, protocolVersion } = {}) {
+  if (!isLoopback(remoteAddress)) return { status: 403, message: 'the MCP endpoint only answers this computer' };
+  if (!LOCAL_HOSTS.includes(hostOf(host))) return { status: 403, message: 'the MCP endpoint only answers a local Host' };
+  if (origin !== undefined && origin !== null && origin !== '') {
+    let name = 'invalid';
+    try { name = new URL(String(origin)).hostname.toLowerCase(); } catch { /* stays invalid */ }
+    if (!LOCAL_HOSTS.includes(name)) return { status: 403, message: 'the MCP endpoint does not answer a web page from another origin' };
+  }
+  if (method !== 'POST') return { status: 405, message: 'the MCP endpoint answers POST only — it has no server-to-client stream' };
+  if (protocolVersion && !PROTOCOL_VERSIONS.includes(String(protocolVersion))) {
+    return { status: 400, message: 'unsupported MCP-Protocol-Version "' + protocolVersion + '". Supported: ' + PROTOCOL_VERSIONS.join(', ') };
+  }
+  return null;
+}
+
+// Express handler. `req.body` is already parsed by the app's JSON middleware.
+export async function handleHttp(req, res) {
+  const refusal = httpRefusal({
+    method: req.method, host: req.headers.host, origin: req.headers.origin,
+    remoteAddress: req.socket && req.socket.remoteAddress, protocolVersion: req.headers['mcp-protocol-version'],
+  });
+  if (refusal) {
+    if (refusal.status === 405) res.set('Allow', 'POST');
+    return res.status(refusal.status).json(err(null, JSONRPC_ERRORS.INVALID_REQUEST, refusal.message));
+  }
+  const body = req.body;
+  const isMessage = v => !!v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length > 0;
+  // A batch is legal in the two older protocol versions this server still speaks.
+  const batch = Array.isArray(body);
+  if (batch ? !body.length || !body.every(isMessage) : !isMessage(body)) {
+    return res.status(400).json(err(null, JSONRPC_ERRORS.PARSE, 'the body must be one JSON-RPC message, sent as application/json'));
+  }
+  const replies = [];
+  for (const msg of batch ? body : [body]) {
+    const reply = await handleMessage(msg);
+    if (reply) replies.push(reply);
+  }
+  // Only notifications: accepted, and there is nothing to say back.
+  if (!replies.length) return res.status(202).end();
+  return res.status(200).json(batch ? replies : replies[0]);
 }
 
 // ── stdio ──────────────────────────────────────────────────────────────────────────────────────

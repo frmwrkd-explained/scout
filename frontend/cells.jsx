@@ -15,20 +15,54 @@ import { MONO } from './tokens';
 import { Freshness } from './Freshness';
 import { useContextMenu } from './ContextMenu';
 import { Chip, Input } from './ui';
+import { colourOfId, labelOfId } from './collectionColour';
+import { useRecordNames, nameOf } from './recordNames';
+import RelationPicker from './RelationPicker';
+import { mediaSrc, mediaLabel, mediaName, mediaPath, isImagePath } from './media';
 
-const mono = (extra = '') => ({ ...sx('font-size:11px;font-weight:500;font-variant-numeric:tabular-nums;' + extra), fontFamily: MONO });
+const mono = (extra = '') => ({ ...sx('font-size:var(--t-data);font-weight:500;font-variant-numeric:tabular-nums;' + extra), fontFamily: MONO });
 
 // A status chip tints BORDER AND TEXT, never the fill — `docs/05_UI_SPEC.md` §6: selected is a
 // neutral raised chip, an accent fill is the one primary action on the screen.
-export function StatusChip({ value, field }) {
+// CLICKABLE WHEN `onPick` IS GIVEN. A value on a row is a thing you can ask about: click `ADS` and
+// the view narrows to the records that carry it (CollectionView's quick filter). Without `onPick`
+// (a details panel, a document) it is the plain read chip it always was. A real <button>, and it
+// stops the click from also selecting the row underneath it.
+// Spread BEFORE the chip's own style. It used to carry `font:inherit` and be spread after, which
+// wiped the chip's size, weight and mono family the moment a chip became clickable — so the same
+// tag looked different in a table (clickable) and on a record (not).
+const PICK = sx('cursor:pointer;margin:0;font-family:inherit;line-height:inherit;text-align:left');
+const pick = (onPick, field, value) => e => { e.stopPropagation(); onPick(field, value); };
+
+// An option's `colour` in a schema is a NAME — `warn`, `ok`, `marked`, `accent`, or one of the
+// eight hues — not a CSS colour. It was handed to CSS as written, where `warn` means nothing, so
+// every status chip silently lost its dot and its edge: "NEEDS REVIEW" read as bold text. A name
+// resolves to its token; anything that already is a colour (`var(…)`, `#…`, `rgb(…)`) passes.
+const OPTION_TOKENS = ['ok', 'warn', 'danger', 'marked', 'accent'];
+const OPTION_HUES = ['red', 'orange', 'amber', 'green', 'teal', 'blue', 'violet', 'pink'];
+export function optionColour(name) {
+  const c = String(name || '').trim();
+  if (!c) return 'var(--border-3)';
+  if (OPTION_TOKENS.includes(c)) return 'var(--' + c + ')';
+  if (OPTION_HUES.includes(c)) return 'var(--hue-' + c + ')';
+  return /^(var\(|#|rgb|hsl)/.test(c) ? c : 'var(--border-3)';
+}
+
+// A choice, as it reads everywhere: a tinted chip with a dot, in sentence case. It used to be an
+// outlined pill in bold spaced capitals — three of those on every card made a grid look like a
+// wall of labels, and the capitals fought the record's own name for attention. The colour now
+// carries the meaning quietly (a tint and a dot); a choice with no colour is a plain neutral chip.
+export const chipText = value => { const w = String(value).replace(/[-_]+/g, ' ').trim(); return w.charAt(0).toUpperCase() + w.slice(1); };
+export function StatusChip({ value, field, onPick }) {
   if (value == null || value === '') return <Dash />;
   const opt = (field?.options || []).find(o => (typeof o === 'string' ? o : o.value) === value);
-  const colour = (typeof opt === 'object' && opt?.colour) || 'var(--border-2)';
+  const named = typeof opt === 'object' && opt?.colour ? optionColour(opt.colour) : null;
+  const cls = 'chip' + (named ? '' : ' plain');
+  const style = named ? { '--chip': named } : undefined;
+  const inner = <><span className="chipDot" aria-hidden="true" />{chipText(value)}</>;
+  if (!onPick) return <span className={cls} style={style}>{inner}</span>;
   return (
-    <span style={{ ...sx('display:inline-flex;align-items:center;gap:6px;height:19px;padding:0 9px;border-radius:9999px;font-size:9px;font-weight:800;letter-spacing:.1em;white-space:nowrap'), border: '1px solid ' + colour, color: 'var(--fg-muted)' }}>
-      <span style={{ ...sx('width:5px;height:5px;border-radius:9999px;flex:none'), background: colour }} />
-      {String(value).replace(/-/g, ' ').toUpperCase()}
-    </span>
+    <button type="button" className={cls} style={style} title={'Show only ' + chipText(value)} onClick={pick(onPick, field, value)} onDoubleClick={e => e.stopPropagation()}>{inner}</button>
   );
 }
 
@@ -45,7 +79,7 @@ function NumberCell({ value, field }) {
     const pct = Math.max(0, Math.min(1, (n - min) / (max - min || 1)));
     return (
       <span style={sx('display:inline-flex;align-items:center;gap:8px')}>
-        <span style={{ ...mono('font-size:11.5px;font-weight:600'), color: 'var(--fg-soft)' }}>{n}</span>
+        <span style={{ ...mono('font-size:var(--t-data);font-weight:600'), color: 'var(--fg-soft)' }}>{n}</span>
         <span style={sx('display:flex;gap:1.5px;height:4px;width:56px;flex:none')}>
           {Array.from({ length: 10 }, (_, i) => (
             <span key={i} style={{ ...sx('flex:1;border-radius:1px'), background: i < Math.round(pct * 10) ? 'var(--fg-muted)' : 'var(--border)' }} />
@@ -56,19 +90,21 @@ function NumberCell({ value, field }) {
   }
   if (field?.display === 'stars') return <span style={mono()}>{'★'.repeat(Math.round(n))}</span>;
   if (field?.display === 'currency') return <span style={{ ...mono(), color: 'var(--sand)' }}>{n.toLocaleString()}</span>;
-  return <span style={{ ...mono('font-size:11.5px;font-weight:600'), color: 'var(--fg-soft)' }}>{n.toLocaleString()}</span>;
+  return <span style={{ ...mono('font-size:var(--t-data);font-weight:600'), color: 'var(--fg-soft)' }}>{n.toLocaleString()}</span>;
 }
 
-function TagList({ value }) {
+function TagList({ value, field, onPick }) {
   const tags = [].concat(value ?? []).filter(Boolean);
   if (!tags.length) return <Dash />;
+  const style = { ...mono('font-size:var(--t-data);padding:3px 8px;border-radius:6px'), background: 'var(--raise)', border: '1px solid var(--border)', color: 'var(--fg-muted)' };
   return (
     <span style={sx('display:inline-flex;flex-wrap:wrap;gap:4px')}>
-      {tags.slice(0, 4).map(t => (
-        <span key={String(t)} style={{ ...mono('font-size:10px;padding:2px 7px;border-radius:6px'), background: 'var(--raise)', border: '1px solid var(--border)', color: 'var(--fg-muted)' }}>
-          {String(t)}
-        </span>
-      ))}
+      {tags.map(t => (onPick ? (
+        <button key={String(t)} type="button" className="hBd hFgL" title={'Show only ' + String(t)} onClick={pick(onPick, field, t)} onDoubleClick={e => e.stopPropagation()}
+          style={{ ...PICK, ...style }}>{String(t)}</button>
+      ) : (
+        <span key={String(t)} style={style}>{String(t)}</span>
+      )))}
     </span>
   );
 }
@@ -76,20 +112,35 @@ function TagList({ value }) {
 // A relation is a chip that opens the other document. It renders as `#collection/slug` so the
 // person can see WHICH collection they are about to jump into — the design does this and it is
 // the difference between a link and a guess.
+// A link shows the NAME of the record it points at, never its slug (recordNames.js). Clicking it
+// opens that record. A slug that names nothing — the record was archived, or an agent typed it
+// wrong — is drawn dashed and says so, instead of looking like a link that works.
+export function RelationChip({ target, id, onFollow, size = 'cell' }) {
+  const names = useRecordNames(target);
+  const { title, known } = nameOf(names, id);
+  const where = target ? labelOfId(target) || target : '';
+  const inner = (
+    <>
+      {target ? <span aria-hidden="true" className="relDot" style={{ background: colourOfId(target) }} /> : null}
+      <span className="relName">{title}</span>
+    </>
+  );
+  const cls = 'relChip' + (size === 'edit' ? ' relChipEdit' : '') + (known ? '' : ' missing');
+  if (!onFollow) return <span className={cls} title={known ? undefined : 'Nothing called "' + id + '" in ' + where}>{inner}</span>;
+  return (
+    <button type="button" className={cls + ' hBd'} onDoubleClick={e => e.stopPropagation()}
+      onClick={e => { e.stopPropagation(); onFollow(target, String(id)); }}
+      title={known ? 'Open ' + title : 'Nothing called "' + id + '" in ' + where}>{inner}</button>
+  );
+}
+
 function RelationCell({ value, field, onFollow }) {
-  const ids = [].concat(value ?? []).filter(Boolean);
+  const ids = [].concat(value ?? []).filter(Boolean).map(String);
   if (!ids.length) return <Dash />;
   return (
-    <span style={sx('display:inline-flex;flex-wrap:wrap;gap:4px')}>
-      {ids.slice(0, 3).map(id => (
-        <button
-          key={String(id)}
-          onClick={onFollow ? e => { e.stopPropagation(); onFollow(field?.target, String(id)); } : undefined}
-          style={{ ...mono('font-size:10px;padding:2px 7px;border-radius:6px;cursor:pointer'), background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--fg-muted)' }}
-        >
-          {(field?.target ? '#' + field.target + '/' : '') + String(id)}
-        </button>
-      ))}
+    <span style={sx('display:inline-flex;flex-wrap:wrap;gap:4px;align-items:center;min-width:0')}>
+      {ids.slice(0, 3).map(id => <RelationChip key={id} target={field?.target} id={id} onFollow={onFollow} />)}
+      {ids.length > 3 ? <span style={{ ...mono('font-size:var(--t-data)'), color: 'var(--fg-faint)' }}>+{ids.length - 3}</span> : null}
     </span>
   );
 }
@@ -109,33 +160,137 @@ function LinkCell({ value, kind }) {
   return <a href={href} target="_blank" rel="noreferrer" style={{ ...mono(), color: 'var(--accent)' }}>{String(value)}</a>;
 }
 
+// A `file` value, read. It printed as its raw path — and a content-addressed attachment is
+// `files/<64 hex>.jpg`, so a record's picture read as three wrapped lines of hash beside the word
+// "Image". The picture is the value: a thumbnail for anything the browser can draw, and a name a
+// person can read (`mediaLabel`). The full path stays on the tooltip — nothing is hidden (Law 8).
+function FileCell({ value }) {
+  const files = [].concat(value ?? []).filter(Boolean);
+  if (!files.length) return <Dash />;
+  return (
+    <span style={sx('display:inline-flex;flex-direction:column;gap:6px;min-width:0')}>
+      {files.map((f, i) => (
+        <span key={i} className="fileRef" title={String(typeof f === 'object' ? (f.path || f.name || '') : f)}>
+          {isImagePath(f) ? <img className="fileRefThumb" src={mediaSrc(f)} alt="" loading="lazy" /> : null}
+          <span className="fileRefName" style={{ fontFamily: MONO }}>{mediaLabel(f) || mediaName(f)}</span>
+        </span>
+      ))}
+    </span>
+  );
+}
+
+// A long text value, read: a prompt, a brief, a description. Line breaks are the author's and are
+// kept; a few lines show and the rest is one click away (docs/DESIGN.md "Progressive disclosure").
+// It dumped whole — a 4,000-character prompt as one unbroken paragraph down a 180px column.
+// The CALLER picks when to use it and how much shows: PropertyRows clamps at 7 lines in a narrow
+// rail, the record page (Document.jsx) at 14 in its reading column. Tables keep the plain cell.
+//   lines   how many lines show before the toggle
+//   chars   the length past which the value is treated as long even without line breaks
+export function LongText({ value, lines = 7, chars = 320 }) {
+  const [open, setOpen] = React.useState(false);
+  const text = String(value ?? '');
+  const long = text.length > chars || text.split('\n').length > lines;
+  const clamped = long && !open;
+  return (
+    <span style={sx('display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:0;width:100%')}>
+      <span className={clamped ? 'longText longTextClamp' : 'longText'} style={clamped ? { WebkitLineClamp: lines } : undefined}>{text}</span>
+      {long ? (
+        <button type="button" className="longTextMore hAccent" aria-expanded={open} onClick={() => setOpen(v => !v)}>
+          {open ? 'Show less' : 'Show all · ' + text.length.toLocaleString('en-US') + ' characters'}
+        </button>
+      ) : null}
+    </span>
+  );
+}
+
+// Copies the EXACT string — the value, not what the clamp happens to be showing. `target` is a ref
+// to the element that holds the text: when the clipboard is refused (an older webview, a denied
+// permission) the text is selected instead, so ⌘C still works and nothing pretends to have copied.
+export function CopyButton({ text, target, label = 'Copy' }) {
+  const [state, setState] = React.useState('idle');
+  const timer = React.useRef(null);
+  React.useEffect(() => () => clearTimeout(timer.current), []);
+  const select = () => {
+    const root = target && target.current;
+    if (!root) return false;
+    const field = root.querySelector('textarea');
+    if (field) { field.focus(); field.select(); return true; }
+    const el = root.querySelector('.longText') || root;
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const sel = window.getSelection();
+    sel.removeAllRanges(); sel.addRange(range);
+    return true;
+  };
+  const copy = async () => {
+    let next = 'copied';
+    try { await navigator.clipboard.writeText(String(text ?? '')); }
+    catch { next = select() ? 'selected' : 'idle'; }
+    setState(next);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setState('idle'), 1500);
+  };
+  return (
+    <button type="button" className="copyBtn" onClick={copy} title="Copy the exact text">
+      <span aria-live="polite">{state === 'copied' ? 'Copied' : state === 'selected' ? 'Selected · press ⌘C' : label}</span>
+    </button>
+  );
+}
+
+// A long text value, written. The reading column's editor: full width, as tall as its text
+// (`field-sizing: content` in styles.css; the measured height below is only the fallback for a
+// browser without it). The draft is the truth while focused, and every keystroke is handed up — so
+// ⌘S and "Finish editing" save what is on screen, byte for byte, with no blur required.
+const SIZES_ITSELF = typeof CSS !== 'undefined' && typeof CSS.supports === 'function' && CSS.supports('field-sizing', 'content');
+export function LongTextEditor({ value, onChange, placeholder = '', minRows = 6, label }) {
+  const initial = value == null ? '' : String(value);
+  const [draft, setDraft] = React.useState(initial);
+  const [focus, setFocus] = React.useState(false);
+  const ref = React.useRef(null);
+  React.useEffect(() => { if (!focus) setDraft(value == null ? '' : String(value)); }, [value, focus]);
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el || SIZES_ITSELF) return;
+    el.style.height = 'auto';
+    el.style.height = (el.scrollHeight + 2) + 'px';
+  }, [draft]);
+  return (
+    <textarea ref={ref} className="longTextEdit" rows={minRows} value={draft} placeholder={placeholder} aria-label={label}
+      onChange={e => { setDraft(e.target.value); onChange(e.target.value); }}
+      onFocus={() => setFocus(true)} onBlur={() => setFocus(false)} />
+  );
+}
+
 // ── the dispatch table ─────────────────────────────────────────────────────────────────────────
 const RENDERERS = {
-  status: (v, f) => <StatusChip value={v} field={f} />,
+  file: v => <FileCell value={v} />,
+  status: (v, f, onPick) => <StatusChip value={v} field={f} onPick={onPick} />,
   number: (v, f) => <NumberCell value={v} field={f} />,
   date: (v, f) => <DateCell value={v} field={f} />,
-  multiselect: v => <TagList value={v} />,
-  select: (v, f) => <StatusChip value={v} field={f} />,
+  multiselect: (v, f, onPick) => <TagList value={v} field={f} onPick={onPick} />,
+  select: (v, f, onPick) => <StatusChip value={v} field={f} onPick={onPick} />,
   checkbox: v => (
-    <span style={{ ...mono('font-size:10px;font-weight:700;letter-spacing:.1em'), color: v ? 'var(--ok)' : 'var(--fg-faint)' }}>
+    <span style={{ ...mono('font-size:var(--t-label);font-weight:700;letter-spacing:.1em'), color: v ? 'var(--ok)' : 'var(--fg-faint)' }}>
       {v ? 'YES' : 'NO'}
     </span>
   ),
   url: v => <LinkCell value={v} kind="url" />,
   email: v => <LinkCell value={v} kind="email" />,
   phone: v => <LinkCell value={v} kind="phone" />,
-  actor: v => (v ? <span style={{ ...mono('font-size:10.5px'), color: 'var(--marked)' }}>{String(v)}</span> : <Dash />),
-  json: v => <span style={{ ...mono('font-size:10px'), color: 'var(--fg-faint)' }}>{v ? '{…}' : '—'}</span>,
+  actor: v => (v ? <span style={{ ...mono('font-size:var(--t-label)'), color: 'var(--marked)' }}>{String(v)}</span> : <Dash />),
+  json: v => <span style={{ ...mono('font-size:var(--t-label)'), color: 'var(--fg-faint)' }}>{v ? '{…}' : '—'}</span>,
 };
 
-export function Cell({ field, value, onFollow }) {
+// `onPick(field, value)` — optional. Given, a choice or a tag becomes a button that asks for "only
+// these" (see StatusChip). It is passed by the collection layouts and by nothing else.
+export function Cell({ field, value, onFollow, onPick }) {
   if (field?.type === 'relation') return <RelationCell value={value} field={field} onFollow={onFollow} />;
   const render = RENDERERS[field?.type];
-  if (render) return render(value, field);
+  if (render) return render(value, field, onPick);
   // text, rollup, formula, file and anything a schema invents fall through to a plain read. A
   // missing renderer must never blank a cell — the value is still the truth.
   if (value == null || value === '') return <Dash />;
-  return <span style={sx('font-size:12px;color:var(--fg-soft)')}>{String(value)}</span>;
+  return <span style={sx('font-size:var(--t-small);color:var(--fg-soft)')}>{String(value)}</span>;
 }
 
 export default Cell;
@@ -219,7 +374,7 @@ function optionsOf(field) {
 }
 function colourOf(field, value) {
   const o = optionsOf(field).find(x => String(x.value) === String(value));
-  return (o && o.colour) || 'var(--border-2)';
+  return optionColour(o && o.colour);
 }
 const asList = v => [].concat(v ?? []).filter(v2 => v2 !== '' && v2 != null);
 
@@ -253,8 +408,8 @@ function TextInput({ value, onChange, placeholder = '', multiline = false, inval
         else if (e.key === 'Escape') { e.preventDefault(); setDraft(value == null ? '' : String(value)); e.currentTarget.blur(); }
       }}
       style={{
-        ...sx('padding:4px 8px;border-radius:6px;font-size:12.5px;box-sizing:border-box;width:100%'),
-        maxWidth: width, height: multiline ? undefined : 26, minHeight: multiline ? 72 : undefined,
+        ...sx('padding:4px 8px;border-radius:6px;font-size:var(--t-body);box-sizing:border-box;width:100%'),
+        maxWidth: width, height: multiline ? undefined : 28, minHeight: multiline ? 72 : undefined,
         resize: multiline ? 'vertical' : 'none', lineHeight: multiline ? 1.6 : undefined,
         fontFamily: monospace ? MONO : 'inherit',
         fontVariantNumeric: monospace ? 'tabular-nums' : undefined,
@@ -274,13 +429,13 @@ const BARE = sx('display:inline-flex;align-items:center;gap:7px;background:none;
 // by accident; this is a real target that says what it wants.
 function SetChip({ label = 'SET' }) {
   return (
-    <span style={{ ...mono('font-size:9px;font-weight:800;letter-spacing:.1em;height:19px;padding:0 9px;border-radius:9999px;display:inline-flex;align-items:center'), border: '1px dashed var(--border-2)', color: 'var(--fg-faint)' }}>
+    <span style={{ ...mono('font-size:var(--t-label);font-weight:800;letter-spacing:.1em;height:22px;padding:0 10px;border-radius:9999px;display:inline-flex;align-items:center'), border: '1px dashed var(--border-2)', color: 'var(--fg-faint)' }}>
       {label}
     </span>
   );
 }
 
-const Caret = () => <span style={{ ...mono('font-size:8px'), color: 'var(--fg-faint)' }}>▾</span>;
+const Caret = () => <span style={{ ...mono('font-size:var(--t-label)'), color: 'var(--fg-faint)' }}>▾</span>;
 
 // ── text ───────────────────────────────────────────────────────────────────────────────────────
 function TextEditor({ field, value, onChange }) {
@@ -316,17 +471,16 @@ function NumberEditor({ field, value, onChange }) {
     const filled = Math.round(pct * 10);
     return (
       <span style={sx('display:inline-flex;align-items:center;gap:10px')}>
-        <span style={{ ...mono('font-size:11.5px;font-weight:600;width:26px'), color: n == null ? 'var(--fg-faint)' : 'var(--fg-soft)' }}>{n == null ? '—' : n}</span>
-        <span style={sx('display:flex;gap:1.5px;height:8px;width:56px;flex:none;align-items:center')}>
+        <TextInput value={value} onChange={set} monospace width={54} placeholder="—" />
+        <span style={sx('display:flex;gap:1.5px;height:8px;width:96px;flex:none;align-items:center')}>
           {Array.from({ length: 10 }, (_, i) => (
             <button key={i} type="button" title={String(min + ((i + 1) * (max - min)) / 10)}
               onClick={() => set(min + ((i + 1) * (max - min)) / 10)}
               style={{ ...sx('flex:1;height:8px;padding:0;border:none;cursor:pointer;background:none;display:flex;align-items:center') }}>
-              <span style={{ ...sx('flex:1;height:4px;border-radius:1px'), background: i < filled ? 'var(--fg-muted)' : 'var(--border)' }} />
+              <span style={{ ...sx('flex:1;height:6px;border-radius:2px'), background: i < filled ? 'var(--fg-muted)' : 'var(--border)' }} />
             </button>
           ))}
         </span>
-        <TextInput value={value} onChange={set} monospace width={54} placeholder="—" />
       </span>
     );
   }
@@ -346,13 +500,29 @@ function NumberEditor({ field, value, onChange }) {
     );
   }
 
+  return <NumberInput value={value} onChange={set} />;
+}
+
+// One field, two faces. Read, it is the number as a person writes it (`3,300`); focused, it is the
+// digits being typed (`3300`). It used to be both at once, side by side — the raw value in a box
+// and the formatted one echoed next to it — which read as two different amounts.
+function NumberInput({ value, onChange }) {
+  const raw = value == null || value === '' ? '' : String(value);
+  const [focus, setFocus] = React.useState(false);
+  const [draft, setDraft] = React.useState(raw);
+  React.useEffect(() => { if (!focus) setDraft(raw); }, [raw, focus]);
+  const n = Number(raw);
+  const shown = focus ? draft : raw === '' || Number.isNaN(n) ? raw : n.toLocaleString('en-US', { maximumFractionDigits: 6 });
   return (
-    <span style={sx('display:inline-flex;align-items:center;gap:8px')}>
-      <TextInput value={value} onChange={set} monospace width={140} placeholder="—" />
-      {field?.display === 'currency' && value != null && value !== ''
-        ? <span style={{ ...mono('font-size:10px'), color: 'var(--sand)' }}>{Number(value).toLocaleString()}</span>
-        : null}
-    </span>
+    <input className="numInput hBd" inputMode="decimal" value={shown} placeholder="—" aria-label="Number"
+      onFocus={e => { setFocus(true); setDraft(raw); requestAnimationFrame(() => { try { e.target.select(); } catch { /* gone */ } }); }}
+      onChange={e => setDraft(e.target.value)}
+      onBlur={() => { setFocus(false); const next = draft.replace(/[,\s]/g, ''); if (next !== raw) onChange(next); }}
+      onKeyDown={e => {
+        e.stopPropagation();
+        if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); }
+        else if (e.key === 'Escape') { e.preventDefault(); setDraft(raw); setFocus(false); e.currentTarget.blur(); }
+      }} />
   );
 }
 
@@ -360,8 +530,10 @@ function NumberEditor({ field, value, onChange }) {
 // One picker, two skins. `status` carries the gate and the board grouping, so its menu prints the
 // group beside each option — that is the whole difference the data model insists on, made visible
 // at the moment of choosing.
-function ChoiceEditor({ field, value, onChange, showGroup }) {
+function ChoiceEditor({ field, value, onChange, showGroup, onPick }) {
   const menu = useContextMenu();
+  const browse = onPick && value != null && value !== ''
+    ? [{ label: 'Show all with ' + String(value).replace(/-/g, ' '), onClick: () => onPick(field, value) }, { sep: true }] : [];
   const items = optionsOf(field).map(o => ({
     label: String(o.value).replace(/-/g, ' '),
     hint: showGroup && o.group ? o.group : undefined,
@@ -370,11 +542,10 @@ function ChoiceEditor({ field, value, onChange, showGroup }) {
   if (value != null && value !== '') items.push({ sep: true }, { label: 'Clear', onClick: () => onChange(null) });
   return (
     <>
-      <button type="button" onClick={menu.open(items)} style={{ ...BARE, ...sx('gap:8px;border-radius:9999px') }}
-        title={field?.gate ? 'The gate field — an agent may not promote past shortlist' : 'Choose'}>
+      <button type="button" onClick={menu.open([...browse, ...items])} style={{ ...BARE, ...sx('gap:8px;border-radius:9999px') }}
+        title={field?.gate ? 'Choose a stage. This is the gate: an assistant may not move a record past shortlist.' : 'Choose'}>
         {value == null || value === '' ? <SetChip /> : <StatusChip value={value} field={field} />}
         <Caret />
-        {field?.gate ? <span style={{ ...mono('font-size:8px;font-weight:700;letter-spacing:.12em'), color: 'var(--fg-faint)' }}>GATE</span> : null}
       </button>
       {menu.render()}
     </>
@@ -388,7 +559,7 @@ const StatusEditor = props => <ChoiceEditor {...props} showGroup />;
 // draws it; `+ tag` opens the remaining options. A multiselect with NO options[] is an OPEN
 // VOCABULARY — a tag field (backend/collections.mjs FIELD_TYPES, docs/02_DATA_MODEL.md §2) — so
 // there is nothing for `+ tag` to offer, and the affordance is a typed one instead.
-function MultiSelectEditor({ field, value, onChange }) {
+function MultiSelectEditor({ field, value, onChange, onPick }) {
   const menu = useContextMenu();
   const chosen = asList(value).map(String);
   const all = optionsOf(field);
@@ -405,9 +576,14 @@ function MultiSelectEditor({ field, value, onChange }) {
     <>
       <span style={sx('display:inline-flex;align-items:center;gap:5px;flex-wrap:wrap')}>
         {chosen.map(t => (
-          <Chip key={t} on label={<>{t}<span style={{ color: 'var(--fg-faint)' }}>×</span></>}
-            title="Remove" onClick={() => onChange(chosen.filter(x => x !== t))}
-            style={{ ...sx('border-radius:6px'), borderColor: colourOf(field, t) === 'var(--border-2)' ? 'var(--border-2)' : colourOf(field, t) }} />
+          // The NAME opens the others that share it (`onPick`); only the × takes the tag off. It
+          // used to be one button titled "Remove", so clicking a tag to look at it deleted it.
+          <span key={t} className="tagEdit" style={{ borderColor: colourOf(field, t) }}>
+            {onPick ? (
+              <button type="button" className="tagEditName hFg" title={'Show everything tagged ' + t} onClick={() => onPick(field, t)}>{t}</button>
+            ) : <span className="tagEditName">{t}</span>}
+            <button type="button" className="tagEditX" title={'Remove ' + t} aria-label={'Remove ' + t} onClick={() => onChange(chosen.filter(x => x !== t))}>×</button>
+          </span>
         ))}
         {open ? (
           <Input value={draft} placeholder="+ tag" aria-label="Add a tag"
@@ -416,10 +592,10 @@ function MultiSelectEditor({ field, value, onChange }) {
               if (e.key === 'Enter') { e.preventDefault(); add(); }
               if (e.key === 'Escape') setDraft('');
             }}
-            style={{ ...mono('font-size:10px;font-weight:600'), ...sx('width:96px;height:22px;padding:0 8px;border-radius:6px') }} />
+            style={{ ...mono('font-size:var(--t-data);font-weight:500'), ...sx('width:104px;height:24px;padding:0 8px;border-radius:6px') }} />
         ) : items.length ? (
           <button type="button" onClick={menu.open(items)} className="hFgL"
-            style={{ ...BARE, ...mono('font-size:10px;font-weight:600;height:22px;padding:0 8px;border-radius:6px'), color: 'var(--fg-faint)' }}>
+            style={{ ...BARE, ...mono('font-size:var(--t-label);font-weight:600;height:22px;padding:0 8px;border-radius:6px'), color: 'var(--fg-faint)' }}>
             + tag
           </button>
         ) : null}
@@ -457,11 +633,13 @@ function DateEditor({ field, value, onChange }) {
   return (
     <span style={sx('display:inline-flex;align-items:center;gap:10px;flex-wrap:wrap')}>
       <TextInput value={str} onChange={v => onChange(v === '' ? null : v)} monospace width={time ? 168 : 120} placeholder={shape} invalid={bad} />
-      <button type="button" className="hFgL" onClick={() => onChange(time ? new Date().toISOString().slice(0, 16).replace('T', ' ') : new Date().toISOString().slice(0, 10))}
-        style={{ ...BARE, ...mono('font-size:9px;font-weight:700;letter-spacing:.1em'), color: 'var(--fg-faint)' }}>
-        TODAY
-      </button>
-      {bad ? <span style={{ ...mono('font-size:9px;font-weight:700;letter-spacing:.1em'), color: 'var(--danger)' }}>NOT A DATE</span>
+      {!str ? (
+        <button type="button" className="hFgL" onClick={() => onChange(time ? new Date().toISOString().slice(0, 16).replace('T', ' ') : new Date().toISOString().slice(0, 10))}
+          style={{ ...BARE, ...sx('font-size:var(--t-small)'), color: 'var(--fg-faint)' }} title="Set to today">
+          Today
+        </button>
+      ) : null}
+      {bad ? <span style={{ ...mono('font-size:var(--t-label);font-weight:700;letter-spacing:.1em'), color: 'var(--danger)' }}>NOT A DATE</span>
         : field?.display === 'freshness' ? <Freshness value={value} />
         : field?.display === 'relative' ? <Freshness value={value} width={0} />
         : null}
@@ -475,7 +653,7 @@ function CheckboxEditor({ value, onChange }) {
   return (
     <button type="button" className="hBd" onClick={() => onChange(!on)}
       style={{
-        ...BARE, ...mono('font-size:10px;font-weight:600;letter-spacing:.08em;height:22px;padding:0 9px;border-radius:6px'),
+        ...BARE, ...mono('font-size:var(--t-label);font-weight:600;letter-spacing:.08em;height:22px;padding:0 9px;border-radius:6px'),
         border: '1px solid var(--border-2)', color: on ? 'var(--ok)' : 'var(--fg-faint)',
       }}>
       <span style={{ ...sx('width:5px;height:5px;border-radius:9999px'), background: on ? 'var(--ok)' : 'var(--fg-faint)' }} />
@@ -496,7 +674,7 @@ function LinkEditor({ field, value, onChange }) {
         placeholder={kind === 'url' ? 'https://…' : kind === 'email' ? 'name@example.com' : '+63…'} width={360} />
       {href ? (
         <a href={href} target="_blank" rel="noreferrer" title={href} className="hAccent"
-          style={{ ...mono('font-size:11px;text-decoration:none;flex:none'), color: 'var(--accent)' }}>↗</a>
+          style={{ ...mono('font-size:var(--t-data);text-decoration:none;flex:none'), color: 'var(--accent)' }}>↗</a>
       ) : null}
     </span>
   );
@@ -507,49 +685,52 @@ function LinkEditor({ field, value, onChange }) {
 // over `options` — which the surface supplies, because a schema knows the target collection but not
 // what is in it. Without options you can still type a slug: a relation must never be unfillable
 // just because a list did not load.
-function RelationEditor({ field, value, onChange, onFollow, options }) {
-  const menu = useContextMenu();
-  const [typing, setTyping] = React.useState(false);
+function RelationEditor({ field, value, onChange, onFollow }) {
+  const [anchor, setAnchor] = React.useState(null);   // the button's box while the picker is open
   const many = !!field?.many;
   const ids = asList(value).map(String);
   const commit = next => onChange(many ? next : (next[next.length - 1] ?? null));
-  const pool = (options || []).filter(o => !ids.includes(String(o.value)));
-  const items = pool.slice(0, 60).map(o => ({ label: o.label || String(o.value), hint: String(o.value), onClick: () => commit([...ids, o.value]) }));
+  const target = field?.target;
+  const what = String(field?.label || field?.key || 'record').replace(/_/g, ' ').toLowerCase();
+  const close = React.useCallback(() => setAnchor(null), []);
+  const open = e => setAnchor(e.currentTarget.getBoundingClientRect());
+  const picker = anchor && target ? (
+    <RelationPicker target={target} at={anchor} exclude={ids} onClose={close}
+      onClear={!many && ids.length ? () => { commit([]); close(); } : undefined}
+      onPick={slug => { commit(many ? [...ids, slug] : [slug]); if (!many) close(); }} />
+  ) : null;
 
-  return (
-    <>
-      <span style={sx('display:inline-flex;align-items:center;gap:5px;flex-wrap:wrap')}>
-        {ids.map(id => (
-          <span key={id} className="hBd"
-            style={{ ...mono('display:inline-flex;align-items:center;gap:7px;height:24px;padding:0 9px;border-radius:6px;font-size:10.5px;font-weight:500'), background: 'var(--raise)', border: '1px solid var(--border-2)', color: 'var(--fg-soft)' }}>
-            <button type="button" onClick={() => onFollow && onFollow(field?.target, id)} title={'Open #' + (field?.target || '') + '/' + id}
-              style={{ ...BARE, ...sx('gap:6px'), fontFamily: MONO, fontSize: 10.5, color: 'inherit' }}>
-              <span style={{ ...sx('font-size:9px'), color: 'var(--fg-faint)' }}>↗</span>
-              <span>{(field?.target ? '#' + field.target + '/' : '') + id}</span>
-            </button>
-            <button type="button" title="Unlink" onClick={() => commit(ids.filter(x => x !== id))}
-              style={{ ...BARE, fontFamily: MONO, fontSize: 10, color: 'var(--fg-faint)' }}>×</button>
-          </span>
-        ))}
-        {(many || !ids.length) ? (
-          items.length ? (
-            <button type="button" onClick={menu.open(items)} className="hFgL"
-              style={{ ...BARE, ...mono('font-size:10px;font-weight:600;height:22px;padding:0 8px;border-radius:6px'), color: 'var(--fg-faint)' }}>
-              + link
-            </button>
-          ) : typing ? (
-            <TextInput value="" width={200} monospace placeholder={'slug in #' + (field?.target || '?')}
-              onChange={v => { setTyping(false); if (v.trim()) commit([...ids, v.trim()]); }} />
-          ) : (
-            <button type="button" onClick={() => setTyping(true)} className="hFgL"
-              style={{ ...BARE, ...mono('font-size:10px;font-weight:600;height:22px;padding:0 8px;border-radius:6px'), color: 'var(--fg-faint)' }}>
-              + link
-            </button>
-          )
-        ) : null}
+  // ONE record: a single chip. The name opens the record; the caret opens the picker, where
+  // another can be chosen or the link removed. It was a chip, an ×, and a "Change" button — three
+  // controls that wrapped onto two lines in a narrow panel.
+  if (!many && ids.length) {
+    return (
+      <span className="relEdit">
+        <span className="relLinked">
+          <RelationChip target={target} id={ids[0]} onFollow={onFollow} size="edit" />
+          <button type="button" className="relUnlink relCaret" title={'Change or remove this ' + what} aria-label={'Change ' + what}
+            aria-haspopup="dialog" aria-expanded={!!anchor} onClick={open}>▾</button>
+        </span>
+        {picker}
       </span>
-      {menu.render()}
-    </>
+    );
+  }
+  return (
+    <span className="relEdit">
+      {ids.map(id => (
+        <span key={id} className="relLinked">
+          <RelationChip target={target} id={id} onFollow={onFollow} size="edit" />
+          <button type="button" className="relUnlink" title="Remove this link (the record itself stays)" aria-label={'Unlink ' + id}
+            onClick={() => commit(ids.filter(x => x !== id))}>×</button>
+        </span>
+      ))}
+      {target ? (
+        <button type="button" className="relAdd hFgL" aria-haspopup="dialog" aria-expanded={!!anchor} onClick={open}>
+          {ids.length ? '+ Link' : '+ Link ' + what}
+        </button>
+      ) : null}
+      {picker}
+    </span>
   );
 }
 
@@ -564,7 +745,7 @@ function Computed({ field, value, onFollow }) {
     <span style={sx('display:inline-flex;align-items:center;gap:9px;min-width:0')}>
       <Cell field={{ ...field, type: field?.type === 'rollup' ? 'number' : 'text' }} value={value} onFollow={onFollow} />
       <span title={how}
-        style={{ ...mono('font-size:8.5px;font-weight:700;letter-spacing:.12em;padding:2px 7px;border-radius:5px;white-space:nowrap'), background: 'var(--sunk)', border: '1px solid var(--line)', color: 'var(--fg-faint)' }}>
+        style={{ ...mono('font-size:var(--t-label);font-weight:700;letter-spacing:.12em;padding:2px 7px;border-radius:5px;white-space:nowrap'), background: 'var(--sunk)', border: '1px solid var(--line)', color: 'var(--fg-faint)' }}>
         COMPUTED · {how}
       </span>
     </span>
@@ -572,31 +753,39 @@ function Computed({ field, value, onFollow }) {
 }
 
 // ── file ───────────────────────────────────────────────────────────────────────────────────────
-// Attachments are content-addressed under files/ (docs/02_DATA_MODEL.md §5). There is no upload
-// route yet, so this edits the REFERENCES a document holds — add by name, unlink, and open through
-// onFollow so the file browser (M5) is the one thing that shows a file.
+// A `file` value is a WORKSPACE-RELATIVE PATH — `files/<sha256>.jpg` as backend/attachments.mjs
+// writes it, or any path the person typed. This editor used to assume a bare filename and print
+// `'files/' + value`, so a stored attachment read `files/files/<64 hex>.jpg` and overflowed its row.
+// `mediaPath` accepts both shapes. There is no upload route yet, so this edits the REFERENCES a
+// document holds — add by path, unlink, and open through onFollow.
+//
+// Each file is a chip: a thumbnail when the browser can draw it, the readable name (`mediaLabel`),
+// and the full path on the tooltip. The chip shrinks with its row and never pushes past it.
 function FileEditor({ field, value, onChange, onFollow }) {
   const [typing, setTyping] = React.useState(false);
   const names = asList(value).map(String);
   const many = !!field?.many;
   const commit = next => onChange(many ? next : (next[next.length - 1] ?? null));
   return (
-    <span style={sx('display:inline-flex;align-items:center;gap:5px;flex-wrap:wrap')}>
-      {names.map(n => (
-        <span key={n} className="hBd"
-          style={{ ...mono('display:inline-flex;align-items:center;gap:7px;height:22px;padding:0 8px;border-radius:6px;font-size:10px'), background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--fg-muted)' }}>
-          <button type="button" onClick={() => onFollow && onFollow(null, 'files/' + n)} title={'files/' + n}
-            style={{ ...BARE, fontFamily: MONO, fontSize: 10, color: 'inherit' }}>{n}</button>
-          <button type="button" title="Unlink" onClick={() => commit(names.filter(x => x !== n))}
-            style={{ ...BARE, fontFamily: MONO, fontSize: 10, color: 'var(--fg-faint)' }}>×</button>
-        </span>
-      ))}
+    <span className="fileChips">
+      {names.map(n => {
+        const path = mediaPath(n);
+        return (
+          <span key={n} className="fileChip hBd">
+            {isImagePath(n) ? <img className="fileChipThumb" src={mediaSrc(path)} alt="" loading="lazy" /> : null}
+            <button type="button" className="fileChipName" onClick={() => onFollow && onFollow(null, path)} title={path}
+              style={{ fontFamily: MONO }}>{mediaLabel(n) || n}</button>
+            <button type="button" className="fileChipX" title="Unlink this file — the file itself stays on disk" aria-label={'Unlink ' + (mediaLabel(n) || n)}
+              onClick={() => commit(names.filter(x => x !== n))}>×</button>
+          </span>
+        );
+      })}
       {(many || !names.length) ? (typing ? (
-        <TextInput value="" width={220} monospace placeholder="filename under files/"
+        <TextInput value="" width={240} monospace placeholder="files/photo.jpg"
           onChange={v => { setTyping(false); if (v.trim()) commit([...names, v.trim()]); }} />
       ) : (
         <button type="button" onClick={() => setTyping(true)} className="hFgL"
-          style={{ ...BARE, ...mono('font-size:10px;font-weight:600;height:22px;padding:0 8px;border-radius:6px'), color: 'var(--fg-faint)' }}>
+          style={{ ...BARE, ...mono('font-weight:600;height:24px;padding:0 8px;border-radius:6px'), color: 'var(--fg-faint)' }}>
           + file
         </button>
       )) : null}
@@ -619,7 +808,7 @@ function ActorEditor({ field, value, onChange, options }) {
     <>
       <button type="button" onClick={menu.open(items)} style={{ ...BARE, ...sx('gap:8px') }}>
         {value
-          ? <span style={{ ...mono('font-size:10.5px;height:22px;padding:0 9px;border-radius:6px;display:inline-flex;align-items:center'), border: '1px solid var(--border-2)', color: 'var(--marked)' }}>{String(value)}</span>
+          ? <span style={{ ...mono('font-size:var(--t-label);height:22px;padding:0 9px;border-radius:6px;display:inline-flex;align-items:center'), border: '1px solid var(--border-2)', color: 'var(--marked)' }}>{String(value)}</span>
           : <SetChip label="ASSIGN" />}
         <Caret />
       </button>
@@ -643,8 +832,12 @@ function JsonEditor({ value, onChange }) {
   if (!open) {
     return (
       <button type="button" onClick={() => setOpen(true)} className="hFgL"
-        style={{ ...BARE, ...mono('font-size:10px;height:22px;padding:0 8px;border-radius:6px'), border: '1px solid var(--border)', color: 'var(--fg-faint)' }}>
-        {pretty ? '{…}' : '{ }'} <span style={{ letterSpacing: '.1em' }}>EDIT</span>
+        style={{ ...BARE, ...sx('font-size:var(--t-small);height:24px;padding:0 9px;border-radius:6px'), border: '1px solid var(--border)', color: 'var(--fg-muted)' }}>
+        {(() => {
+          let v = value; if (typeof v === 'string') { try { v = JSON.parse(v); } catch { v = null; } }
+          const n = Array.isArray(v) ? v.length : v && typeof v === 'object' ? Object.keys(v).length : 0;
+          return !pretty ? 'Empty · edit' : Array.isArray(v) ? n + (n === 1 ? ' item' : ' items') + ' · edit' : n ? n + (n === 1 ? ' field' : ' fields') + ' · edit' : 'Edit';
+        })()}
       </button>
     );
   }
@@ -662,11 +855,11 @@ function JsonEditor({ value, onChange }) {
         }}
         style={{
           ...sx('width:100%;max-width:620px;min-height:110px;padding:8px;border-radius:6px;box-sizing:border-box;line-height:1.6;outline:none'),
-          fontFamily: MONO, fontSize: 11, color: 'var(--fg-soft)', background: 'var(--sunk)',
+          fontFamily: MONO, fontSize: 'var(--t-data)', color: 'var(--fg-soft)', background: 'var(--sunk)',
           border: '1px solid ' + (bad ? 'var(--danger)' : 'var(--border-2)'),
         }}
       />
-      {bad ? <span style={{ ...mono('font-size:9px;font-weight:700;letter-spacing:.1em'), color: 'var(--danger)' }}>NOT VALID JSON — NOTHING WILL BE SAVED</span> : null}
+      {bad ? <span style={{ ...mono('font-size:var(--t-label);font-weight:700;letter-spacing:.1em'), color: 'var(--danger)' }}>NOT VALID JSON — NOTHING WILL BE SAVED</span> : null}
     </span>
   );
 }
@@ -695,11 +888,11 @@ export const EDITORS = {
 // `onChange` absent ⇒ read-only, and it falls through to `Cell`. That is the one switch between the
 // inspector's read view and the document surface's edit view, and it is why they can be the same
 // component (PropertyRows.jsx).
-export function Editor({ field, value, onChange, onFollow, options }) {
+export function Editor({ field, value, onChange, onFollow, options, onPick }) {
   if (!onChange || isDerived(field)) {
     if (isDerived(field)) return <Computed field={field} value={value} onFollow={onFollow} />;
-    return <Cell field={field} value={value} onFollow={onFollow} />;
+    return <Cell field={field} value={value} onFollow={onFollow} onPick={onPick} />;
   }
   const C = EDITORS[field?.type] || TextEditor;
-  return <C field={field} value={value} onChange={onChange} onFollow={onFollow} options={options} />;
+  return <C field={field} value={value} onChange={onChange} onFollow={onFollow} options={options} onPick={onPick} />;
 }

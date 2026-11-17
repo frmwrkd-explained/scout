@@ -21,6 +21,7 @@ import { Btn, Card, Chip, Eyebrow, Field, Input } from './ui';
 import { THEMES, getTheme, applyTheme, onThemeChange } from './theme';
 import { KEYS } from './keymap';
 import { IntegrationSettings } from './Integrations';
+import Connectors from './Connectors';
 
 const mono = (extra = '') => ({ ...sx(extra), fontFamily: MONO });
 const THEME_LABEL = { system: 'System', dark: 'Dark', light: 'Light' };
@@ -245,6 +246,10 @@ export default function ScoutSettings({ onToast, onRootChanged }) {
               ))}
           </Card>
         </Section>
+
+        {/* Which outside agents may work in this workspace, and which assistants Scout itself drives
+            (Connectors.jsx). Above Integrations: it is the first thing somebody setting up an agent looks for. */}
+        <Connectors onToast={onToast} />
 
         <IntegrationSettings onToast={onToast} />
 

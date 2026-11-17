@@ -1,0 +1,80 @@
+[
+  {
+    "id": "timeline",
+    "label": "Timeline",
+    "type": "list",
+    "filter": [],
+    "sort": [
+      {
+        "field": "date",
+        "dir": "desc"
+      }
+    ],
+    "group": null,
+    "size": "m",
+    "fields": [
+      "date",
+      "channel",
+      "direction"
+    ],
+    "summary": true
+  },
+  {
+    "id": "inbound",
+    "label": "Inbound",
+    "type": "list",
+    "filter": [
+      {
+        "field": "direction",
+        "op": "is",
+        "value": "inbound"
+      }
+    ],
+    "sort": [
+      {
+        "field": "date",
+        "dir": "desc"
+      }
+    ],
+    "group": null,
+    "size": "m",
+    "fields": [
+      "date",
+      "channel",
+      "company"
+    ],
+    "summary": true
+  },
+  {
+    "id": "calls-and-meetings",
+    "label": "Calls and meetings",
+    "type": "table",
+    "filter": [
+      {
+        "field": "channel",
+        "op": "is-not",
+        "value": "email"
+      },
+      {
+        "field": "channel",
+        "op": "is-not",
+        "value": "linkedin"
+      }
+    ],
+    "sort": [
+      {
+        "field": "date",
+        "dir": "desc"
+      }
+    ],
+    "group": null,
+    "size": "m",
+    "fields": [
+      "date",
+      "channel",
+      "person",
+      "company",
+      "deal"
+    ]
+  }
+]

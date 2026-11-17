@@ -48,7 +48,7 @@
 import React from 'react';
 import { sx } from './sx';
 import { MONO } from './tokens';
-import { Cell, Editor, FieldIcon, TYPE_ABBR, isDerived } from './cells';
+import { Cell, Editor, FieldIcon, LongText, TYPE_ABBR, isDerived } from './cells';
 
 const mono = (extra = '') => ({ ...sx(extra), fontFamily: MONO });
 
@@ -108,11 +108,11 @@ export function rowsFor(collection, values, { hideEmpty = false, showAuto = fals
 const DENSITY = {
   document: {
     row: sx('display:flex;align-items:center;gap:10px;min-height:28px;padding:2px 8px;border-radius:5px'),
-    key: 136, gutter: true, keyStyle: sx('font-size:12px;font-weight:500'), pad: 'padding:2px 0',
+    key: 136, gutter: true, keyStyle: sx('font-size:var(--t-small);font-weight:500'), pad: 'padding:2px 0',
   },
   inspector: {
-    row: sx('display:flex;align-items:center;gap:8px;min-height:24px;padding:1px 0;border-radius:4px'),
-    key: 88, gutter: false, keyStyle: sx('font-size:11px;font-weight:500'), pad: 'padding:1px 0',
+    row: sx('display:flex;align-items:center;gap:10px;min-height:34px;padding:1px 0;border-radius:6px'),
+    key: 104, gutter: false, keyStyle: sx('font-size:var(--t-small);font-weight:500'), pad: 'padding:1px 0',
   },
 };
 
@@ -124,11 +124,23 @@ export function propertyLabel(field) {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
-export function PropertyRow({ field, value, onChange, onFollow, options, variant = 'document' }) {
+export function PropertyRow({ field, value, onChange, onFollow, options, variant = 'document', onPick }) {
   const d = DENSITY[variant] || DENSITY.document;
   // Derived and automatic fields never take an onChange — the affordance IS the contract.
   const writable = !!onChange && !isDerived(field) && !field.auto && !field.technical;
   const machine = isMachine(field);
+  // A long text value being READ takes the row's full width, under its label. Beside the label it
+  // had 180px of a 302px rail, which is how a prompt became forty wrapped lines.
+  // In the side panel it is read this way even when the panel is editable: a prompt is edited on
+  // the record's own page, at full width, not in a three-line box in a rail.
+  if ((!writable || variant === 'inspector') && field.type === 'text' && field.multiline && value != null && value !== '') {
+    return (
+      <div style={sx('display:flex;flex-direction:column;gap:5px;padding:7px 0 9px' + (d.gutter ? ';padding-left:8px' : ''))}>
+        <span title={field.key} style={{ ...d.keyStyle, color: 'var(--fg-muted)' }}>{propertyLabel(field)}</span>
+        <LongText value={value} />
+      </div>
+    );
+  }
   return (
     <div className="hBg" style={{ ...d.row, transition: 'background 130ms ease' }}>
       {d.gutter ? (
@@ -139,7 +151,9 @@ export function PropertyRow({ field, value, onChange, onFollow, options, variant
       ) : null}
       <span title={field.key + (field.undeclared ? ' — not in the schema' : '')}
         style={{
-          ...d.keyStyle, ...sx('flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'),
+          // A label is read in full. It was one line with an ellipsis, so "Generated image" printed
+          // as "Generated ima…" — a name nobody can act on. It wraps to a second line instead.
+          ...d.keyStyle, ...sx('flex:none;line-height:1.3;overflow-wrap:anywhere'),
           width: d.key,
           color: machine ? 'var(--fg-faint)' : 'var(--fg-muted)',
         }}>
@@ -147,8 +161,8 @@ export function PropertyRow({ field, value, onChange, onFollow, options, variant
       </span>
       <span style={sx('flex:1;min-width:0;display:flex;align-items:center;gap:6px;flex-wrap:wrap;overflow-wrap:anywhere')}>
         {writable
-          ? <Editor field={field} value={value} onChange={onChange} onFollow={onFollow} options={options} />
-          : <Editor field={field} value={value} onFollow={onFollow} />}
+          ? <Editor field={field} value={value} onChange={onChange} onFollow={onFollow} options={options} onPick={onPick} />
+          : <Editor field={field} value={value} onFollow={onFollow} onPick={onPick} />}
       </span>
     </div>
   );
@@ -164,8 +178,8 @@ function SystemGroup({ rows, values, onFollow, variant }) {
     <div style={sx('display:flex;flex-direction:column;margin-top:4px')}>
       <button type="button" onClick={() => setOpen(v => !v)} className="hBg" aria-expanded={open}
         style={{ ...sx('display:flex;align-items:center;gap:8px;padding:3px 8px;border-radius:5px;background:none;border:none;cursor:pointer;text-align:left;transition:background 130ms ease') }}>
-        <span style={{ ...mono('flex:none;width:9px;font-size:8px'), color: 'var(--fg-faint)' }}>{open ? '▾' : '▸'}</span>
-        <span style={sx('font-size:11px;font-weight:500;color:var(--fg-muted)')}>File details</span>
+        <span style={{ ...mono('flex:none;width:10px;font-size:var(--t-label)'), color: 'var(--fg-faint)' }}>{open ? '▾' : '▸'}</span>
+        <span style={sx('font-size:var(--t-small);font-weight:500;color:var(--fg-muted)')}>File details</span>
       </button>
       {open ? (
         <div style={sx('display:flex;flex-direction:column;' + d.pad)}>
@@ -179,7 +193,7 @@ function SystemGroup({ rows, values, onFollow, variant }) {
 }
 
 export default function PropertyRows({
-  collection, values, onChange, onFollow, options = {},
+  collection, values, onChange, onFollow, onPick, options = {},
   variant = 'document', hideEmpty = variant === 'inspector', showAuto = false, onAddProperty, addComposer,
   omit = [], technicalKeys = ['source_task', 'source_cycle', 'result_hash'],
 }) {
@@ -191,7 +205,7 @@ export default function PropertyRows({
 
   if (!rows.length) {
     return (
-      <span style={{ ...mono('font-size:9.5px;font-weight:500;letter-spacing:.08em'), color: 'var(--fg-faint)' }}>
+      <span style={{ ...mono('font-size:var(--t-label);font-weight:500;letter-spacing:.08em'), color: 'var(--fg-faint)' }}>
         NO PROPERTIES SET
       </span>
     );
@@ -206,6 +220,7 @@ export default function PropertyRows({
           value={(values || {})[f.key]}
           onChange={onChange ? v => onChange(f.key, v) : null}
           onFollow={onFollow}
+          onPick={onPick}
           options={options[f.key]}
           variant={variant}
         />
@@ -223,7 +238,7 @@ export default function PropertyRows({
           {(DENSITY[variant] || DENSITY.document).gutter ? (
             <span style={sx('flex:none;display:flex;align-items:center;justify-content:center;width:18px;font-size:13px;line-height:1')}>+</span>
           ) : null}
-          <span style={sx('font-size:12px;font-weight:500')}>Add property</span>
+          <span style={sx('font-size:var(--t-small);font-weight:500')}>Add property</span>
         </button>
       ) : null)}
 

@@ -1,0 +1,95 @@
+<style>
+  @page { size: A4; margin: 16mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #fff; color: #1b1b1f; font: 14px/1.5 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .sheet { max-width: 780px; margin: 0 auto; padding: 56px 60px 44px; }
+  .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 32px; padding-bottom: 28px; border-bottom: 2px solid #1b1b1f; }
+  .seller { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.2; }
+  .sellerMeta { margin-top: 8px; color: #5d5d66; font-size: 12.5px; line-height: 1.55; }
+  .doc { text-align: right; }
+  .docWord { font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #5d5d66; }
+  .docNo { margin-top: 4px; font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .meta { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 28px; padding: 28px 0 8px; }
+  .k { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #8a8a94; margin-bottom: 6px; }
+  .v { font-size: 14px; }
+  .v b { font-weight: 650; font-size: 15px; }
+  .muted { color: #5d5d66; }
+  .subject { margin: 22px 0 4px; font-size: 15px; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; margin-top: 14px; font-variant-numeric: tabular-nums; }
+  th { text-align: left; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #8a8a94; padding: 0 0 9px; border-bottom: 1px solid #d9d9df; }
+  td { padding: 12px 0; border-bottom: 1px solid #ececf0; vertical-align: top; }
+  th.n, td.n { text-align: right; white-space: nowrap; padding-left: 24px; }
+  .totals { margin: 18px 0 0 auto; width: 300px; font-variant-numeric: tabular-nums; }
+  .totals div { display: flex; justify-content: space-between; padding: 5px 0; color: #5d5d66; }
+  .totals .grand { margin-top: 8px; padding-top: 12px; border-top: 2px solid #1b1b1f; color: #1b1b1f; font-size: 18px; font-weight: 700; }
+  .note { margin-top: 40px; padding: 16px 18px; background: #f5f5f7; border-radius: 8px; font-size: 13px; color: #3c3c44; }
+  .note .k { margin-bottom: 4px; }
+  .foot { margin-top: 36px; padding-top: 14px; border-top: 1px solid #d9d9df; display: flex; justify-content: space-between; gap: 24px; font-size: 11.5px; color: #8a8a94; }
+  @media print { .sheet { padding: 0; max-width: none; } }
+</style>
+<div class="sheet">
+  <div class="top">
+    <div>
+      <div class="seller">{{ default(me.business, me.name) }}</div>
+      <div class="sellerMeta">
+        {{#if me.address}}{{ me.address }}<br>{{/if}}
+        {{#if me.email}}{{ me.email }}{{/if}}{{#if me.phone}} · {{ me.phone }}{{/if}}
+      </div>
+    </div>
+    <div class="doc">
+      <div class="docWord">Invoice</div>
+      <div class="docNo">{{ number }}</div>
+    </div>
+  </div>
+
+  <div class="meta">
+    <div>
+      <div class="k">Billed to</div>
+      <div class="v"><b>{{ default(client.name, record.company) }}</b></div>
+      {{#if contact}}<div class="v muted">{{ contact.name }}{{#if contact.role}}, {{ contact.role }}{{/if}}</div>{{/if}}
+      {{#if client.city}}<div class="v muted">{{ client.city }}</div>{{/if}}
+    </div>
+    <div>
+      <div class="k">Invoice date</div>
+      <div class="v">{{ date(issued) }}</div>
+    </div>
+    <div>
+      <div class="k">Due</div>
+      <div class="v">{{ date(due) }}</div>
+    </div>
+  </div>
+
+  <div class="subject">{{ subject }}</div>
+
+  <table>
+    <thead>
+      <tr><th>Description</th><th class="n">Qty</th><th class="n">Unit price</th><th class="n">Amount</th></tr>
+    </thead>
+    <tbody>
+      {{#each lines}}
+      <tr><td>{{ item.description }}</td><td class="n">{{ number(item.quantity) }}</td><td class="n">{{ money(item.unit_price) }}</td><td class="n">{{ money(item.amount) }}</td></tr>
+      {{/each}}
+      {{#if count(lines)}}{{else}}
+      <tr><td>{{ subject }}</td><td class="n">1</td><td class="n">{{ money(subtotal) }}</td><td class="n">{{ money(subtotal) }}</td></tr>
+      {{/if}}
+    </tbody>
+  </table>
+
+  <div class="totals">
+    <div><span>Subtotal</span><span>{{ money(subtotal) }}</span></div>
+    {{#if tax}}<div><span>Tax {{ number(tax_rate) }}%</span><span>{{ money(tax) }}</span></div>{{/if}}
+    <div class="grand"><span>Total due</span><span>{{ money(total) }}</span></div>
+  </div>
+
+  {{#if note}}
+  <div class="note">
+    <div class="k">Payment</div>
+    {{ note }}
+  </div>
+  {{/if}}
+
+  <div class="foot">
+    <span>{{ default(me.business, me.name) }}{{#if me.tax_id}} · Tax ID {{ me.tax_id }}{{/if}}</span>
+    <span>{{ number }} · {{ date(issued) }}</span>
+  </div>
+</div>

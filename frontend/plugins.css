@@ -1,0 +1,265 @@
+/* plugins.css — the Skills and Plugins screens, and the dialog a plugin button opens
+   (Skills.jsx, Plugins.jsx, RecordActions.jsx). Tokens only; type by role (--t-*).
+   The one exception is the SHEET inside the run dialog: it shows a printed page, and paper is
+   white in both themes — that white belongs to the plugin's own document, inside its frame. */
+
+/* ── the screen: a header, a list on the left, what is selected on the right ── */
+.pgScreen{flex:1;min-height:0;display:flex;flex-direction:column;background:var(--ink)}
+.pgHead{flex:none;display:flex;align-items:flex-end;justify-content:space-between;gap:32px;padding:22px 28px 20px;background:var(--surface);border-bottom:1px solid var(--line)}
+.pgHeadText{min-width:0;display:flex;flex-direction:column;gap:6px}
+.pgTitle{margin:0;font-size:20px;font-weight:600;letter-spacing:-.01em;line-height:1.2;color:var(--fg)}
+.pgLead{margin:0;max-width:86ch;font-size:var(--t-body);line-height:1.55;color:var(--fg-muted)}
+.pgHeadRight{flex:none;display:flex;align-items:center;gap:10px}
+.pgCols{flex:1;min-height:0;display:flex}
+.pgList{flex:none;width:380px;overflow-y:auto;padding:14px 12px 24px;background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;gap:14px}
+.pgDetail{flex:1;min-width:0;overflow-y:auto}
+
+.pgGroup{display:flex;flex-direction:column;gap:2px}
+.pgGroupHead{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 12px 8px;font-size:var(--t-label);font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--fg-faint)}
+.pgRow{display:flex;flex-direction:column;gap:5px;width:100%;padding:11px 12px;border-radius:9px;background:none;border:1px solid transparent;cursor:pointer;font:inherit;text-align:left;color:var(--fg-muted);transition:background 130ms ease,border-color 130ms ease}
+.pgRow:hover{background:var(--surface-2)}
+.pgRow.on{background:var(--raise);border-color:var(--border-3)}
+.pgRowTitle{font-size:var(--t-body);font-weight:600;color:var(--fg-soft)}
+.pgRow.on .pgRowTitle{color:var(--fg)}
+.pgRowText{font-size:var(--t-small);line-height:1.45;color:var(--fg-muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pgRowMeta{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
+.pgRowMeta span{font-size:var(--t-label);font-weight:600;letter-spacing:.02em;padding:2px 7px;border-radius:5px;background:var(--sunk);border:1px solid var(--line);color:var(--fg-muted)}
+.pgRow.on .pgRowMeta span{background:var(--surface);border-color:var(--border-2)}
+.pgNone{margin:0;padding:6px 12px;font-size:var(--t-small);line-height:1.5;color:var(--fg-faint)}
+.pgPad{padding:36px 44px}
+.pgAside{margin-top:auto;padding:12px 0 0;border-top:1px solid var(--line)}
+.pgAside p{margin:0 12px 8px;font-size:var(--t-small);line-height:1.55;color:var(--fg-muted)}
+
+/* ── the detail: one readable column ── */
+.pgDoc{box-sizing:border-box;max-width:1040px;margin:0 auto;padding:36px 44px 72px;display:flex;flex-direction:column;gap:28px}
+.pgDocHead{display:flex;flex-direction:column;gap:8px}
+.pgKicker{font-size:var(--t-label);font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--fg-faint)}
+.pgDocTitle{margin:0;font-size:28px;font-weight:600;letter-spacing:-.025em;line-height:1.25;color:var(--fg)}
+.pgDocLead{margin:0;max-width:74ch;font-size:var(--t-lead);line-height:1.55;color:var(--fg-soft)}
+
+.pgFacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden}
+.pgFact{display:flex;flex-direction:column;gap:8px;padding:16px 18px;border-bottom:1px solid var(--line);border-right:1px solid var(--line)}
+.pgFact:nth-child(2n){border-right:none}
+.pgFact:nth-last-child(-n+2){border-bottom:none}
+.pgFactLabel{font-size:var(--t-label);font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--fg-faint)}
+.pgFactValue{display:flex;flex-direction:column;gap:6px;font-size:var(--t-body);line-height:1.5;color:var(--fg-soft)}
+.pgNote{font-size:var(--t-small);line-height:1.5;color:var(--fg-muted)}
+.pgMuted{color:var(--fg-muted);font-size:var(--t-small);line-height:1.5;margin:0}
+.pgChips{display:flex;flex-wrap:wrap;gap:6px}
+.pgChip{display:inline-flex;align-items:center;gap:7px;height:26px;padding:0 10px;border-radius:7px;background:var(--surface-2);border:1px solid var(--border-2);font:inherit;font-size:var(--t-small);font-weight:600;color:var(--fg-soft);cursor:pointer}
+button.pgChip:hover{border-color:var(--border-3);color:var(--fg)}
+.pgChip.off{cursor:default;color:var(--fg-muted);border-style:dashed}
+.pgDot{flex:none;width:8px;height:8px;border-radius:9999px}
+.pgPath{align-self:flex-start;background:none;border:none;padding:0;font-size:var(--t-data);color:var(--fg-soft);cursor:default;text-align:left}
+button.pgPath{cursor:pointer;text-decoration:underline;text-decoration-color:var(--border-3);text-underline-offset:3px}
+
+.pgSection{display:flex;flex-direction:column;gap:12px}
+.pgSectionTitle{margin:0;display:flex;align-items:baseline;gap:9px;font-size:var(--t-lead);font-weight:650;color:var(--fg)}
+.pgSectionTitle span{font-size:var(--t-data);font-weight:500;color:var(--fg-faint)}
+.pgFiles{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;background:var(--surface);overflow:hidden}
+.pgFile{display:flex;align-items:center;gap:14px;min-height:42px;padding:0 14px;background:none;border:none;border-bottom:1px solid var(--line);cursor:pointer;font:inherit;text-align:left;color:var(--fg-soft)}
+.pgFile:last-child{border-bottom:none}
+.pgFile:hover:not(:disabled){background:var(--surface-2)}
+.pgFile.on{background:var(--raise)}
+.pgFile:disabled{cursor:default}
+.pgFileKind{flex:none;width:76px;font-size:var(--t-label);font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--fg-faint)}
+.pgFileKind.script{color:var(--marked)}
+.pgFileName{flex:1;min-width:0;font-size:var(--t-data);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pgFileSize{flex:none;font-size:var(--t-data);color:var(--fg-faint)}
+.pgSource{margin:0;max-height:420px;overflow:auto;padding:14px 16px;border-radius:10px;background:var(--sunk);border:1px solid var(--line);font-size:var(--t-data);line-height:1.6;color:var(--fg-soft);white-space:pre-wrap;word-break:break-word}
+.pgProse{padding:6px 22px 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+
+/* ── a plugin's buttons, in plain words ── */
+.pgActions{display:flex;flex-direction:column;gap:12px}
+.pgAction{display:flex;flex-direction:column;gap:14px;padding:18px 20px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.pgActionHead{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+.pgButtonLook{display:inline-flex;align-items:center;height:28px;padding:0 12px;border-radius:7px;border:1px solid var(--border-3);background:var(--raise);font-size:var(--t-small);font-weight:650;color:var(--fg)}
+.pgRW{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}
+.pgPlain{margin:8px 0 0;padding:0 0 0 18px;display:flex;flex-direction:column;gap:5px;font-size:var(--t-body);line-height:1.5;color:var(--fg-soft)}
+.pgPlainNone{margin-top:8px}
+.pgTry{display:flex;align-items:center;gap:10px;padding-top:14px;border-top:1px solid var(--line)}
+.pgSelect{max-width:420px}
+
+.pgBanner{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:16px 18px;border-radius:12px;background:var(--surface);border:1px solid var(--warn)}
+.pgBanner>div:first-child{display:flex;flex-direction:column;gap:5px;font-size:var(--t-small);line-height:1.5;color:var(--fg-muted)}
+.pgBanner b{font-size:var(--t-body);font-weight:650;color:var(--fg)}
+.pgBannerActions{flex:none;display:flex;align-items:center;gap:8px}
+.pgError{display:flex;flex-direction:column;gap:4px;padding:12px 16px;border-radius:10px;border:1px solid var(--danger);background:var(--surface);font-size:var(--t-small);line-height:1.5;color:var(--fg-soft)}
+.pgError.soft{border-color:var(--border-3);color:var(--fg-muted)}
+.pgError .pgPlain{font-size:var(--t-small);margin-top:4px}
+
+/* ── forms (the create panel and the run dialog) ── */
+.pgField{display:flex;flex-direction:column;gap:6px}
+.pgLabel{font-size:var(--t-small);font-weight:600;color:var(--fg-soft)}
+.pgHelp{font-size:var(--t-data);line-height:1.45;color:var(--fg-muted)}
+.pgInput{box-sizing:border-box;width:100%;min-height:34px;padding:7px 10px;border-radius:7px;background:var(--ink);border:1px solid var(--border-2);color:var(--fg);font:inherit;font-size:var(--t-small);line-height:1.4}
+.pgInput:focus{outline:none;border-color:var(--accent-60)}
+.pgInput:disabled{color:var(--fg-muted);background:var(--sunk)}
+.pgArea{resize:vertical;min-height:72px;line-height:1.5}
+.pgExamples{display:flex;flex-direction:column;gap:6px}
+.pgExample{padding:9px 12px;border-radius:8px;background:none;border:1px dashed var(--border-2);font:inherit;font-size:var(--t-small);line-height:1.45;color:var(--fg-muted);text-align:left;cursor:pointer}
+.pgExample:hover{border-color:var(--border-3);color:var(--fg-soft);background:var(--surface)}
+.pgCreateRow{display:flex;align-items:center;gap:12px}
+.pgCreateRow .pgInput{flex:1;min-width:0}
+.pgCreateRow .pgSelect{flex:none;width:200px}
+
+/* ── a record's plugin buttons ── */
+.pgRecordActions{display:inline-flex;align-items:center;gap:8px}
+
+/* ── the run dialog ── */
+.pgCatch{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;padding:32px;background:color-mix(in srgb,var(--void) 72%,transparent)}
+.pgDialog{box-sizing:border-box;width:min(1320px,100%);height:min(900px,100%);display:flex;flex-direction:column;border-radius:14px;background:var(--surface);border:1px solid var(--border-3);box-shadow:0 24px 80px var(--void);overflow:hidden;text-align:left}
+.pgDialogHead{flex:none;display:flex;align-items:center;gap:16px;padding:16px 20px;border-bottom:1px solid var(--line)}
+.pgDialogTitle{flex:1;min-width:0;display:flex;align-items:baseline;gap:12px}
+.pgDialogName{font-size:var(--t-lead);font-weight:650;color:var(--fg);white-space:nowrap}
+.pgDialogFor{font-size:var(--t-body);color:var(--fg-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pgDialogBy{flex:none;font-size:var(--t-label);font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--fg-faint)}
+.pgClose{flex:none;width:30px;height:30px;border-radius:7px;background:none;border:1px solid transparent;cursor:pointer;font:inherit;font-size:20px;line-height:1;color:var(--fg-muted)}
+.pgClose:hover{border-color:var(--border-2)}
+.pgDialogBody{flex:1;min-height:0;display:flex}
+.pgForm{flex:none;width:340px;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px;border-right:1px solid var(--line)}
+.pgQuiet{margin:0;font-size:var(--t-small);line-height:1.55;color:var(--fg-muted)}
+.pgQuiet b{font-weight:650;color:var(--fg-soft)}
+.pgMade{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:14px;border-radius:10px;border:1px solid var(--ok);background:var(--surface-2)}
+.pgMadeTitle{font-size:var(--t-body);font-weight:650;color:var(--fg)}
+.pgPaper{flex:1;min-width:0;display:flex;align-items:stretch;justify-content:center;padding:24px;background:var(--sunk);overflow:hidden}
+.pgFrame{flex:1;max-width:900px;border:1px solid var(--border-2);border-radius:6px;background:white;box-shadow:0 8px 32px var(--void)}
+.pgDialogFoot{flex:none;display:flex;align-items:center;gap:10px;padding:14px 20px;border-top:1px solid var(--line)}
+.pgProblem{flex:1;min-width:0;font-size:var(--t-small);line-height:1.45;color:var(--fg-faint)}
+.pgProblem.on{color:var(--danger);font-weight:600}
+
+/* ── a plugin button's automations (Plugins.jsx) ── */
+.pgUsedBy{display:flex;flex-direction:column;gap:6px}
+.pgUsedRow{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:9px 12px;border-radius:8px;background:var(--surface-2);border:1px solid var(--line);font:inherit;font-size:var(--t-body);line-height:1.4;color:var(--fg-soft);text-align:left;cursor:pointer}
+.pgUsedRow:hover{border-color:var(--border-3);color:var(--fg)}
+.pgUsedState{flex:none;font-size:var(--t-label);font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-faint)}
+
+/* ── AUTOMATIONS (Automations.jsx). One column of rules, each a sentence. Body text is --t-body. ── */
+.auScroll{flex:1;min-height:0;overflow-y:auto}
+.auDoc{box-sizing:border-box;max-width:1080px;margin:0 auto;padding:32px 44px 72px;display:flex;flex-direction:column;gap:16px}
+.auRule,.auBuilder{display:flex;flex-direction:column;gap:16px;padding:22px 24px;border-radius:14px;background:var(--surface);border:1px solid var(--line)}
+.auBuilder{border-color:var(--border-3)}
+.auRuleTop{display:flex;align-items:flex-start;justify-content:space-between;gap:32px}
+.auRuleText{min-width:0;display:flex;flex-direction:column;gap:8px}
+.auSentence{margin:0;font-size:20px;font-weight:500;line-height:1.4;letter-spacing:-.01em;color:var(--fg-soft);text-wrap:pretty}
+.auSentence b{font-weight:650;color:var(--fg)}
+.auRule.off .auSentence,.auRule.off .auSentence b{color:var(--fg-muted)}
+.auArrow{color:var(--fg-faint);padding:0 4px}
+.auControls{flex:none;display:flex;align-items:center;gap:16px;padding-top:2px}
+.auNote,.auBody{margin:0;max-width:78ch;font-size:var(--t-body);line-height:1.55;color:var(--fg-muted)}
+.auBody{color:var(--fg-soft)}
+.auQuiet{margin:0;font-size:var(--t-body);line-height:1.5;color:var(--fg-faint)}
+.auFlag{margin:0;padding:10px 14px;border-radius:9px;border:1px solid var(--warn);background:var(--surface-2);font-size:var(--t-body);line-height:1.5;color:var(--fg-soft)}
+.auRule .pgError .pgPlain{font-size:var(--t-body)}
+
+/* on / off */
+.auSwitch{display:inline-flex;align-items:center;gap:9px;padding:0;background:none;border:none;font:inherit;cursor:pointer;color:var(--fg-muted)}
+.auSwitch:disabled{cursor:not-allowed;opacity:.5}
+.auSwitchTrack{position:relative;width:38px;height:22px;border-radius:9999px;background:var(--sunk);border:1px solid var(--border-3);transition:background 140ms ease,border-color 140ms ease}
+.auSwitchKnob{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:9999px;background:var(--fg-faint);transition:transform 140ms ease,background 140ms ease}
+.auSwitch.on .auSwitchTrack{background:var(--accent-12);border-color:var(--accent-35)}
+.auSwitch.on .auSwitchKnob{transform:translateX(16px);background:var(--fg)}
+.auSwitchWord{min-width:24px;font-size:var(--t-body);font-weight:600;color:var(--fg-muted);text-align:left}
+.auSwitch.on .auSwitchWord{color:var(--fg)}
+.auSwitch:focus-visible .auSwitchTrack{border-color:var(--accent-60)}
+
+/* ask me first | do it — selected is neutral raised */
+.auSeg{display:inline-flex;padding:3px;border-radius:9px;background:var(--sunk);border:1px solid var(--line)}
+.auSegBtn{height:28px;padding:0 12px;border-radius:6px;background:none;border:1px solid transparent;font:inherit;font-size:var(--t-small);font-weight:600;color:var(--fg-muted);cursor:pointer;white-space:nowrap}
+.auSegBtn:hover:not(:disabled){color:var(--fg-soft)}
+.auSegBtn.on{background:var(--raise);border-color:var(--border-3);color:var(--fg);cursor:default}
+.auSegBtn:disabled{cursor:default}
+
+/* last runs */
+.auRuns{display:flex;flex-direction:column;gap:8px;padding-top:16px;border-top:1px solid var(--line)}
+.auRun{display:flex;align-items:baseline;gap:16px;font-size:var(--t-body);line-height:1.5;color:var(--fg-muted)}
+.auRunWhen{flex:none;width:118px;font-size:var(--t-data);color:var(--fg-faint)}
+.auRunWhat{min-width:0}
+.auLink{padding:0;background:none;border:none;font:inherit;font-weight:600;color:var(--fg);cursor:pointer;text-align:left;text-decoration:underline;text-decoration-color:var(--border-3);text-underline-offset:3px}
+.auLink:hover{text-decoration-color:var(--fg-muted)}
+.auFailed{color:var(--danger)}
+.auFoot{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:30px}
+.auArchive{display:flex;align-items:center;gap:8px;flex:1;max-width:620px}
+
+/* the builder: the sentence, with selects in it */
+.auBuild{display:flex;align-items:center;flex-wrap:wrap;gap:10px;font-size:18px;line-height:1.4;color:var(--fg-soft)}
+.auPick{box-sizing:border-box;height:38px;max-width:100%;padding:0 12px;border-radius:8px;background:var(--ink);border:1px solid var(--border-3);color:var(--fg);font:inherit;font-size:var(--t-lead);font-weight:600}
+.auPick:focus{outline:none;border-color:var(--accent-60)}
+.auPick.wide{flex:1;min-width:280px}
+.auType{font-weight:500;min-width:160px}
+.auType::placeholder{color:var(--fg-faint);font-weight:400}
+.auSave{padding-top:16px;border-top:1px solid var(--line);font-size:var(--t-body)}
+.auSave .pgInput{flex:1;min-width:0;height:38px;font-size:var(--t-body)}
+.auLimits{margin-top:12px;padding:18px 22px;border-radius:12px;border:1px dashed var(--border-2)}
+.auLimits .pgPlain{color:var(--fg-muted)}
+
+/* ── A PLUGIN'S PAGE (Plugins.jsx): show what it makes, say how to use it, then the fine print ── */
+.pgList{width:320px}
+.ppSafe{margin:-12px 0 0;display:flex;align-items:center;gap:9px;font-size:var(--t-body);line-height:1.5;color:var(--fg-muted)}
+.ppSafeMark{flex:none;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:9999px;border:1px solid var(--ok);font-size:11px;font-weight:700;line-height:1;color:var(--ok)}
+
+.ppHero{display:grid;grid-template-columns:minmax(0,1fr) 404px;gap:36px;align-items:start;padding:28px;border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+.ppHow{display:flex;flex-direction:column;gap:18px;padding-top:4px;min-width:0}
+.ppSteps{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:0}
+.ppStep{position:relative;display:flex;gap:14px;padding:0 0 22px}
+.ppStep:last-child{padding-bottom:0}
+.ppStep:not(:last-child)::before{content:"";position:absolute;left:13px;top:30px;bottom:2px;width:1px;background:var(--border-2)}
+.ppStepN{flex:none;display:inline-flex;align-items:center;justify-content:center;width:27px;height:27px;border-radius:9999px;background:var(--raise);border:1px solid var(--border-3);font-size:var(--t-small);font-weight:650;font-variant-numeric:tabular-nums;color:var(--fg)}
+.ppStepText{min-width:0;display:block;padding-top:1px;font-size:var(--t-lead);line-height:1.85;color:var(--fg-soft)}
+.ppStepText .pgButtonLook,.ppStepText .pgChip{vertical-align:middle;margin:0 3px}
+.ppStepNote{display:block;margin-top:2px;font-size:var(--t-small);line-height:1.5;color:var(--fg-muted)}
+.ppHowTry{display:flex;flex-direction:column;gap:8px;margin-top:6px;padding-top:20px;border-top:1px solid var(--line)}
+.ppTry{display:flex;align-items:center;gap:8px;min-width:0}
+.ppTrySelect{flex:1;min-width:0;max-width:340px;height:34px}
+.ppActionTop .ppTrySelect{flex:none;width:230px}
+
+/* the sample: a sheet of paper, drawn at half size. Paper is white in both themes (see the note at the top). */
+.ppSample{margin:0;display:flex;flex-direction:column;gap:10px}
+.ppSheet{position:relative;width:404px;height:571px;border-radius:5px;background:white;border:1px solid var(--border-2);box-shadow:0 1px 2px color-mix(in srgb,var(--void) 18%,transparent),0 14px 34px color-mix(in srgb,var(--void) 22%,transparent);overflow:hidden}
+.ppSheetFrame{width:808px;height:1142px;border:none;transform:scale(.5);transform-origin:0 0;pointer-events:none;background:white}
+.ppSheetBlank{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;font-size:var(--t-small);color:var(--fg-faint);text-align:center}
+.ppSheetOpen{position:absolute;inset:0;margin:0;padding:0;border:none;border-radius:5px;background:transparent;cursor:zoom-in}
+.ppSheetOpen:hover{box-shadow:inset 0 0 0 2px var(--border-3)}
+.ppSheetOpen:focus-visible{outline:none;box-shadow:inset 0 0 0 2px var(--accent-60)}
+.ppSampleCap{font-size:var(--t-small);line-height:1.45;color:var(--fg-muted);text-align:center}
+.ppSampleCap b{font-weight:600;color:var(--fg-soft)}
+
+/* the buttons, one calm row each */
+.ppActions{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:14px;background:var(--surface);overflow:hidden}
+.ppAction{display:flex;flex-direction:column;gap:12px;padding:18px 20px;border-bottom:1px solid var(--line)}
+.ppAction:last-child{border-bottom:none}
+.ppActionTop{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.ppActionWhat{display:flex;align-items:center;flex-wrap:wrap;gap:9px;min-width:0;font-size:var(--t-body)}
+.ppActionWhat .pgMuted{font-size:var(--t-body)}
+.ppArrow{color:var(--fg-faint);padding:0 2px}
+.ppAuto{display:flex;align-items:center;gap:11px;width:100%;padding:9px 12px;border-radius:9px;background:var(--surface-2);border:1px solid var(--line);font:inherit;font-size:var(--t-body);line-height:1.45;color:var(--fg-muted);text-align:left;cursor:pointer}
+.ppAuto:hover{border-color:var(--border-3)}
+.ppAutoMark{flex:none;font-size:15px;color:var(--fg-faint)}
+.ppAutoText{flex:1;min-width:0}
+.ppAutoText b{font-weight:600;color:var(--fg-soft)}
+.ppAutoState{flex:none;font-size:var(--t-small);font-weight:600;color:var(--fg-faint)}
+.ppAutoState.on{color:var(--ok)}
+.ppExact>summary,.ppHood>summary{cursor:pointer;list-style:none;display:flex;align-items:baseline;gap:10px;font-size:var(--t-small);font-weight:600;color:var(--fg-muted);user-select:none}
+.ppExact>summary::-webkit-details-marker,.ppHood>summary::-webkit-details-marker{display:none}
+.ppExact>summary::before,.ppHood>summary::before{content:"▸";flex:none;width:10px;font-size:10px;color:var(--fg-faint);transition:transform 120ms ease}
+.ppExact[open]>summary::before,.ppHood[open]>summary::before{transform:rotate(90deg)}
+.ppExact>summary:hover,.ppHood>summary:hover{color:var(--fg-soft)}
+.ppExact .pgRW{margin-top:14px;padding:16px 18px;border-radius:10px;background:var(--surface-2);border:1px solid var(--line)}
+.ppExact .pgPlain{font-size:var(--t-body)}
+.ppAsks{margin-top:16px}
+
+/* what it has made */
+.ppMadeList{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden}
+.ppMade{display:flex;align-items:center;gap:11px;min-height:44px;padding:0 16px;margin:0;background:none;border:none;border-bottom:1px solid var(--line);font:inherit;text-align:left;cursor:pointer;color:var(--fg-soft)}
+.ppMade:last-child{border-bottom:none}
+.ppMade:hover{background:var(--surface-2)}
+.ppMadeTitle{flex:1;min-width:0;font-size:var(--t-body);font-weight:600;color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ppMadeMeta{flex:none;font-size:var(--t-small);color:var(--fg-faint)}
+
+/* the fine print, folded */
+.ppHood{padding-top:20px;border-top:1px solid var(--line)}
+.ppHood>summary{font-size:var(--t-body)}
+.ppHood>summary span{font-weight:400;color:var(--fg-faint);font-size:var(--t-small)}
+.ppHoodBody{display:flex;flex-direction:column;gap:14px;margin-top:16px}
+.ppHoodLine{display:flex;align-items:baseline;gap:14px}
+@media (max-width:1500px){.ppHero{grid-template-columns:minmax(0,1fr) 324px;gap:28px}.ppSheet{width:324px;height:458px}.ppSheetFrame{transform:scale(.401)}}

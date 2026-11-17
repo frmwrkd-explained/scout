@@ -15,11 +15,12 @@
 // refused — so a card moves when the rows come back changed, not when the mouse comes up.
 
 import React from 'react';
+import { sizeOf, coverOf, fitOf, summaryOf, shownFields } from './viewDisplay';
+import { Thumb } from './ListView';
 import { sx } from './sx';
 import { MONO } from './tokens';
 import { Cell, StatusChip } from './cells';
 import { Empty, Eyebrow, OpenRecord } from './ui';
-import { Freshness } from './Freshness';
 
 const mono = (extra = '') => ({ ...sx(extra), fontFamily: MONO });
 
@@ -30,10 +31,16 @@ const GROUP_RANK = { todo: 0, active: 1, done: 2 };
 // Which status field draws the columns: the one the view groups by, else the gate field, else the
 // first status field. The gate is the meaningful default — it is the field the promotion gate
 // guards, so it is the one a person is actually moving cards along.
+// ANY single-choice field can draw the columns — a `status` or a `select` with options. It used to
+// be `status` only, so a collection whose stage is a plain choice (Companies: lead · prospect ·
+// customer) opened as a board with one unnamed column and no way to change that. The person picks
+// the field with the board's "Columns" control (ViewBar.jsx), saved on the view as `group`.
+export const BOARD_TYPES = ['status', 'select'];
+export const boardFields = collection => (collection?.fields || []).filter(f => BOARD_TYPES.includes(f.type) && (f.options || []).length);
 export function boardField(collection, view) {
-  const fields = collection?.fields || [];
-  const grouped = view?.group && fields.find(f => f.key === view.group && f.type === 'status');
-  return grouped || fields.find(f => f.type === 'status' && f.gate) || fields.find(f => f.type === 'status') || null;
+  const choices = boardFields(collection);
+  const grouped = view?.group && choices.find(f => f.key === view.group);
+  return grouped || choices.find(f => f.type === 'status' && f.gate) || choices.find(f => f.type === 'status') || choices[0] || null;
 }
 
 function optionsOf(field) {
@@ -90,6 +97,9 @@ export function activityOf(collection, row) {
   const counts = [];
   for (const def of fields) {
     if (def.type === 'relation') {
+      // Only a field that can hold SEVERAL is worth counting. "1 companies" under every deal was a
+      // fact about the schema (a deal has one company), not about the deal.
+      if (!def.many) continue;
       const n = [].concat(f[def.key] ?? []).filter(v => v !== '' && v != null).length;
       if (n) counts.push(n + ' ' + plural(def.label || def.target || def.key, n));
     } else if (def.type === 'rollup' && def.fn === 'count') {
@@ -102,32 +112,12 @@ export function activityOf(collection, row) {
   return { counts, touch: f.verified_at || f.updated || f.created || null };
 }
 
-function ActivityLine({ activity }) {
-  if (!activity) return null;
-  const { counts, touch } = activity;
-  if (!counts.length && !touch) return null;
-  return (
-    <div style={sx('display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding-top:1px')}>
-      {counts.map(c => (
-        <span key={c} style={{ ...mono('font-size:9.5px;font-weight:600;letter-spacing:.06em;font-variant-numeric:tabular-nums;text-transform:uppercase'), color: 'var(--fg-faint)' }}>
-          {c}
-        </span>
-      ))}
-      {touch ? (
-        <span style={sx('display:inline-flex;align-items:center;gap:6px')}>
-          <span style={{ ...mono('font-size:9px;font-weight:700;letter-spacing:.12em'), color: 'var(--fg-faint)' }}>LAST TOUCH</span>
-          <Freshness value={touch} width={20} />
-        </span>
-      ) : null}
-    </div>
-  );
-}
-
 // ── the card ───────────────────────────────────────────────────────────────────────────────────
 // Selected is the neutral raised chip treatment (docs/05_UI_SPEC.md §6) — a --raise bed with a
 // --border-3 edge, exactly the ui.jsx Chip vocabulary. Never an accent fill: the accent is the one
 // primary action on a screen, and a selected card is state, not an action.
-function BoardCard({ collection, row, defs, selected, dragging, draggable, onSelect, onOpen, onFollow, onDragStart, onDragEnd }) {
+function BoardCard({ collection, row, defs, look, selected, dragging, draggable, onSelect, onOpen, onFollow, onPick, onDragStart, onDragEnd }) {
+  const { z, cover, fit, summary } = look;
   return (
     <div
       draggable={draggable}
@@ -137,45 +127,49 @@ function BoardCard({ collection, row, defs, selected, dragging, draggable, onSel
       onDoubleClick={() => onOpen(row)}
       // `rvH` arms OpenRecord. A card that can only be opened by a gesture nobody can see is a
       // card that cannot be opened — the same reason the table, the list and the gallery carry it.
-      className="rvH"
-      style={{
-        ...sx('display:flex;flex-direction:column;gap:6px;padding:9px 10px;border-radius:8px;cursor:pointer;transition:background 130ms ease,border-color 130ms ease'),
-        background: selected ? 'var(--raise)' : 'var(--surface-2)',
-        border: '1px solid ' + (selected ? 'var(--border-3)' : 'var(--border)'),
-        opacity: dragging ? 0.45 : 1,
-      }}>
+      className={'rvH bvCard' + (selected ? ' on' : '')}
+      style={{ opacity: dragging ? 0.45 : 1 }}>
       <span style={sx('display:flex;align-items:flex-start;justify-content:space-between;gap:8px;min-width:0')}>
-        <span style={{ ...sx('min-width:0;font-size:12.5px;font-weight:600;line-height:1.35'), color: selected ? 'var(--fg)' : 'var(--fg-soft)' }}>
-          {row.title}
+        <span style={sx('display:flex;align-items:flex-start;gap:10px;min-width:0')}>
+          {cover && row.fields[cover.key] ? <Thumb value={row.fields[cover.key]} size={z.thumb} fit={fit} /> : null}
+          <span className="bvTitle" style={{ fontSize: z.title }}>
+            {row.title}
+          </span>
         </span>
         <OpenRecord onOpen={() => onOpen(row)} style={sx('margin-top:1px')} />
       </span>
+      {summary && row.summary ? (
+        <span className="gallerySummary" style={{ fontSize: z.text }}>{row.summary}</span>
+      ) : null}
       {defs.length ? (
-        <div style={sx('display:flex;align-items:center;gap:10px;flex-wrap:wrap')}>
-          {defs.map(f => <Cell key={f.key} field={f} value={row.fields[f.key]} onFollow={onFollow} />)}
+        <div className="bvFields" style={{ zoom: z.zoom }}>
+          {defs.map(f => {
+            const v = row.fields[f.key];
+            if (v === undefined || v === null || v === '' || (Array.isArray(v) && !v.length)) return null;
+            return <Cell key={f.key} field={f} value={v} onFollow={onFollow} onPick={onPick} />;
+          })}
         </div>
       ) : null}
-      <ActivityLine activity={activityOf(collection, row)} />
+      {/* Nothing else. A card shows the properties the person chose in Properties, and only those.
+          It used to add a line of counts it worked out itself ("2 all deals · 1 deals · 12
+          messages") that nobody had asked for and nobody could switch off. */}
     </div>
   );
 }
 
 // ── the board ──────────────────────────────────────────────────────────────────────────────────
-export default function BoardView({ collection, view, views, rows, counts, selected, onSelect, onOpen, onFollow, onPickView, onMove }) {
+export default function BoardView({ collection, view, views, rows, counts, selected, onSelect, onOpen, onFollow, onPick, onPickView, onMove }) {
   const [drag, setDrag] = React.useState(null);   // { path, from } — the card in flight
   const [over, setOver] = React.useState(null);   // the status value under the cursor
 
   const { field, bands } = boardBands(collection, view, rows);
   const primary = (collection.fields || []).find(f => f.primary);
 
-  // Card fields: what the view says, else the view's columns minus the two things the card already
-  // shows by other means (the title, and the status the column itself IS).
-  const cardKeys = (view.card && view.card.fields && view.card.fields.length)
-    ? view.card.fields
-    : (view.fields || []).filter(k => k !== primary?.key && k !== field?.key).slice(0, 3);
-  const defs = cardKeys
-    .filter(k => k !== primary?.key)
-    .map(k => (collection.fields || []).find(f => f.key === k) || { key: k, type: 'text' });
+  // What a card shows is the view's (`./viewDisplay`), minus the status the column itself IS.
+  const z = sizeOf(view);
+  const cover = coverOf(collection, view);
+  const defs = shownFields(collection, view).filter(f => f.key !== field?.key);
+  const look = { z, cover, fit: fitOf(view), summary: summaryOf(view) };
 
   const canMove = !!onMove && !!field;
 
@@ -186,7 +180,7 @@ export default function BoardView({ collection, view, views, rows, counts, selec
     setDrag(null);
     if (!row || !canMove || col.unset) return;
     if (String(row.fields?.[field.key] ?? '') === col.value) return;   // a no-op drop is not a move
-    onMove(row, col.value);
+    onMove(row, col.value, field);
   };
 
   if (!rows.length) {
@@ -207,7 +201,8 @@ export default function BoardView({ collection, view, views, rows, counts, selec
       {bands.map((band, bi) => (
         <div key={(band.group || 'unsorted') + '-' + bi} style={sx('flex:none;min-height:0;display:flex;flex-direction:column;gap:7px')}>
           <div style={sx('flex:none;display:flex;align-items:center;gap:9px;padding:0 2px')}>
-            <Eyebrow>{band.group || 'unsorted'}</Eyebrow>
+            {/* The band names (to do · active · done) only mean something when a stage declares them. */}
+            {bands.length > 1 || (band.group && band.group !== 'other') ? <Eyebrow>{band.group === 'other' ? 'other' : band.group || 'unsorted'}</Eyebrow> : null}
             <span style={sx('flex:1;height:1px;background:var(--line)')} />
           </div>
 
@@ -246,7 +241,7 @@ export default function BoardView({ collection, view, views, rows, counts, selec
                         key={r.path}
                         collection={collection}
                         row={r}
-                        defs={defs}
+                        defs={defs} look={look} onPick={onPick}
                         selected={selected === r.path}
                         dragging={drag?.path === r.path}
                         draggable={canMove && !col.unset}

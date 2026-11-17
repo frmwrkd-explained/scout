@@ -1,0 +1,23 @@
+---
+name: Mateo Abara
+role: Managing director
+company: ostrander-cycles
+email: mateo.abara@ostrander-cycles.example
+phone: +1 555 0124
+decision_maker: true
+follow_up: true
+messages:
+  - msg-0003
+  - msg-0004
+  - msg-0053
+  - msg-0054
+  - msg-0055
+  - msg-0056
+created: '2026-11-17'
+updated: '2026-11-17'
+created_by: crystal
+updated_by: crystal
+verified_at: '2026-11-17'
+provenance: pipeline
+---
+Signs off on creative work at Ostrander Cycles. Prefers a call to a long email.

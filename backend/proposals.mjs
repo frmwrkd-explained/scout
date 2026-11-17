@@ -32,7 +32,7 @@ const R = () => getStorageRoot();
 export const proposalsDir = () => path.join(R(), 'proposals');
 const proposalFile = id => path.join(proposalsDir(), safe(id) + '.md');
 
-export const CARD_KINDS = ['finding', 'outbound', 'territory', 'learning', 'schema', 'question', 'widget'];
+export const CARD_KINDS = ['finding', 'outbound', 'territory', 'learning', 'schema', 'question', 'widget', 'automation'];
 // The same five as records.mjs ARCHIVE_REASONS, and that is not a coincidence: rejecting a finding
 // archives the record with this reason, which is what makes a rejection move a territory's score
 // (GOAL §4 gate 5). If that list ever changes, these must change together.
@@ -147,6 +147,8 @@ const REQUIRED = {
   schema: ['change'],
   question: ['question'],
   widget: ['widget'],
+  // An automation in `ask` mode: the rule that fired and the record it fired for.
+  automation: ['automation', 'record'],
 };
 
 // A territory card names its ground either as an id — `territory: ofw-uk` — or as the whole object
@@ -372,6 +374,12 @@ async function effectFor(card, actor, deps) {
         : ['[[' + String(card.path).replace(/\.md$/, '') + ']]'];
       return { effect: 'learning', result: await saveLearning(id, { status: 'active', claim: answer, question: card.question, evidence, verified_at: nowIso() }, { actor }) };
     }
+    case 'automation': {
+      // The rule fired and asked first; this yes is what runs it, once, for this record. The work
+      // is done by the automation module through the record writer — nothing is written here.
+      const run = needed(await resolve('runAutomationCard', './automations.mjs', deps), 'runAutomationCard', 'backend/automations.mjs');
+      return { effect: 'automation', result: await run(card, { actor }) };
+    }
     default:
       throw new ProposalError('unknown card kind "' + card.kind + '"');
   }
@@ -412,8 +420,11 @@ export async function reject(id, { reason, actor = 'crystal', deps = null } = {}
   const card = getProposal(id);
   if (!card) throw new ProposalError('no proposal "' + id + '"', 404);
   if (card.status !== 'open') throw new ProposalError('this card was already ' + card.status, 409);
+  // "Not this time" to an automation is a decision about one firing, not a judgement of a
+  // proposal's quality, so none of the five reasons fits and none is asked for.
+  if (card.kind === 'automation' && !reason) reason = 'declined';
   if (!reason) throw new ProposalError('a rejection needs a reason — one of ' + REJECT_REASONS.join(' · '));
-  if (!REJECT_REASONS.includes(reason)) {
+  if (!REJECT_REASONS.includes(reason) && !(card.kind === 'automation' && reason === 'declined')) {
     throw new ProposalError('"' + reason + '" is not a rejection reason. One of: ' + REJECT_REASONS.join(' · '));
   }
 
@@ -427,6 +438,10 @@ export async function reject(id, { reason, actor = 'crystal', deps = null } = {}
       try { await archiveRecord(card.record, { reason, actor }); side = 'archived'; }
       catch (e) { side = 'archive-failed: ' + e.message; }
     }
+  }
+  if (card.kind === 'automation') {
+    const declined = await resolve('automationDeclined', './automations.mjs', deps);
+    if (declined) { try { await declined(card, { actor }); side = 'declined'; } catch (e) { side = 'decline-not-recorded: ' + e.message; } }
   }
 
   const { data, content } = readMd(proposalFile(id));

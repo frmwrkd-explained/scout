@@ -24,6 +24,10 @@
 //   onDone(field)  fired after the field exists, so the caller can reload
 //   onCancel()
 //   actor        who is adding it. Default 'crystal' — the UI is never an agent (Law 4).
+//   variant      'row' (default) — a row in a property list, as on the record page.
+//                'popover' — the same composer inside a menu: the table's + column and the view
+//                bar's Properties menu. One component; only the box around it and the way the type
+//                list opens differ.
 
 import React from 'react';
 import { sx } from './sx';
@@ -60,18 +64,22 @@ const keyify = s => String(s || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, 
 // Two columns of icon + name, anchored under the type button. Arrow keys move, Enter picks, Esc
 // closes — `TypePickerDropdown.svelte` navigates the same way, and a picker of thirteen things
 // that only takes a mouse is a picker you have to aim at.
-function TypePicker({ value, onPick, onDismiss }) {
-  const [i, setI] = React.useState(() => Math.max(0, KINDS.findIndex(k => k.type === value)));
+// `kinds` narrows the list (a property being re-typed may only become some things). `inline` lays
+// the grid out in the flow instead of floating it: inside a popover that scrolls, a second
+// floating layer is clipped by the first.
+export function TypePicker({ value, onPick, onDismiss, kinds = KINDS, inline = false }) {
+  const KINDS_SHOWN = kinds;
+  const [i, setI] = React.useState(() => Math.max(0, KINDS_SHOWN.findIndex(k => k.type === value)));
   const ref = React.useRef(null);
 
   React.useEffect(() => {
     const onKey = e => {
       if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); return onDismiss(); }
-      if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); return onPick(KINDS[i].type); }
+      if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); return onPick(KINDS_SHOWN[i].type); }
       const step = { ArrowDown: 2, ArrowUp: -2, ArrowRight: 1, ArrowLeft: -1 }[e.key];
       if (step === undefined) return;
       e.preventDefault(); e.stopPropagation();
-      setI(n => (n + step + KINDS.length) % KINDS.length);
+      setI(n => (n + step + KINDS_SHOWN.length) % KINDS_SHOWN.length);
     };
     // Capture: the name input below has its own Enter handler, and without capture both fire.
     window.addEventListener('keydown', onKey, true);
@@ -79,30 +87,38 @@ function TypePicker({ value, onPick, onDismiss }) {
   }, [i, onPick, onDismiss]);
 
   React.useEffect(() => {
-    const onDown = e => { if (ref.current && !ref.current.contains(e.target)) onDismiss(); };
+    // The button that opened this is not "outside": its own click closes the list. Counting it as
+    // outside closed the list on mousedown and the click then opened it again.
+    const onDown = e => {
+      if (e.target.closest && e.target.closest('[data-type-button]')) return;
+      if (ref.current && !ref.current.contains(e.target)) onDismiss();
+    };
     window.addEventListener('mousedown', onDown);
     return () => window.removeEventListener('mousedown', onDown);
   }, [onDismiss]);
 
   return (
     <div ref={ref}
-      style={{
+      style={inline ? {
+        ...sx('padding:4px;border-radius:8px;display:grid;grid-template-columns:1fr 1fr;gap:1px'),
+        background: 'var(--sunk)', border: '1px solid var(--border)',
+      } : {
         ...sx('position:absolute;top:100%;left:0;z-index:30;margin-top:5px;width:284px;padding:5px;border-radius:9px;display:grid;grid-template-columns:1fr 1fr;gap:1px'),
         background: 'var(--surface-2)', border: '1px solid var(--border-3)', boxShadow: '0 12px 28px rgba(0,0,0,.4)',
       }}>
-      {KINDS.map((k, n) => {
+      {KINDS_SHOWN.map((k, n) => {
         const on = n === i;
         return (
           <button key={k.type} type="button" title={k.hint}
             onMouseEnter={() => setI(n)}
             onClick={() => onPick(k.type)}
             style={{
-              ...sx('display:flex;align-items:center;gap:8px;height:26px;padding:0 7px;border-radius:5px;cursor:pointer;text-align:left;border:none'),
+              ...sx('display:flex;align-items:center;gap:8px;height:28px;padding:0 7px;border-radius:5px;cursor:pointer;text-align:left;border:none'),
               background: on ? 'var(--raise)' : 'transparent',
               color: k.type === value ? 'var(--fg)' : on ? 'var(--fg-soft)' : 'var(--fg-muted)',
             }}>
             <FieldIcon type={k.type} size={14} />
-            <span style={sx('font-size:11.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{k.label}</span>
+            <span style={sx('font-size:var(--t-data);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{k.label}</span>
           </button>
         );
       })}
@@ -110,7 +126,8 @@ function TypePicker({ value, onPick, onDismiss }) {
   );
 }
 
-export default function AddField({ collection, onDone, onCancel, actor = 'crystal' }) {
+export default function AddField({ collection, onDone, onCancel, actor = 'crystal', variant = 'row' }) {
+  const popover = variant === 'popover';
   const [label, setLabel] = React.useState('');
   const [kind, setKind] = React.useState('text');
   const [picking, setPicking] = React.useState(false);
@@ -160,77 +177,88 @@ export default function AddField({ collection, onDone, onCancel, actor = 'crysta
     else if (e.key === 'Escape') { e.preventDefault(); onCancel && onCancel(); }
   };
 
+  const typeButton = (
+    <button type="button" data-type-button onClick={() => setPicking(v => !v)} className="hBd" aria-expanded={picking}
+      title="What kind of thing is it?"
+      style={{
+        ...sx('flex:none;display:flex;align-items:center;gap:7px;padding:0 9px;border-radius:6px;cursor:pointer;font-size:var(--t-data);font-weight:500'),
+        height: popover ? 30 : 26,
+        background: 'var(--ink)', border: '1px solid ' + (picking ? 'var(--border-3)' : 'var(--border-2)'), color: 'var(--fg-soft)',
+      }}>
+      <FieldIcon type={kind} size={14} />
+      <span>{chosen.label}</span>
+      <span style={{ ...mono('font-size:8px'), color: 'var(--fg-faint)' }}>▾</span>
+    </button>
+  );
+  const picker = picking ? (
+    <TypePicker value={kind} inline={popover} onDismiss={() => setPicking(false)}
+      onPick={t => { setKind(t); setPicking(false); }} />
+  ) : null;
+  const nameInput = (
+    <Input value={label} autoFocus placeholder="Property name" onChange={e => setLabel(e.target.value)}
+      style={{ ...sx('flex:1;min-width:120px;padding:0 10px;font-size:var(--t-small)'), height: popover ? 30 : 26 }} />
+  );
+  const buttons = (
+    <>
+      <Btn variant="primary" size="sm" onClick={save} busy={busy}>{busy ? 'Adding…' : 'Add'}</Btn>
+      <Btn variant="ghost" size="sm" onClick={onCancel}>Cancel</Btn>
+    </>
+  );
+
   return (
     <div onKeyDown={onKeyDown}
-      style={{
-        ...sx('display:flex;flex-direction:column;gap:8px;margin:2px 0;padding:8px;border-radius:7px'),
-        background: 'var(--surface-2)', border: '1px solid var(--border-2)',
-      }}>
+      style={popover
+        ? sx('display:flex;flex-direction:column;gap:8px;padding:4px 3px 3px')
+        : { ...sx('display:flex;flex-direction:column;gap:8px;margin:2px 0;padding:8px;border-radius:7px'), background: 'var(--surface-2)', border: '1px solid var(--border-2)' }}>
       <div style={sx('display:flex;align-items:center;gap:8px;flex-wrap:wrap')}>
         {/* The type button IS the gutter icon of the row this will become. */}
-        <div style={sx('position:relative;flex:none')}>
-          <button type="button" onClick={() => setPicking(v => !v)} className="hBd"
-            title="What kind of thing is it?"
-            style={{
-              ...sx('display:flex;align-items:center;gap:7px;height:26px;padding:0 9px;border-radius:6px;cursor:pointer'),
-              background: 'var(--ink)', border: '1px solid ' + (picking ? 'var(--border-3)' : 'var(--border-2)'), color: 'var(--fg-soft)',
-            }}>
-            <FieldIcon type={kind} size={14} />
-            <span style={sx('font-size:11.5px;font-weight:500')}>{chosen.label}</span>
-            <span style={{ ...mono('font-size:8px'), color: 'var(--fg-faint)' }}>▾</span>
-          </button>
-          {picking ? (
-            <TypePicker value={kind} onDismiss={() => setPicking(false)}
-              onPick={t => { setKind(t); setPicking(false); }} />
-          ) : null}
-        </div>
-
-        <Input value={label} autoFocus placeholder="Property name" onChange={e => setLabel(e.target.value)}
-          style={sx('flex:1;min-width:150px;height:26px;padding:0 10px;font-size:12px')} />
-
-        <Btn variant="primary" size="sm" onClick={save} busy={busy}>{busy ? 'Adding…' : 'Add'}</Btn>
-        <Btn variant="ghost" size="sm" onClick={onCancel}>Cancel</Btn>
+        {popover ? typeButton : <div style={sx('position:relative;flex:none')}>{typeButton}{picker}</div>}
+        {nameInput}
+        {popover ? null : buttons}
       </div>
+      {popover ? picker : null}
 
       {/* Everything below only appears when the chosen type actually needs it. The old dialog
           showed the explanation whether or not it applied, which is most of why it was long. */}
       {needsOptions ? (
-        <Input value={options} placeholder="The choices, separated by commas — needs review, shortlist, contacted"
+        <Input value={options} placeholder={popover ? 'Choices, separated by commas' : 'The choices, separated by commas — needs review, shortlist, contacted'}
           onChange={e => setOptions(e.target.value)}
-          style={sx('height:26px;padding:0 10px;font-size:12px')} />
+          style={{ ...sx('padding:0 10px;font-size:var(--t-small)'), height: popover ? 30 : 26 }} />
       ) : null}
 
       {needsTarget ? (
         <div style={sx('display:flex;align-items:center;gap:6px;flex-wrap:wrap')}>
-          <span style={{ ...sx('font-size:11px'), color: 'var(--fg-faint)' }}>Pointing at</span>
+          <span style={{ ...sx('font-size:var(--t-data)'), color: 'var(--fg-faint)' }}>Pointing at</span>
           {collections.filter(c => c.id !== collection?.id).map(c => (
             <button key={c.id} type="button" onClick={() => setTarget(c.id)} className="hBd"
               style={{
-                ...mono('height:24px;padding:0 9px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer'),
+                ...sx('height:26px;padding:0 9px;border-radius:6px;font-size:var(--t-data);font-weight:600;cursor:pointer'),
                 background: target === c.id ? 'var(--raise)' : 'transparent',
                 border: '1px solid ' + (target === c.id ? 'var(--border-3)' : 'var(--border)'),
                 color: target === c.id ? 'var(--fg)' : 'var(--fg-muted)',
-              }}>#{c.id}</button>
+              }}>{c.label || c.id}</button>
           ))}
         </div>
       ) : null}
 
       <div style={sx('display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-height:14px')}>
         {error ? (
-          <span style={{ ...sx('font-size:11px;line-height:1.5'), color: 'var(--danger)' }}>{error}</span>
+          <span style={{ ...sx('font-size:var(--t-data);line-height:1.5'), color: 'var(--danger)' }}>{error}</span>
         ) : (
           <>
             {key ? (
-              <span style={{ ...mono('font-size:10px'), color: clash ? 'var(--danger)' : 'var(--fg-faint)' }}>
+              <span style={{ ...mono('font-size:var(--t-label)'), color: clash ? 'var(--danger)' : 'var(--fg-faint)' }}>
                 saved as {key}{clash ? ' — already taken' : ''}
               </span>
             ) : null}
-            <span style={{ ...sx('font-size:11px'), color: 'var(--fg-faint)' }}>
+            <span style={{ ...sx('font-size:var(--t-data);line-height:1.45'), color: 'var(--fg-faint)' }}>
               {chosen.hint} It stays empty on the records you already have.
             </span>
           </>
         )}
       </div>
+
+      {popover ? <div style={sx('display:flex;align-items:center;gap:8px')}>{buttons}</div> : null}
     </div>
   );
 }

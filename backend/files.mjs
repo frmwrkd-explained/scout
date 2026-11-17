@@ -282,7 +282,11 @@ export function registerFileRoutes(app, deps = {}) {
       'X-Content-Type-Options': 'nosniff',
       'Content-Security-Policy': "default-src 'none'; sandbox",
       'Content-Disposition': (f.inline ? 'inline' : 'attachment') + '; filename="' + f.name.replace(/["\\]/g, '_') + '"',
-      'Cache-Control': 'no-cache',
+      // An attachment's NAME is its content (`files/<sha256>.<ext>`, backend/attachments.mjs), so
+      // those bytes can never change under that path and the browser may keep them for good.
+      // Without this a list of a thousand thumbnails re-downloaded every picture on every visit.
+      // Anything else in the workspace can be edited in place, so it is revalidated as before.
+      'Cache-Control': /^files\/[0-9a-f]{64}\.[a-z0-9]+$/.test(f.path) ? 'private, max-age=31536000, immutable' : 'no-cache',
       'Accept-Ranges': 'bytes',
       'Last-Modified': new Date(f.modified).toUTCString(),
     });

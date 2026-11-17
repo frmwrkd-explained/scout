@@ -286,6 +286,14 @@ export default class Decide extends React.Component {
     }
   }
 
+  // "No" opens the reason grid — except for a kind whose no needs no reason (KIND.<kind>.noReason:
+  // an automation asking "shall I?"), which is answered in one step. Table-driven, like needsAnswer.
+  decline() {
+    const card = this.card();
+    if (card && kindOf(card).noReason) { this.commit('reject', 'declined'); return; }
+    this.setState({ mode: 'reject' });
+  }
+
   onKey = e => {
     if (isTyping(e)) return;
 
@@ -321,7 +329,7 @@ export default class Decide extends React.Component {
     }
 
     if (k === KEYS.accept) { e.preventDefault(); this.commit('accept'); }
-    else if (k === KEYS.reject) { e.preventDefault(); this.setState({ mode: 'reject' }); }
+    else if (k === KEYS.reject) { e.preventDefault(); this.decline(); }
     else if (k === KEYS.skip) { e.preventDefault(); this.skip(); }
     else if (k === KEYS.why) { e.preventDefault(); this.setState(s => ({ why: !s.why, ev: false })); }
     else if (k === KEYS.evidence) { if (this.state.why) { e.preventDefault(); this.setState(s => ({ ev: !s.ev })); } }
@@ -508,7 +516,7 @@ export default class Decide extends React.Component {
                             <span>{kind.yes}</span>
                             <Key k={KEYS.accept} on="accent" />
                           </Btn>
-                          <Btn variant="ghost" disabled={busy} onClick={() => this.setState({ mode: 'reject' })} style={sx('height:44px;padding:0 18px;border-radius:6px;background:var(--raise);font-size:13.5px;font-weight:600;color:var(--fg-soft);gap:10px')}>
+                          <Btn variant="ghost" disabled={busy} onClick={() => this.decline()} style={sx('height:44px;padding:0 18px;border-radius:6px;background:var(--raise);font-size:13.5px;font-weight:600;color:var(--fg-soft);gap:10px')}>
                             <span>{kind.no}</span>
                             <Key k={KEYS.reject} />
                           </Btn>

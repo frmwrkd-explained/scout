@@ -28,6 +28,15 @@ export const TOKENS = {
   danger: '#F05B54',
   // the running/marked blue — see the note in styles.css :root
   marked: '#5B9DFF',
+  // which collection a thing belongs to — see the `--hue-*` note in styles.css :root
+  'hue-red': '#FF7B72',
+  'hue-orange': '#FF9A5C',
+  'hue-amber': '#E8C547',
+  'hue-green': '#8FD460',
+  'hue-teal': '#3CCFCF',
+  'hue-blue': '#8AA4FF',
+  'hue-violet': '#B197FC',
+  'hue-pink': '#F58BC0',
 };
 
 // The light set — mirrors `:root[data-theme="light"]` in styles.css, same rule, same commit.
@@ -62,6 +71,14 @@ export const LIGHT = {
   warn: '#916200',
   danger: '#B3322C',
   marked: '#2E5FCC',
+  'hue-red': '#B4321F',
+  'hue-orange': '#A34A00',
+  'hue-amber': '#7A5C00',
+  'hue-green': '#3A7212',
+  'hue-teal': '#0B7273',
+  'hue-blue': '#2B5FC7',
+  'hue-violet': '#6B46C1',
+  'hue-pink': '#B02A72',
 };
 
 // The dark set under its own name, so a reader of this file does not have to know that the

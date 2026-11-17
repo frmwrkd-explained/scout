@@ -55,6 +55,8 @@ function spyDeps() {
     saveTerritory: (id, patch) => { calls.push(['saveTerritory', id, patch.access]); return { id, ...patch }; },
     saveLearning: (id, patch) => { calls.push(['saveLearning', id, patch.status]); return { id, ...patch }; },
     writeMe: (body) => { calls.push(['writeMe', body]); return { ok: true }; },
+    runAutomationCard: (card) => { calls.push(['runAutomationCard', card.automation, card.record]); return { made: { path: 'data/invoices/inv-1.md' } }; },
+    automationDeclined: (card) => { calls.push(['automationDeclined', card.automation]); return { declined: true }; },
     logEvent: (ev) => { calls.push(['log', ev.type, ev.detail && ev.detail.decision ? ev.detail.decision : ev.detail && ev.detail.effect]); return ev; },
   };
 }
@@ -88,6 +90,10 @@ function sixCards() {
       why: 'I cannot tell them apart and guessing would poison the dedupe.' },
     { kind: 'widget', title: 'Goal progress', widget: { type: 'goal_progress', id: 'goals' },
       why: 'Keep the active goal visible during work.', evidence: ['One active goal needs a visible progress check.'] },
+    // Raised by a rule in `ask` mode (backend/automations.mjs), not by an agent — but it is a card
+    // in the same queue, decided through the same path.
+    { kind: 'automation', title: 'Brand film was won. Create invoice?', automation: 'invoice-when-won', record: 'data/deals/brand-film.md',
+      why: 'Your automation "Invoice when a deal is won" fired.' },
   ];
 }
 

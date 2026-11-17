@@ -1,0 +1,70 @@
+[
+  {
+    "id": "by-company",
+    "label": "Everyone",
+    "type": "list",
+    "filter": [],
+    "sort": [
+      {
+        "field": "name",
+        "dir": "asc"
+      }
+    ],
+    "group": "company",
+    "size": "m",
+    "fields": [
+      "role",
+      "email",
+      "last_message"
+    ],
+    "summary": false
+  },
+  {
+    "id": "needs-follow-up",
+    "label": "No reply in 14 days",
+    "type": "list",
+    "filter": [
+      {
+        "field": "follow_up",
+        "op": "is",
+        "value": true
+      }
+    ],
+    "sort": [
+      {
+        "field": "last_message",
+        "dir": "asc"
+      }
+    ],
+    "group": null,
+    "size": "m",
+    "fields": [
+      "role",
+      "company",
+      "last_message"
+    ],
+    "summary": false
+  },
+  {
+    "id": "decision-makers",
+    "label": "Decision makers",
+    "type": "table",
+    "filter": [
+      {
+        "field": "decision_maker",
+        "op": "is",
+        "value": true
+      }
+    ],
+    "sort": [],
+    "group": null,
+    "size": "m",
+    "fields": [
+      "role",
+      "company",
+      "email",
+      "phone",
+      "last_message"
+    ]
+  }
+]

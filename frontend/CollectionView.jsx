@@ -31,6 +31,7 @@ import TableView from './TableView';
 import BoardView from './BoardView';
 import ListView from './ListView';
 import GalleryView from './GalleryView';
+import { applyQuick, toggleQuick, quickKey, quickToFilter, fieldLabel } from './viewDisplay';
 
 const mono = (extra = '') => ({ ...sx(extra), fontFamily: MONO });
 
@@ -135,6 +136,44 @@ export const RENDERERS = {
   gallery: { render: GalleryView, chrome: true },
 };
 
+// What the centre shows while a collection's rows are on their way. It names the collection being
+// opened — the alternative was the PREVIOUS collection's table sitting under the new one's rail
+// highlight for as long as the fetch took, which reads as the click not having worked.
+export function CollectionLoading({ collection }) {
+  return (
+    <div className="collectionLoading" role="status" aria-live="polite">
+      <span className="collectionLoadingBar" />
+      <span>Opening {collection ? (collection.label || collection.id) : 'collection'}…</span>
+    </div>
+  );
+}
+
+// ── quick filters — the draft on top of the saved view ───────────────────────────────────────
+// What is being shown, in words, with a way out of each part and a way to keep the whole.
+function QuickStrip({ collection, quick, shown, of, onDrop, onClear, onKeep }) {
+  if (!quick.length) return null;
+  const fields = collection.fields || [];
+  return (
+    <div className="quickStrip">
+      <span className="quickLead">Showing only</span>
+      {quick.map(q => {
+        const field = fields.find(f => f.key === q.field) || { key: q.field };
+        return (
+          <button key={quickKey(q)} type="button" className="quickChip hBd" onClick={() => onDrop(q)} title="Remove this filter">
+            <span className="quickChipField">{fieldLabel(field)}</span>
+            <span className="quickChipValue">{q.value}</span>
+            <span aria-hidden="true" className="quickChipX">×</span>
+          </button>
+        );
+      })}
+      <span className="quickCount" style={{ fontFamily: MONO }}>{shown.toLocaleString('en-US')} of {of.toLocaleString('en-US')}</span>
+      <span style={sx('flex:1')} />
+      {onKeep ? <button type="button" className="quickAct hBdAccent" onClick={onKeep} title="Keep this as a view of its own, in the workspace">Save as view</button> : null}
+      <button type="button" className="quickAct quickClear hFg" onClick={onClear}>Clear</button>
+    </div>
+  );
+}
+
 export default function CollectionView(props) {
   const { collection, view, views, rows, counts, onPickView } = props;
   if (!collection || !view) return null;
@@ -145,17 +184,44 @@ export default function CollectionView(props) {
   const entry = RENDERERS[view.type] || RENDERERS.table;
   const Body = entry.render;
 
+  // A click on a value in a row (a category, a tag) narrows the view to the records that carry
+  // it. It is a draft: dropped when the person moves to another view or collection, kept only if
+  // they save it — and then it is an ordinary saved view the server filters.
+  const [quick, setQuick] = React.useState([]);
+  const scope = collection.id + '/' + view.id;
+  // `startQuick` — { id, quick, n } — is a set somebody asked to see as a full page (from the
+  // browse popup on a record, RecordPeek.jsx). It lands here as the same draft a click on a tag
+  // would have made, so it can be dropped, added to, or saved as a view like any other.
+  const start = props.startQuick && props.startQuick.id === collection.id ? props.startQuick : null;
+  const startN = start ? start.n : 0;
+  const usedStart = React.useRef(0);
+  React.useEffect(() => {
+    if (start && usedStart.current !== startN) { usedStart.current = startN; setQuick(start.quick); return; }
+    setQuick([]);
+  }, [scope, startN]);
+  const shownRows = React.useMemo(() => applyQuick(rows, quick), [rows, quick]);
+  const onPick = (field, value) => setQuick(q => toggleQuick(q, field, value));
+  const keep = props.onSaveView ? () => {
+    const label = quick.map(q => q.value).join(' · ');
+    const id = label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'view';
+    const taken = (views || []).some(v => v.id === id);
+    const { generated, ...base } = view;
+    Promise.resolve(props.onSaveView({ ...base, id: taken ? id + '-' + Date.now().toString(36).slice(-4) : id, label, filter: [...(view.filter || []), ...quickToFilter(collection, quick)] })).catch(() => {});
+  } : null;
+
   if (!entry.chrome) return <Body {...props} />;
 
   return (
     <div style={sx('flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden')}>
       <ViewBar
-        collection={collection} view={view} views={views} counts={counts}
+        collection={collection} view={view} views={views} counts={quick.length ? { ...counts, [view.id]: shownRows.length } : counts} total={shownRows.length}
         onPickView={onPickView} onSaveView={props.onSaveView} onDeleteView={props.onDeleteView}
+        onSchemaChanged={props.onSchemaChanged} onOpen={props.onOpen} actor={props.actor}
       />
-      <QueryBar collection={collection} view={view} total={(rows || []).length} path={collection.query?.path || '—'} />
       <QuarantineStrip items={props.quarantined} onAccept={props.onAccept} />
-      <Body {...props} />
+      <QuickStrip collection={collection} quick={quick} shown={shownRows.length} of={(rows || []).length}
+        onDrop={q => setQuick(list => list.filter(x => quickKey(x) !== quickKey(q)))} onClear={() => setQuick([])} onKeep={keep} />
+      <Body {...props} rows={shownRows} onPick={onPick} />
     </div>
   );
 }

@@ -39,6 +39,112 @@ export const ROW_GAP = GAP + STRIP_H;
 
 export const snap = v => Math.round(v / GRID) * GRID;
 
+// ── the whiteboard's record cards ──────────────────────────────────────────────────────────────
+// Two sizes, both on the lattice, shared by the canvas and the server (backend/scoutBoard.mjs) so
+// a card placed by a person, by "Show related" and by an agent come out the same size:
+//   plain    a record of words — name, a few properties, the opening line
+//   picture  a record whose collection has a picture field — the picture leads, whole
+// A card can still be resized by hand afterwards; this is only what it is born as.
+//   compact  a record with nothing to say beyond its name and a property or two — no empty box
+export const BOARD_CARD = { plain: { w: 300, h: 180 }, picture: { w: 280, h: 340 }, compact: { w: 300, h: 120 } };
+export const BOARD_GAP = 40;        // between cards placed as a group — room for an edge label
+
+// Where a batch of same-sized cards goes: a grid of `cols` columns starting at (x, y).
+export function gridSlots(count, size, { x = 0, y = 0, cols = null, gap = BOARD_GAP } = {}) {
+  const n = Math.max(0, count | 0);
+  const c = Math.max(1, cols || Math.ceil(Math.sqrt(n * 1.6)));
+  return Array.from({ length: n }, (_, i) => ({
+    x: snap(x + (i % c) * (size.w + gap)),
+    y: snap(y + Math.floor(i / c) * (size.h + gap)),
+  }));
+}
+
+// The first free spot for a block of `w` × `h` near (x, y): tries the spot itself, then steps to
+// the right and down in block-sized strides until nothing on the board overlaps it. Bounded, so a
+// crowded board still gets an answer (the last candidate) instead of a loop.
+export function freeSpot(nodes, { x, y, w, h }, gap = BOARD_GAP) {
+  const rects = (nodes || []).filter(n => n && n.t !== 'arrow' && n.t !== 'frame');
+  const hits = (ax, ay) => rects.some(n => ax < n.x + n.w + gap / 2 && ax + w + gap / 2 > n.x && ay < n.y + n.h + gap / 2 && ay + h + gap / 2 > n.y);
+  let best = { x: snap(x), y: snap(y) };
+  for (let ring = 0; ring < 14; ring++) {
+    for (let step = 0; step <= ring; step++) {
+      for (const [cx, cy] of [[x + ring * (w + gap), y + step * (h + gap)], [x + step * (w + gap), y + ring * (h + gap)]]) {
+        best = { x: snap(cx), y: snap(cy) };
+        if (!hits(best.x, best.y)) return best;
+      }
+    }
+  }
+  return best;
+}
+
+// ── freehand strokes ───────────────────────────────────────────────────────────────────────────
+// A stroke is a `draw` node: a box on the board and, inside it, a string of integer points relative
+// to the box's own corner ("0,0 4,7 12,9"). Shared by the canvas (which draws and erases them) and
+// the tests; the server only checks the string is made of numbers (backend/scoutBoard.mjs).
+export function parsePoints(str) {
+  const nums = String(str == null ? '' : str).split(/[\s,]+/).map(Number).filter(Number.isFinite);
+  const out = [];
+  for (let i = 0; i + 1 < nums.length; i += 2) out.push({ x: nums[i], y: nums[i + 1] });
+  return out;
+}
+
+// Board-space samples from the pen → a node's geometry. Samples closer together than `step` are
+// one point (a slow hand produces hundreds on one spot), the box is the stroke's bounds grown by
+// the line's own thickness so nothing is clipped at the edge, and the points are rounded: a
+// 14-decimal float per sample is how a readable file stops being one.
+const STROKE_MAX = 1200;
+export function packStroke(samples, width = 4, step = 2) {
+  const src = (samples || []).filter(p => p && Number.isFinite(p.x) && Number.isFinite(p.y));
+  if (!src.length) return null;
+  let kept = [];
+  for (let gap = step; ; gap *= 1.5) {
+    kept = [src[0]];
+    for (let i = 1; i < src.length; i++) {
+      const last = kept[kept.length - 1];
+      if (Math.hypot(src[i].x - last.x, src[i].y - last.y) >= gap || i === src.length - 1) kept.push(src[i]);
+    }
+    if (kept.length <= STROKE_MAX) break;
+  }
+  if (kept.length > 1) {
+    const a = kept[kept.length - 2], b = kept[kept.length - 1];
+    if (Math.hypot(a.x - b.x, a.y - b.y) < 0.5) kept.pop();
+  }
+  const pad = Math.ceil(width / 2) + 2;
+  const x0 = Math.floor(Math.min(...kept.map(p => p.x)) - pad), y0 = Math.floor(Math.min(...kept.map(p => p.y)) - pad);
+  const x1 = Math.ceil(Math.max(...kept.map(p => p.x)) + pad), y1 = Math.ceil(Math.max(...kept.map(p => p.y)) + pad);
+  const rel = kept.map(p => Math.round(p.x - x0) + ',' + Math.round(p.y - y0));
+  if (rel.length === 1) rel.push(rel[0]);
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0, points: rel.join(' ') };
+}
+
+// The SVG path of a stroke: a quadratic through the midpoints, so a hand-drawn line reads as a
+// line and not as the polygon the mouse actually reported.
+export function strokePath(str) {
+  const p = parsePoints(str);
+  if (!p.length) return '';
+  if (p.length < 3) return 'M ' + p[0].x + ' ' + p[0].y + ' L ' + p[p.length - 1].x + ' ' + p[p.length - 1].y;
+  const mid = (a, b) => ((a.x + b.x) / 2) + ' ' + ((a.y + b.y) / 2);
+  let d = 'M ' + p[0].x + ' ' + p[0].y + ' L ' + mid(p[0], p[1]);
+  for (let i = 1; i < p.length - 1; i++) d += ' Q ' + p[i].x + ' ' + p[i].y + ' ' + mid(p[i], p[i + 1]);
+  return d + ' L ' + p[p.length - 1].x + ' ' + p[p.length - 1].y;
+}
+
+// Is the board point `pt` on this stroke? The LINE, not its box — a long diagonal owns a large
+// rectangle of board it does not touch, and neither a click nor the eraser should land on that.
+export function strokeHit(node, pt, tol = 6) {
+  const reach = tol + (node.width || 4) / 2;
+  if (pt.x < node.x - reach || pt.x > node.x + node.w + reach || pt.y < node.y - reach || pt.y > node.y + node.h + reach) return false;
+  const p = node._pts || parsePoints(node.points);
+  const x = pt.x - node.x, y = pt.y - node.y;
+  for (let i = 0; i + 1 < p.length; i++) {
+    const ax = p[i].x, ay = p[i].y, dx = p[i + 1].x - ax, dy = p[i + 1].y - ay;
+    const len = dx * dx + dy * dy;
+    const t = len ? Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / len)) : 0;
+    if (Math.hypot(x - (ax + dx * t), y - (ay + dy * t)) <= reach) return true;
+  }
+  return false;
+}
+
 // A shot card's full height, caption included. Kept as a function because `t:'frame'` and the
 // asset node use the same helper with different bodies.
 export const cardH = () => CARD.h + CAPTION_H;
@@ -98,11 +204,16 @@ export const ZOOM_MIN = 0.1;
 export const ZOOM_MAX = 3;
 export const clampZoom = z => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z));
 
-export function fitView(nodes, vw, vh, pad = 80) {
+// `inset` is screen space the content must stay clear of — a floating panel over the canvas
+// (`{ left, right, top, bottom }` in px). Without it "fit" centred the cards in the whole canvas
+// and the left-hand ones landed underneath the shelf.
+export function fitView(nodes, vw, vh, pad = 80, inset = null) {
   const b = bounds(nodes);
   if (!b.w || !b.h) return { x: 0, y: 0, z: 1 };
-  const z = clampZoom(Math.min((vw - pad * 2) / b.w, (vh - pad * 2) / b.h, 1));
-  return { x: vw / 2 - (b.x + b.w / 2) * z, y: vh / 2 - (b.y + b.h / 2) * z, z };
+  const l = (inset && inset.left) || 0, r = (inset && inset.right) || 0, t = (inset && inset.top) || 0, bt = (inset && inset.bottom) || 0;
+  const aw = Math.max(120, vw - l - r), ah = Math.max(120, vh - t - bt);
+  const z = clampZoom(Math.min((aw - pad * 2) / b.w, (ah - pad * 2) / b.h, 1));
+  return { x: l + aw / 2 - (b.x + b.w / 2) * z, y: t + ah / 2 - (b.y + b.h / 2) * z, z };
 }
 
 // screen ↔ board. One conversion pair, used by every pointer handler, so a drop point and a drag
@@ -145,7 +256,33 @@ export function arrowGeom(arrow, byId) {
     : p.side === 'l' ? { x: p.x - k, y: p.y }
       : p.side === 'b' ? { x: p.x, y: p.y + k } : { x: p.x, y: p.y - k };
   const c1 = a.side ? push(a, d) : a, c2 = b.side ? push(b, d) : b;
-  return { a, b, path: `M ${a.x} ${a.y} C ${c1.x} ${c1.y} ${c2.x} ${c2.y} ${b.x} ${b.y}` };
+  return { a, b, c1, c2, path: `M ${a.x} ${a.y} C ${c1.x} ${c1.y} ${c2.x} ${c2.y} ${b.x} ${b.y}` };
+}
+
+// A point ON the connector at `t` (0 = start, 1 = end) — the cubic `arrowGeom` drew, not the
+// straight line between its ends, so a label sits on the curve it names.
+export function curvePoint(g, t) {
+  const c1 = g.c1 || g.a, c2 = g.c2 || g.b, u = 1 - t;
+  const at = k => u * u * u * g.a[k] + 3 * u * u * t * c1[k] + 3 * u * t * t * c2[k] + t * t * t * g.b[k];
+  return { x: at('x'), y: at('y') };
+}
+
+// Where a connector's label goes: the middle of the curve unless a card is in the way there, in
+// which case it slides along the curve to the nearest stretch that is clear. A label printed over
+// a card hides the card's own words; a label a little off-centre hides nothing. `taken` is the
+// list of label boxes already placed, so two labels never stack on the same spot either.
+const LABEL_STOPS = [0.5, 0.42, 0.58, 0.34, 0.66, 0.26, 0.74, 0.18, 0.82];
+export function labelSpot(g, rects, { w = 84, h = 24, taken = [] } = {}) {
+  const clear = p => {
+    const x0 = p.x - w / 2, y0 = p.y - h / 2;
+    const hit = r => x0 < r.x + r.w && x0 + w > r.x && y0 < r.y + r.h && y0 + h > r.y;
+    return !(rects || []).some(hit) && !taken.some(hit);
+  };
+  let spot = null;
+  for (const t of LABEL_STOPS) { const p = curvePoint(g, t); if (clear(p)) { spot = p; break; } }
+  spot = spot || curvePoint(g, 0.5);
+  taken.push({ x: spot.x - w / 2, y: spot.y - h / 2, w, h });
+  return spot;
 }
 
 // ── the layouts ────────────────────────────────────────────────────────────────────────────────
@@ -364,9 +501,10 @@ export function production(nodes, shots, opts = {}) {
 // repacking the cards into a fresh grid means a scene frame no longer contains its scene, and an
 // empty labelled box is worse than no box.
 export function tidy(nodes, opts = {}) {
-  const { cols = DEFAULT_COLS, originX = null, originY = null } = opts;
+  const { cols = DEFAULT_COLS, originX = null, originY = null, gap = GAP } = opts;
   const list = (nodes || []).filter(n => !isAutoFrame(n)).map(n => ({ ...n }));
-  const movable = list.filter(n => isRect(n) && n.t !== 'frame');
+  // A locked card is one somebody finished placing: arranging never moves it.
+  const movable = list.filter(n => isRect(n) && n.t !== 'frame' && !n.locked);
   if (!movable.length) return list;
 
   const b = bounds(movable);
@@ -382,8 +520,8 @@ export function tidy(nodes, opts = {}) {
 
   const colW = Math.max(...movable.map(n => n.w || 0)) || CARD.w;
   ordered.forEach((n, i) => {
-    n.x = snap(x0 + (i % cols) * (colW + GAP));
-    n.y = snap(y0 + Math.floor(i / cols) * (band + GAP));
+    n.x = snap(x0 + (i % cols) * (colW + gap));
+    n.y = snap(y0 + Math.floor(i / cols) * (band + gap));
   });
   return list;
 }

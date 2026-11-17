@@ -48,13 +48,24 @@ import { sx } from './sx';
 import { MONO } from './tokens';
 import { api } from './api';
 import { Btn, Empty, InlineEdit } from './ui';
-import { Cell } from './cells';
-import PropertyRows from './PropertyRows';
+import { Cell, CopyButton, FieldIcon, LongText, LongTextEditor } from './cells';
+import PropertyRows, { propertyLabel } from './PropertyRows';
+import { RenderMedia, RenderLightbox, mediaKind } from './RenderMedia';
+import { mediaSrc, mediaName, mediaLabel, mediaPath, isImagePath } from './media';
 import { Freshness } from './Freshness';
 import RichEditor, { MarkdownSourceEditor } from './RichEditor';
 import { ConflictNotification } from './Conflict';
 import AddField from './AddField';
+import Subtables from './Subtables';
 import Inspector from './Inspector';
+import RecordHeader from './RecordHeader';
+import PageLayout from './PageLayout';
+import RecordPeek from './RecordPeek';
+import RecordActions from './RecordActions';
+import AskAI from './AskAI';
+import { collectionsApi } from './collectionsApi';
+import { updateField } from './schemaApi';
+import { pageOf, PAGE_WIDTH_PX, PAGE_MEDIA_PX } from '../shared/recordPage.mjs';
 import { Markdown } from './Markdown';
 import { REJECT_REASONS } from './DecideCards';
 
@@ -97,6 +108,184 @@ function firstParagraph(content) {
   return (para || '').trim().replace(/\s+/g, ' ');
 }
 
+// ── what a record IS, above its note ─────────────────────────────────────────────────────────
+// A record with a picture and a prompt used to open on a paragraph of analysis: the picture was a
+// path in the Details panel and the prompt a three-line textarea beside it. The page now leads with
+// both. Each is read off the SCHEMA, never named here, so any collection with a `file` field or a
+// long `text` field gets the same page — a reference library, a set of proofs, a batch of clips.
+
+const hasValue = v => !(v === undefined || v === null || v === '' || (Array.isArray(v) && !v.length));
+
+// image | video | audio | file. `isImagePath` and RenderMedia's `mediaKind` are the two existing
+// oracles; anything neither recognises is a file, shown as a chip rather than as a broken picture.
+function fileKind(value) {
+  if (isImagePath(value)) return 'image';
+  const kind = mediaKind(mediaName(value) || '');
+  return kind === 'image' ? 'file' : kind;
+}
+
+// Every file a record carries, the `primary_media` field's first. → [{ key, label, path, kind }]
+export function recordMedia(collection, values) {
+  const fields = (collection?.fields || []).filter(f => f.type === 'file');
+  const ordered = [...fields.filter(f => f.primary_media), ...fields.filter(f => !f.primary_media)];
+  const out = [];
+  for (const f of ordered) {
+    const files = [].concat(values?.[f.key] ?? []).filter(hasValue);
+    files.forEach((file, i) => {
+      const path = mediaPath(file);
+      if (!path) return;
+      out.push({ key: f.key + ':' + i, field: f.key, index: i, label: propertyLabel(f) + (files.length > 1 ? ' ' + (i + 1) : ''), path, kind: fileKind(path) });
+    });
+  }
+  return out;
+}
+
+// The long text fields, in schema order — except a field literally keyed `prompt`, which leads:
+// on a record that has one, it is what the person opened the record for.
+export function longTextFields(collection) {
+  const fields = (collection?.fields || []).filter(f => f.type === 'text' && f.multiline && !f.primary);
+  return [...fields.filter(f => f.key === 'prompt'), ...fields.filter(f => f.key !== 'prompt')];
+}
+
+function MediaFrame({ item, title, onView, onOpenPath }) {
+  const src = mediaSrc(item.path);
+  if (item.kind === 'image') {
+    return (
+      <button type="button" className="recordMediaBtn" onClick={() => onView({ src, label: item.label })} title="Open full size">
+        <RenderMedia src={src} kind="image" fit="contain" className="recordMediaImg" alt={title ? title + ' — ' + item.label : item.label} />
+      </button>
+    );
+  }
+  if (item.kind === 'video') {
+    return <RenderMedia src={src} kind="video" fit="contain" controls hoverPlay={false} autoPlay={false} loop={false} muted={false} className="recordMediaImg" />;
+  }
+  if (item.kind === 'audio') return <div className="recordMediaAudio"><RenderMedia src={src} kind="audio" /></div>;
+  return null;
+}
+
+// A record's pictures and files, in the style its collection chose (Edit layout → Pictures):
+//   lead   the first one large, the others small beneath it
+//   grid   every picture the same size — a gallery
+//   strip  one picture large, the rest a filmstrip you click through
+// A file the browser cannot draw (a PDF, a Markdown file) is a named chip under any of them.
+// `onAdd` puts a "+ Add" tile at the end; `onRemove(item)` takes a picture OFF THE RECORD — the
+// file itself stays in files/ (Law 5: never delete).
+function RecordMedia({ items, title, style = 'lead', maxHeight, onView, onOpenPath, onAdd, onRemove, busy }) {
+  const shown = items.filter(i => i.kind !== 'file');
+  const files = items.filter(i => i.kind === 'file');
+  const [at, setAt] = React.useState(0);
+  React.useEffect(() => { setAt(0); }, [items.length]);
+  if (!items.length && !onAdd) return null;
+
+  const remove = item => (onRemove ? (
+    <button type="button" className="recordMediaX" title="Take this off the record. The file stays in the workspace."
+      aria-label={'Remove ' + item.label} onClick={e => { e.stopPropagation(); onRemove(item); }}>×</button>
+  ) : null);
+  const add = onAdd ? (
+    <button type="button" className="recordMediaAdd hBd" onClick={onAdd} disabled={busy}
+      title="Add a picture, video or file — or drop one anywhere on this page">
+      <span aria-hidden="true" className="recordMediaAddPlus">+</span>
+      <span>{busy ? 'Adding…' : shown.length ? 'Add' : 'Add a picture'}</span>
+    </button>
+  ) : null;
+  const chips = files.map(item => (
+    <span key={item.key} className="recordFileWrap">
+      <button type="button" className="recordFile hBd" title={item.path} disabled={!onOpenPath}
+        onClick={() => onOpenPath && onOpenPath(item.path)}>
+        <FieldIcon type="file" size={15} />
+        <span>{mediaLabel(item.path) || item.path}</span>
+      </button>
+      {remove(item)}
+    </span>
+  ));
+  const cap = maxHeight ? { '--media-max': maxHeight + 'px' } : undefined;
+
+  if (!shown.length) {
+    return <div className="recordMedia" style={cap}><div className="recordMediaRow">{chips}{add}</div></div>;
+  }
+
+  if (style === 'grid') {
+    return (
+      <div className="recordMedia recordMedia-grid" style={cap}>
+        <div className="recordMediaGrid">
+          {shown.map(item => (
+            <figure key={item.key} className="recordMediaCell" aria-label={item.label}>
+              <MediaFrame item={item} title={title} onView={onView} />
+              {remove(item)}
+            </figure>
+          ))}
+        </div>
+        {chips.length || add ? <div className="recordMediaRow">{chips}{add}</div> : null}
+      </div>
+    );
+  }
+
+  const current = style === 'strip' ? (shown[Math.min(at, shown.length - 1)] || shown[0]) : shown[0];
+  const rest = style === 'strip' ? shown : shown.slice(1);
+  return (
+    <div className={'recordMedia recordMedia-' + style} style={cap}>
+      <figure className="recordMediaLead" aria-label={current.label}>
+        <MediaFrame item={current} title={title} onView={onView} />
+        {remove(current)}
+      </figure>
+      {(style === 'strip' ? shown.length > 1 : rest.length) || chips.length || add ? (
+        <div className="recordMediaRow">
+          {style === 'strip' && shown.length > 1 ? shown.map((item, i) => (
+            <button key={item.key} type="button" className={'recordMediaThumb' + (item === current ? ' on' : '')} aria-pressed={item === current}
+              title={item.label} onClick={() => setAt(i)}>
+              {item.kind === 'image'
+                ? <img src={mediaSrc(item.path)} alt="" loading="lazy" />
+                : <span className="recordMediaThumbKind">{item.kind}</span>}
+            </button>
+          )) : null}
+          {style !== 'strip' ? rest.map(item => (
+            <figure key={item.key} className="recordMediaItem">
+              <div className="recordMediaFrame"><MediaFrame item={item} title={title} onView={onView} />{remove(item)}</div>
+              <figcaption className="recordMediaCaption">{item.label}</figcaption>
+            </figure>
+          )) : null}
+          {chips}
+          {add}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+// One long text field as a block in the reading column. READ: the text with its own line breaks,
+// fourteen lines and then a toggle, and a Copy that takes the exact string. EDIT: the same block is
+// a textarea as tall as its text, writing through the same `queue` every property row uses.
+function TextBlock({ field, value, onChange, open = false }) {
+  const body = React.useRef(null);
+  const label = propertyLabel(field);
+  const text = value == null ? '' : String(value);
+  // A four-thousand-character prompt, fully open on every record, pushes everything else off the
+  // screen. It starts at a readable height and scrolls inside itself; one click opens it whole.
+  // (A collection that wants them open sets `page.text: open` in Edit layout.)
+  const long = text.length > 900 || text.split('\n').length > 12;
+  const [all, setAll] = React.useState(open);
+  React.useEffect(() => { setAll(open); }, [open]);
+  return (
+    <section className={'recordText' + (long && !all ? ' folded' : '')} aria-label={label}>
+      <div className="recordTextHead">
+        <span className="recordTextLabel">{label}</span>
+        <span className="recordTextTools">
+          {long ? (
+            <button type="button" className="recordTextFold hFgL" aria-expanded={all} onClick={() => setAll(v => !v)}>
+              {all ? 'Fold' : 'Show all · ' + text.length.toLocaleString('en-US') + ' characters'}
+            </button>
+          ) : null}
+          {text ? <CopyButton text={text} target={body} /> : null}
+        </span>
+      </div>
+      <div className="recordTextBody" ref={body}>
+        <LongTextEditor value={text} label={label} placeholder={'Write the ' + label.toLowerCase() + '…'}
+          onChange={v => onChange(v === '' ? null : v)} />
+      </div>
+    </section>
+  );
+}
+
 const SAVE_LOOK = {
   saved: { text: 'SAVED', colour: 'var(--fg-faint)' },
   saving: { text: 'SAVING…', colour: 'var(--fg-muted)' },
@@ -118,7 +307,7 @@ function seedOf(doc) {
 
 export default function Document({
   path, collection, collections, doc, actor = 'crystal', assistants = [], referencedBy = [], onOpenBoard, startExpanded = false,
-  onOpen, onOpenPath, onPromote, onFieldAdded, onBack, onDirty, onSaved, onArchived,
+  onOpen, onOpenPath, onBrowse, onPromote, onFieldAdded, onBack, onDirty, onSaved, onArchived, onSchemaChanged,
 }) {
   const seed = seedOf(doc);
   const [loading, setLoading] = React.useState(!seed);
@@ -171,22 +360,37 @@ export default function Document({
     // field). collapsedFields falls back to a `select` for the collapsed ROW, which is right for
     // display and wrong for promotion: on #group it offered "instagram" as the next stage, and
     // pressing it would have written `platform: instagram` through the move route.
-    if (!gate || gate.type !== 'status') return null;
+    // …and only the field the schema MARKS as the gate (`gate: true`). A plain status field is a
+    // property, not a pipeline to be advanced: on a CRM deal whose stage was `won`, this offered a
+    // solid "lost" button — and the `A` key anywhere on the page would have pressed it.
+    if (!gate || gate.type !== 'status' || !gate.gate) return null;
     const opts = (gate.options || []).map(o => (typeof o === 'string' ? o : o.value));
     const i = opts.indexOf(data[gate.key]);
     return opts[i + 1] || null;
   }, [schema, data, onPromote]);
 
+  // 'editor' is the page; 'raw' is its Markdown source. There is NO read mode and no edit mode:
+  // the page is always live. A person opens a record to write on it, and a button between them
+  // and the first keystroke ("Edit note") was the stiffest thing about this screen.
   const [mode, setMode] = React.useState('editor');
-  const [propsOpen, setPropsOpen] = React.useState(false);
+  // The one side panel: null · 'details' (every property, history, links) · 'layout' (Edit layout).
+  const [panel, setPanel] = React.useState(null);
+  const propsOpen = panel === 'details';
   const [detailSection, setDetailSection] = React.useState('props');
-  const [editing, setEditing] = React.useState(false);
-  const [bodyOpen, setBodyOpen] = React.useState(startExpanded);
+  // Layout choices made in Edit layout, shown at once and confirmed by the server a moment later.
+  const [layoutDraft, setLayoutDraft] = React.useState(null);
+  const [layoutError, setLayoutError] = React.useState(null);
+  // Long text fields with no value yet that the person has asked to write (by key).
+  const [openText, setOpenText] = React.useState([]);
+  // A value clicked to see the other records that share it — { field, value } (RecordPeek.jsx).
+  const [peek, setPeek] = React.useState(null);
   const [save, setSave] = React.useState('saved');
   const [saveError, setSaveError] = React.useState(null);
   const [conflict, setConflict] = React.useState(null);
   const [raw, setRaw] = React.useState(null);
   const [options, setOptions] = React.useState({});
+  // Counts saves that changed a property — what the sub-collection lists re-read on (Subtables.jsx).
+  const [savedProps, setSavedProps] = React.useState(0);
   // null = not archiving · 'picking' = the reason strip is up · 'busy' = the write is in flight.
   // Law 5 has no path out of a removal without a reason, so there is no state that archives
   // without one — the button opens the picker, and only the picker calls the API.
@@ -194,6 +398,8 @@ export default function Document({
   const [archiveError, setArchiveError] = React.useState(null);
   // The add-property composer is a row in the list, not a dialog over the page — see AddField.jsx.
   const [addingProperty, setAddingProperty] = React.useState(false);
+  // The picture opened full size — { src, label } — in the app's one viewer (RenderLightbox).
+  const [viewer, setViewer] = React.useState(null);
 
   // Refs shadow the state the save path reads, so a debounced flush firing three keystrokes later
   // writes what is on screen and not what was on screen when the timer was set.
@@ -259,7 +465,8 @@ export default function Document({
     let cancelled = false;
     setLoadError(null); setConflict(null); setRaw(null); setOwnCollection(null);
     setCollectionKnown(false); setKind(null);
-    setSave('saved'); setSaveError(null); setBodyOpen(startExpanded); setPropsOpen(false); setEditing(false); setMode('editor');
+    setSave('saved'); setSaveError(null); setMode('editor'); setOpenText([]); setPeek(null);
+    setPanel(p => (p === 'layout' ? p : null));   // Edit layout stays open across records: it is about the collection
     pendingRef.current = {}; bodyDirtyRef.current = false;
     // Switching documents re-seeds synchronously, so the surface never shows the PREVIOUS
     // record's fields under the new record's path for a frame.
@@ -329,6 +536,7 @@ export default function Document({
       }
       if (sendBody !== undefined && bodyRef.current === sendBody) bodyDirtyRef.current = false;
       if (res.rev !== undefined) revRef.current = res.rev;
+      if (Object.keys(patch).length) setSavedProps(n => n + 1);
       if (res.data) { dataRef.current = res.data; setData(res.data); }
       if (res.content !== undefined && !bodyChangedDuringSave) { bodyRef.current = res.content; setBody(res.content); setSummary(firstParagraph(res.content)); }
       const stillDirty = Object.keys(pendingRef.current).length || bodyDirtyRef.current;
@@ -423,18 +631,15 @@ export default function Document({
   // Loaded only when PROPERTIES is opened. Altitude 1 must not pay for altitude 2: opening a
   // record is one GET, and the relation lists are a click away by construction.
   React.useEffect(() => {
-    if (!propsOpen) return;
+    // The header rows under the title are editable from the first paint, so their pickers are
+    // needed as soon as the schema is known — not only once Details is opened.
     let cancelled = false;
-    const rels = (schema?.fields || []).filter(f => f.type === 'relation' && f.target);
     const actors = (schema?.fields || []).filter(f => f.type === 'actor');
     (async () => {
       const next = {};
-      await Promise.all(rels.map(async f => {
-        try {
-          const r = await api.documents(f.target, '');
-          next[f.key] = (r.rows || r.documents || []).map(x => ({ value: x.slug || x.id, label: x.title || x.slug }));
-        } catch { /* a picker that cannot load falls back to typing a slug — never to nothing */ }
-      }));
+      // Relation pickers load their own names (RelationPicker.jsx → recordNames.js), from the WHOLE
+      // target collection. This used to ask for the target's first saved view, so a company outside
+      // that view's filter could not be linked at all.
       if (actors.length) {
         try {
           const r = await api.assistants();
@@ -445,7 +650,7 @@ export default function Document({
       if (!cancelled && Object.keys(next).length) setOptions(o => ({ ...o, ...next }));
     })();
     return () => { cancelled = true; };
-  }, [propsOpen, schema, actor]);
+  }, [schema, actor]);
 
   // ── raw ─────────────────────────────────────────────────────────────────────────────────────
   React.useEffect(() => {
@@ -471,7 +676,7 @@ export default function Document({
       if (editable(e.target)) return;
       if (e.key === 'p' || e.key === 'P') {
         e.preventDefault();
-        setPropsOpen(v => !v);
+        setPanel(v => (v === 'details' ? null : 'details'));
         return;
       }
       if ((e.key === 'a' || e.key === 'A') && nextStage) {
@@ -487,10 +692,69 @@ export default function Document({
     return () => window.removeEventListener('keydown', onKey);
   }, [schema?.id, flush, nextStage, promote]);
 
-  const toggleProps = () => setPropsOpen(v => !v);
+  // ── pictures ────────────────────────────────────────────────────────────────────────────────
+  // A file chosen or dropped is stored once, by its content (`POST /api/files/attach` →
+  // files/<sha256>.<ext>), and then the RECORD is changed through the same `queue` as any other
+  // property. Which field takes it: the collection's picture field. If that field holds one file
+  // and already has one, it is made a field that holds several — a person who adds a second
+  // picture has just said this kind of thing can have more than one.
+  const [attaching, setAttaching] = React.useState(false);
+  const fileInput = React.useRef(null);
+  const addFiles = async list => {
+    const files = [...(list || [])];
+    const fields = (schema?.fields || []).filter(f => f.type === 'file');
+    const target = fields.find(f => f.primary_media) || fields[0];
+    if (!files.length || !target) return;
+    setAttaching(true); setSaveError(null);
+    try {
+      const paths = [];
+      for (const file of files) {
+        const res = await fetch('/api/files/attach?name=' + encodeURIComponent(file.name || 'file') + '&actor=' + encodeURIComponent(actor),
+          { method: 'POST', headers: { 'Content-Type': file.type || 'application/octet-stream' }, body: file });
+        const out = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(out.error || 'That file could not be added.');
+        paths.push(out.path);
+      }
+      const have = [].concat(dataRef.current[target.key] ?? []).filter(hasValue);
+      const all = [...have, ...paths.filter(p => !have.includes(p))];
+      if (!target.many && all.length > 1) {
+        await updateField(schema.id, target.key, { many: true }, actor);
+        if (onSchemaChanged) await onSchemaChanged();
+      }
+      queue(target.key, target.many || all.length > 1 ? all : all[0]);
+    } catch (e) { setSaveError(e.message); }
+    finally { if (aliveRef.current) setAttaching(false); }
+  };
+  const removeMedia = item => {
+    const have = [].concat(dataRef.current[item.field] ?? []).filter(hasValue);
+    const next = have.filter((_, i) => i !== item.index);
+    const field = (schema?.fields || []).find(f => f.key === item.field);
+    queue(item.field, field && field.many ? next : (next[0] ?? null));
+  };
+  const canAttach = !!schema && (schema.fields || []).some(f => f.type === 'file');
+  const onDropFiles = e => {
+    if (!canAttach || !e.dataTransfer || !e.dataTransfer.files || !e.dataTransfer.files.length) return;
+    e.preventDefault();
+    addFiles(e.dataTransfer.files);
+  };
+
+  const toggleProps = () => setPanel(v => (v === 'details' ? null : 'details'));
+  const toggleLayout = () => setPanel(v => (v === 'layout' ? null : 'layout'));
+
+  // The server's schema has caught up with what Edit layout changed: drop the draft.
+  React.useEffect(() => { setLayoutDraft(null); }, [schema]);
+  const changeLayout = async patch => {
+    if (!schema) return;
+    setLayoutError(null);
+    setLayoutDraft(d => ({ ...(d || {}), ...patch }));
+    try {
+      await collectionsApi.setMeta(schema.id, patch, actor);
+      if (onSchemaChanged) await onSchemaChanged();
+    } catch (e) { setLayoutDraft(null); setLayoutError(e.message); }
+  };
 
   // Opening another record must not leave the previous one's reason strip armed over it.
-  React.useEffect(() => { setArchiving(null); setArchiveError(null); setAddingProperty(false); }, [path]);
+  React.useEffect(() => { setArchiving(null); setArchiveError(null); setAddingProperty(false); setViewer(null); }, [path]);
 
   // The ONE removal in the app. `records.mjs` refuses a reasonless archive with a 400 that names
   // the five, so the picker is not politeness — sending nothing would simply fail. The pending
@@ -536,8 +800,75 @@ export default function Document({
     ? ['source_task', 'source_cycle', 'result_hash', 'assistant', 'goal_id', 'project', 'universe']
     : ['source_task', 'source_cycle', 'result_hash'];
 
-  const beginEdit = () => { setEditing(true); setBodyOpen(true); };
-  const finishEdit = async () => { await flush(); setEditing(false); };
+  // The collection as it should be DRAWN: the saved schema, with any layout choice still on its
+  // way to the server applied on top (a `null` there means "back to the default").
+  const shape = !schema ? null : !layoutDraft ? schema
+    : Object.fromEntries(Object.entries({ ...schema, ...layoutDraft }).filter(([, v]) => v !== null));
+  const page = pageOf(shape);
+
+  // Long text fields (a prompt, a brief) get their own blocks on the page. The ones with text, and
+  // the ones somebody has asked to write, are open; the rest are one small button each, so an
+  // empty "Generated prompt" does not sit on every record as a blank box.
+  const media = recordMedia(schema, data);
+  const longFields = longTextFields(schema);
+  const textBlocks = longFields.filter(f => hasValue(data[f.key]) || openText.includes(f.key));
+  const emptyText = longFields.filter(f => !textBlocks.includes(f));
+  const detailOmit = [...(primary ? [primary.key] : []), ...longFields.map(f => f.key)];
+  const slug = String(path || '').split('/').pop().replace(/\.md$/, '');
+
+  // The picture leaves the flow when the layout gives it its own place.
+  const showMedia = page.sections.includes('media');
+  const hasMedia = media.length > 0 && showMedia;
+  const beside = page.layout === 'side' && hasMedia;
+  const small = page.layout === 'compact' && hasMedia;
+  // In its own column or as a thumbnail the picture is sized by that place; on top, by the
+  // collection's chosen size.
+  const mediaEl = media.length || canAttach ? (
+    <RecordMedia items={media} title={title} style={small ? 'lead' : page.media}
+      maxHeight={beside || small ? null : PAGE_MEDIA_PX[page.mediaSize]}
+      onView={setViewer} onOpenPath={onOpenPath} busy={attaching}
+      onAdd={canAttach && !small ? () => fileInput.current && fileInput.current.click() : null}
+      onRemove={small ? null : removeMedia} />
+  ) : null;
+
+  const part = {
+    properties: schema ? (
+      <RecordHeader key="properties" schema={shape} data={data} options={options} onChange={queue} onFollow={onOpen}
+        onShowAll={() => setPanel('details')} onPick={(field, value) => setPeek({ field, value })} />
+    ) : null,
+    media: beside || small ? null : (mediaEl ? <React.Fragment key="media">{mediaEl}</React.Fragment> : null),
+    text: textBlocks.length || emptyText.length ? (
+      <div key="text" className="recordTexts">
+        {textBlocks.map(f => (
+          <TextBlock key={f.key} field={f} value={data[f.key]} open={page.text === 'open'} onChange={v => queue(f.key, v)} />
+        ))}
+        {emptyText.length ? (
+          <div className="recordTextAdd">
+            {emptyText.map(f => (
+              <button key={f.key} type="button" className="recordTextAddBtn hBd" onClick={() => setOpenText(o => [...o, f.key])}>
+                + {propertyLabel(f)}
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    ) : null,
+    note: (
+      <div key="note" className="documentBody">
+        <RichEditor key={path} value={body} onChange={queueBody} minHeight={160}
+          placeholder="Write here. Type / for headings, lists, tables and more." />
+      </div>
+    ),
+    // What belongs to this record: its sub-collections (docs/02_DATA_MODEL.md §4).
+    children: schema ? (
+      <Subtables key="children" collection={schema} collections={collections} slug={slug}
+        actor={actor} onOpenPath={onOpenPath} onOpen={onOpen} refreshKey={savedProps} />
+    ) : null,
+  };
+  // A document that is in no collection (a goal, me.md) has no layout to customize: it is its
+  // title and its note, with everything else in Details.
+  const flow = schema ? page.sections.map(s => part[s]) : [part.note];
+  const widthPx = PAGE_WIDTH_PX[page.width];
 
   return (
     <div className="documentSurface">
@@ -548,10 +879,24 @@ export default function Document({
             <span className="documentCollection">{schema?.label || (kind && kind !== 'other' ? kind : 'Note')}</span>
           </div>
           <div className="documentToolbarGroup">
-            {editing || save !== 'saved' ? <span role="status" title={saveError || 'Changes save automatically'} style={{ fontSize: 11, color: look.colour }}>{saveText}</span> : null}
-            <Btn variant="ghost" size="sm" onClick={() => setMode(v => v === 'raw' ? 'editor' : 'raw')} aria-pressed={mode === 'raw'}>{mode === 'raw' ? 'Note' : 'Raw'}</Btn>
-            <Btn variant="ghost" size="sm" onClick={toggleProps} aria-expanded={propsOpen}>Details</Btn>
-            <Btn variant="secondary" size="sm" onClick={editing ? finishEdit : beginEdit}>{editing ? 'Finish editing' : 'Edit note'}</Btn>
+            <span role="status" className="documentSaveState" title={saveError || 'Everything you type is saved automatically'} style={{ color: look.colour }}>{saveText}</span>
+            {/* What installed plugins can do with this record ("Create invoice" on a deal). Renders
+                nothing when no plugin has an action for this collection. */}
+            {schema ? <RecordActions collection={schema.id} path={path} actor={actor} onOpenPath={onOpenPath} /> : null}
+            {/* Ask the connected AI about this record. What it proposes is applied through the same
+                queue as anything typed, so it autosaves, shows in history and can be undone by hand. */}
+            <AskAI path={path} schema={schema} data={data} disabled={mode === 'raw'}
+              onApply={(fields, bodyAppend) => {
+                for (const [key, value] of Object.entries(fields || {})) queue(key, value);
+                if (bodyAppend) queueBody((bodyRef.current ? bodyRef.current.replace(/\s+$/, '') + '\n\n' : '') + bodyAppend);
+              }} />
+            <Btn variant="ghost" size="sm" onClick={() => setMode(v => v === 'raw' ? 'editor' : 'raw')} aria-pressed={mode === 'raw'}
+              title="The Markdown file behind this page">{mode === 'raw' ? 'Back to page' : 'Source'}</Btn>
+            <Btn variant="ghost" size="sm" onClick={toggleProps} aria-expanded={propsOpen} title="Every property, the history and the links (P)">Details</Btn>
+            {schema ? (
+              <Btn variant="secondary" size="sm" onClick={toggleLayout} aria-expanded={panel === 'layout'}
+                title={'Change how every ' + (schema.label || schema.id) + ' record is laid out'}>Edit layout</Btn>
+            ) : null}
           </div>
         </div>
       {/* The reason strip — the same shape as NOT SAVED below, and the same five reasons the
@@ -560,13 +905,13 @@ export default function Document({
           leave a fifth-reason picker behind on this screen. */}
       {archiving ? (
         <div style={{ ...sx('flex:none;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:9px 22px'), background: 'var(--surface-2)', borderBottom: '1px solid var(--border)', borderLeft: '2px solid var(--danger)' }}>
-          <span style={{ ...mono('font-size:9px;font-weight:700;letter-spacing:.14em;white-space:nowrap'), color: 'var(--danger)' }}>ARCHIVE — WHY?</span>
+          <span style={{ ...mono('font-size:var(--t-label);font-weight:700;letter-spacing:.14em;white-space:nowrap'), color: 'var(--danger)' }}>ARCHIVE — WHY?</span>
           {REJECT_REASONS.map(r => (
             <Btn key={r.id} variant="secondary" size="sm" disabled={archiving === 'busy'} onClick={() => archive(r.id)}>
               {r.label}
             </Btn>
           ))}
-          <span style={{ ...sx('flex:1;min-width:0;font-size:11px'), color: archiveError ? 'var(--danger)' : 'var(--fg-faint)' }}>
+          <span style={{ ...sx('flex:1;min-width:0;font-size:var(--t-data)'), color: archiveError ? 'var(--danger)' : 'var(--fg-faint)' }}>
             {archiveError || 'It stays on disk with the reason attached, and the reason moves the source’s score.'}
           </span>
           <Btn variant="ghost" size="sm" disabled={archiving === 'busy'} onClick={() => { setArchiving(null); setArchiveError(null); }}>Cancel</Btn>
@@ -579,53 +924,52 @@ export default function Document({
 
       {saveError && !conflict ? (
         <div style={{ ...sx('flex:none;display:flex;align-items:center;gap:12px;padding:9px 22px'), background: 'var(--surface-2)', borderBottom: '1px solid var(--border)', borderLeft: '2px solid var(--danger)' }}>
-          <span style={{ ...mono('font-size:9px;font-weight:700;letter-spacing:.14em'), color: 'var(--danger)' }}>NOT SAVED</span>
-          <span style={{ ...sx('flex:1;min-width:0;font-size:11.5px'), color: 'var(--fg-muted)' }}>{saveError}</span>
+          <span style={{ ...mono('font-size:var(--t-label);font-weight:700;letter-spacing:.14em'), color: 'var(--danger)' }}>NOT SAVED</span>
+          <span style={{ ...sx('flex:1;min-width:0;font-size:var(--t-small)'), color: 'var(--fg-muted)' }}>{saveError}</span>
           <Btn variant="ghost" size="sm" onClick={() => flush()}>Try again</Btn>
         </div>
       ) : null}
 
-
         <div className="documentScroll">
-          <article className="documentPage" aria-label="Note">
-            <header className="documentHeading">
-              <h1>{primary && editing
-                ? <InlineEdit value={title} placeholder="Untitled" onCommit={v => queue(primary.key, v)} title="Click to rename" />
-                : title}</h1>
-              <div className="documentByline">
-                {writer ? <span>{writer}</span> : null}
-                {when ? <Freshness value={when} /> : null}
-                {gateValue ? <Cell field={gate} value={gateValue} /> : null}
-                {num ? <span>{num.label || num.key}: <Cell field={num} value={data[num.key]} /></span> : null}
-                {data.proposed && !gateValue ? <span>Needs review</span> : null}
-                {flags?.quarantined ? <span style={{ color: 'var(--danger)' }}>Quarantined · excluded from counts</span> : null}
-                {flags?.agentPromotion ? <span style={{ color: 'var(--warn)' }}>Agent promotion ignored</span> : null}
-                {nextStage ? <Btn variant="primary" size="sm" onClick={() => promote(nextStage)}>{String(nextStage).replace(/-/g, ' ')} <span style={{ opacity: .55 }}>A</span></Btn> : null}
-              </div>
-            </header>
+          <article className={'documentPage recordPage-' + page.layout + (beside ? ' hasSide' : '')} aria-label="Record"
+            style={{ maxWidth: widthPx == null ? 'none' : widthPx }}
+            onDragOver={e => { if (canAttach && e.dataTransfer && [...(e.dataTransfer.types || [])].includes('Files')) e.preventDefault(); }}
+            onDrop={onDropFiles}>
+            <input ref={fileInput} type="file" multiple hidden accept="image/*,video/*,audio/*,application/pdf"
+              onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />
+            {beside ? <aside className="recordSide">{mediaEl}</aside> : null}
+            <div className="recordFlow">
+              <header className="documentHeading">
+                <div className="recordTitleRow">
+                 <div className="recordTitleMain">
+                  <h1>{primary
+                    ? <InlineEdit value={title} placeholder="Untitled" onCommit={v => queue(primary.key, v)} title="Click to rename" />
+                    : title}</h1>
+                <div className="documentByline">
+                  {writer ? <span>{writer}</span> : null}
+                  {when ? <Freshness value={when} /> : null}
+                  {data.proposed && !gateValue ? <span>Needs review</span> : null}
+                  {flags?.quarantined ? <span style={{ color: 'var(--danger)' }}>Quarantined · excluded from counts</span> : null}
+                  {flags?.agentPromotion ? <span style={{ color: 'var(--warn)' }}>Agent promotion ignored</span> : null}
+                  {nextStage ? <Btn variant="primary" size="sm" onClick={() => promote(nextStage)}>{String(nextStage).replace(/-/g, ' ')} <span style={{ opacity: .55 }}>A</span></Btn> : null}
+                </div>
+                 </div>
+                 {small ? <div className="recordThumbs">{mediaEl}</div> : null}
+                </div>
+              </header>
 
-            {mode === 'raw' ? (
-              <div className="documentRaw">
-                <p>{editing ? 'Markdown · changes save automatically' : 'Markdown source'} </p>
-                <MarkdownSourceEditor value={body} onChange={queueBody} readOnly={!editing} />
-                <details>
-                  <summary>{raw?.source === 'disk' ? 'Full file on disk' : 'Reconstructed file'}</summary>
-                  <div className="documentFilePath">{path}</div>
-                  <pre>{raw?.text || ''}</pre>
-                </details>
-              </div>
-            ) : bodyOpen ? (
-              <div className="documentBody">
-                <RichEditor key={path} value={body} onChange={queueBody} readOnly={!editing}
-                  minHeight={260} placeholder="Write the part a human would want to read." />
-                {!editing ? <Btn variant="ghost" size="sm" onClick={() => setBodyOpen(false)} style={{ marginTop: 24 }}>Show less ↑</Btn> : null}
-              </div>
-            ) : (
-              <div className="documentPreview">
-                {summary ? <Markdown text={summary} /> : <p style={{ color: 'var(--fg-faint)' }}>No note yet.</p>}
-                <Btn variant="secondary" size="sm" onClick={() => setBodyOpen(true)}>Read note ↓</Btn>
-              </div>
-            )}
+              {mode === 'raw' ? (
+                <div className="documentRaw">
+                  <p>Markdown source of the note · changes save automatically</p>
+                  <MarkdownSourceEditor value={body} onChange={queueBody} />
+                  <details>
+                    <summary>{raw?.source === 'disk' ? 'Full file on disk' : 'Reconstructed file'}</summary>
+                    <div className="documentFilePath">{path}</div>
+                    <pre>{raw?.text || ''}</pre>
+                  </details>
+                </div>
+              ) : flow}
+            </div>
           </article>
         </div>
       </div>
@@ -635,13 +979,23 @@ export default function Document({
         onOpen={onOpen} onOpenPath={onOpenPath} onOpenBoard={onOpenBoard}
         properties={<>
           <PropertyRows collection={schema} values={data} onChange={queue} onFollow={onOpen}
-            options={options} variant="inspector" showAuto hideEmpty={false} omit={primary ? [primary.key] : []}
+            onPick={schema ? (field, value) => setPeek({ field, value }) : undefined}
+            options={options} variant="inspector" showAuto hideEmpty={false} omit={detailOmit}
             technicalKeys={technicalKeys}
             onAddProperty={onFieldAdded && schema ? () => setAddingProperty(true) : undefined}
             addComposer={addingProperty && schema ? <AddField collection={schema} actor={actor}
               onCancel={() => setAddingProperty(false)} onDone={f => { setAddingProperty(false); onFieldAdded(f); }} /> : null} />
           {onArchived && canArchive ? <Btn variant="ghost" size="sm" onClick={() => setArchiving('picking')} disabled={archiving === 'busy'} style={{ marginTop: 16 }}>Archive note…</Btn> : null}
         </>} /> : null}
+      {panel === 'layout' && shape ? (
+        <PageLayout schema={shape} onChange={changeLayout} onClose={() => setPanel(null)} error={layoutError} />
+      ) : null}
+      {peek && schema ? (
+        <RecordPeek collection={schema} field={peek.field} value={peek.value} currentPath={path}
+          onOpenPath={onOpenPath} onBrowse={onBrowse} onClose={() => setPeek(null)} />
+      ) : null}
+      {viewer ? <RenderLightbox src={viewer.src} kind="image" title={viewer.label} keyboard autoPlay={false}
+        onClose={() => setViewer(null)} /> : null}
     </div>
   );
 }

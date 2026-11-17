@@ -52,6 +52,8 @@ export const INDEX_CAPABILITIES = [
   { route: 'POST /api/records/upsert', what: 'submit one finding; read the verdict store · update · merge · skip. A store raises the DECIDE card for you — do not post a finding card as well.' },
   { route: 'POST /api/records/batch', what: '20-50 findings in one call. Use this when sweeping.' },
   { route: 'POST /api/records/move', what: 'move a record. Only as far as shortlist — further is 403.' },
+  { route: 'GET /api/scout/board/:id/describe', what: 'the project whiteboard in words: the records on it, the relations between them, the texts and shapes, and every arrow a person drew as "A → B: label".' },
+  { route: 'GET /api/automations', what: 'the rules a person set: when a record is created or a field becomes a value, file one new record. Read them before doing by hand what a rule already does. POST proposes one — it arrives switched off; only a person turns it on.' },
   { route: 'GET /api/territory', what: 'where you may work, with hit rates and how stale each one is.' },
   { route: 'PATCH /api/territory/:id', what: 'facts you may write yourself: last_swept, access, rules, posted[].' },
   { route: 'GET /api/playbook/:id', what: 'one playbook body — only the ones the context named.' },

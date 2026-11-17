@@ -33,7 +33,7 @@ import { registerUserToolRoutes } from './userTools.mjs';
 import { search as structuredSearch } from './search.mjs';
 import { registerFeedbackRoutes, installLogRing, recordApiCall, flushOutbox } from './feedback.mjs';
 import { listCollections, getCollection, saveCollection, addField, FIELD_TYPE_NAMES } from './collections.mjs';
-import { documentsFor, documentAt, collectionsOf, allDocuments, referencesTo, viewFor } from './documents.mjs';
+import { documentsFor, documentAt, collectionsOf, allDocuments, referencesTo, viewFor, viewCounts } from './documents.mjs';
 import { listViews, getView, saveView, deleteView, applyView, defaultView } from './views.mjs';
 // ── Scout's own spine (M2–M5) ────────────────────────────────────────────────────────────────
 // Each of these owns its routes and mounts them through a registerXRoutes(app, deps) call below,
@@ -51,6 +51,10 @@ import { registerInboxRoutes, startInboxWatch, ensureInbox, refreshAgentFiles } 
 import { registerDispatchRoutes, startScheduler, stopScheduler, stopAll as stopAllRuns } from './dispatch.mjs';
 import { registerTodayRoutes } from './today.mjs';
 import { registerOpsgraphRoutes } from './opsgraphImport.mjs';
+import { registerSchemaRoutes } from './schemaRoutes.mjs';
+import { registerCollectionRoutes } from './collectionRoutes.mjs';
+import { registerPluginRoutes } from './pluginRoutes.mjs';
+import { registerConnectorRoutes } from './connectorRoutes.mjs';
 import { registerDeliveryRoutes } from './delivery.mjs';
 import { registerWidgetRoutes } from './widgets.mjs';
 import { registerWorkerScope } from './workerScope.mjs';
@@ -222,6 +226,10 @@ registerDispatchRoutes(app, { logEvent });
 // The Today loop — the chat+plan surface, the clock, the brain calls (docs/09_TODAY_LOOP.md).
 registerTodayRoutes(app, { logEvent });
 registerOpsgraphRoutes(app);
+registerSchemaRoutes(app);       // rename · retype · remove a property (collections.mjs is still the only writer)
+registerCollectionRoutes(app);   // create a collection · its label, colour and sub-collections
+registerPluginRoutes(app);       // skills as records · plugins (small apps that act on records)
+registerConnectorRoutes(app);    // connect outside agents (MCP config) · ask AI about a record
 registerDeliveryRoutes(app);
 registerWidgetRoutes(app);
 registerPaperclipRoutes(app);
@@ -348,10 +356,14 @@ app.get('/api/collections/:id/documents', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get('/api/views/:collection', (req, res) => {
+// `?counts=1` adds `{ counts: { viewId: n }, total }` — every tab's count from one read of the store
+// (documents.mjs `viewCounts`), so the app never has to fetch a view's rows just to count them.
+app.get('/api/views/:collection', async (req, res) => {
   const found = listViews(req.params.collection);
   if (!found) return res.status(404).json({ error: 'no collection "' + req.params.collection + '"' });
-  res.json(found);
+  if (!req.query.counts) return res.json(found);
+  try { res.json({ ...found, ...((await viewCounts(req.params.collection)) || {}) }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.put('/api/views/:collection', (req, res) => {
@@ -1041,6 +1053,9 @@ if (IS_MAIN) {
   // Without an 'error' listener an occupied port kills the process with a raw unhandled
   // EADDRINUSE stack — the usual cause being a previous instance that never shut down.
   const server = app.listen(PORT, HOST, () => {
+    // Read the workspace once, off the request path: the first screen then finds every file
+    // already parsed (documents.mjs parse cache) instead of paying for a thousand of them.
+    setTimeout(() => { try { allDocuments(); } catch { /* an unreadable workspace is reported by the routes */ } }, 30);
     // The BOUND port is the truth — an ephemeral bind (port 0) means the Index would otherwise
     // hand every agent an api base nothing listens on.
     setSelfPort(server.address().port);

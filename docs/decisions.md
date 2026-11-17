@@ -1274,3 +1274,289 @@ inline artifact opens its full body immediately. Expanding replaces the summary,
 there is only one copy of the content. Read mode uses the existing RichEditor with
 editing disabled; Edit note enables its existing toolbar, autosave and conflict path.
 Raw remains available directly. Palette tokens and source Markdown are unchanged.
+
+## Reference library import, attachments and the gallery (2026-11-17)
+
+At the owner's request, an Airtable table of reference images and prompts is imported as the
+`references` collection (`backend/referenceImport.mjs`, `scripts/import-references.mjs`). It
+follows `opsgraphImport.mjs`: a read-only snapshot, a hashed preview, the canonical writer,
+stable ids and provenance. The source is passed in as data, so the module holds no Airtable
+token and has no way to write there.
+
+**`files/` finally has a writer.** `02_DATA_MODEL.md` has said since M1 that a `file` value is
+content-addressed by sha256 under `files/`, and nothing wrote that folder. `backend/attachments.mjs`
+`storeAttachment` is that writer: `files/<sha256><ext>`, tmp + rename, an existing file is reused
+and never replaced. A record stores the workspace-relative path (`files/ab12….jpg`), which is
+what `GalleryView.mediaSrc` already resolved. `cells.jsx` `FileEditor` still assumes a bare
+filename under `files/`; that mismatch predates this change and is left for its own fix.
+
+**`references` joins the id-is-identity list in `records.mjs`.** Its titles are descriptions
+that repeat across different images, so the name near-match would fold two references into one
+file. Identity is the Airtable record id (`airtable_id`), looked up before any write.
+
+**Re-import never overwrites.** The writer only fills empty fields, so a prompt edited in
+Airtable later does not replace the local one. A missing image is the one thing a second run
+repairs. Base and table ids are recorded once, on the collection, not on every record.
+
+**Search reads `prompt` and `signature`.** `search.mjs` indexes "only the values a person would
+search by"; for a reference that is the words of its prompt.
+
+**Type roles are tokens.** `--t-label` 11 · `--t-data` 12 · `--t-small` 13 · `--t-body` 14 ·
+`--t-lead` 16 in `:root`. Only the gallery tiles and long read-only property values use them so
+far. The owner asked for body text of at least 14px for screen recordings, which is larger than
+the 11–13px register `DESIGN.md` describes; carrying the roles through the other screens is a
+change to that register and waits for the owner's go-ahead.
+
+**The gallery shows the whole image.** Tiles are square with `object-fit: contain`. The library
+mixes portrait ads and 16:9 thumbnails, so any single crop removes the headline from about half
+of them. Tile size follows the view's existing density setting, which the gallery had ignored.
+
+## Flexible views, resizable panels and the record page (2026-11-17)
+
+The owner tried the polished gallery and asked for a more flexible system, modelled on the Tray
+app, and lifted the earlier limits ("feel free to change everything"). This replaces the
+gallery-only scope recorded above.
+
+**One set of display keys on the saved view** (`size`, `fields`, `cover`, `fit`, `summary`,
+`wrap`, `group`, `widths`; `docs/02_DATA_MODEL.md` §3). `frontend/viewDisplay.js` is the only
+reader. The table, list, board and cards all take what they show from it, so choosing properties
+or a size works the same in every layout and an agent can set the same keys in the JSON.
+`view.card.fields` and `density` are still read so older view files look as they did; the
+controls write `fields` and `size`.
+
+**The view bar is two rows of single-purpose controls** (tabs and layout; then Filter, Sort,
+Group, Properties, Picture, size, count), following Tray's layout switcher and query bar. Tray
+has no size control, no column resize and no resizable panels; those are additions here because
+the owner asked for them. The read-only QUERY strip is gone: sort and filter state now reads on
+the controls themselves, and the collection's path is the count's tooltip.
+
+**Display changes do not refetch.** A change that leaves filter and sort alone is applied at once
+and written behind the paint. Tab counts come from one server pass (`viewCounts`), not from
+fetching every view's rows. Opening a 1,169-record collection went from 3.2s of blank pane to
+under a second, with a named loading state in between.
+
+**Size is per view, not a global zoom.** CSS `zoom` on the app root was tried and works for
+layout, but it breaks every place that positions with pointer coordinates (the whiteboard, context
+menus, the editor's floating handles). Typed cells are scaled as a unit with `zoom` on their small
+wrappers instead, where no pointer maths happens.
+
+**Panel widths are per machine** (`localStorage`, `PanelSplitter.jsx`), not vault data. The rail
+folds with Cmd-backslash.
+
+**The record page shows the record.** Media first, then long text fields as readable blocks with
+Copy, then the note (`Document.jsx`). Long text and the name are omitted from the side panel so
+nothing shows twice. A file value is a workspace-relative path everywhere now (`media.js`
+`mediaPath`), which fixes the editor that assumed a bare filename.
+
+**Imported analysis is readable Markdown**, not fenced JSON. The prompt stays word for word; the
+analysis is a note a person reads.
+
+**Stored attachments are cached for good.** `files/<sha256>.<ext>` cannot change under its name,
+so `GET /api/files/raw` marks it immutable. Other workspace files are revalidated as before.
+
+
+
+## Everything is a thing: properties, tags, collections, sub-collections (2026-11-17)
+
+The owner asked to add, change and delete properties from the table and list, for clickable
+tags, for collections shown with coloured dots instead of a hashtag, and for sub-collections
+("company -> person"). The model, as built:
+
+- **A collection is a kind of thing.** It is shown by its label with a coloured dot. A person can
+  create one by hand (`POST /api/collections/create`); an agent still proposes one on a card.
+- **A property belongs to a collection** and is edited where it is seen: the table header, the
+  Properties menu, a trailing `+` column. Renaming changes the `label`, never the key, so no
+  document is rewritten. Removing a property removes it from the schema and from saved views;
+  the values stay in the files and still show on each record (Law 5, Law 8).
+- **A tag is a value you can click.** Clicking a tag or a choice narrows the view (a draft, applied
+  to the rows already loaded); "Save as view" turns the draft into an ordinary saved view. There
+  is no second filter engine: the draft uses the two comparisons the server's filter has.
+- **A sub-collection is the inverse side of a relation**, using the `subtables` key the data model
+  already defined: the child carries a relation to the parent, the parent lists the child. The
+  sidebar nests it, the parent record's page lists its children and can add one with the relation
+  filled in. Nothing new is stored.
+- **Eight hue tokens** (`--hue-*`) identify collections. They are a new channel, added at the
+  owner's request: never interactive, never status. A collection created in the app is given the
+  least-used hue and it is written into the schema; an older collection without one gets a
+  stable pick from its id.
+- **Values are editable in the details panel** beside any layout, through the one record route.
+  Long text stays read-only there and is edited on the record's page.
+
+Humans change schemas directly (they are the ones who dispose); agents get 403 on these routes
+and go through proposal cards, as before.
+
+## Speed with a thousand records (2026-11-17)
+
+The owner reported the app as "super slow" with the 1,169-record library loaded. Measured causes
+and what was done:
+
+- **Every request re-read and re-parsed every Markdown file.** `allDocuments()` now keeps what a
+  file said, keyed by its stat (mtime, size, inode), and parses it again only when that changes.
+  `store.writeMd` tells the cache when it replaces a file. The files are still the only truth;
+  emptying the cache changes nothing. Routes went from 0.3 to 1.5 s each to 10 to 130 ms.
+- **`computed.json` was rewritten on every read with every field of every record.** It now holds
+  derived values only and is written when they change.
+- **Search read every schema once per document.** It reads them once.
+- **The browser drew every row at once.** Lists, tables and cards draw a screenful and add more as
+  the end comes near (`useIncremental.jsx`). The count and the scrollbar still describe the whole
+  view.
+
+In the running app, opening the library went from 3.2 s to about 0.4 s; switching layout or
+selecting a row takes roughly 60 to 130 ms. Not done, and the next step if a workspace grows
+past a few thousand records: serving rows in pages from the server instead of sending the whole
+view (Baserow's approach), and windowing that also removes rows above the viewport.
+
+## The record page is one live document, laid out per collection (2026-11-17)
+
+This reverses "Calmer note presentation (2026-10-02)" at the owner's request. They found the
+read-first page "too stiff, too rigid, not clear" and asked to write immediately and to be able
+to customize the layout for a whole collection.
+
+- **No modes.** The page opens ready to write on: the title is a field, the note is the editor,
+  long text fields are text areas, and everything autosaves through the same save, conflict and
+  provenance path as before. "Edit note", "Finish editing" and "Read note" are gone. Source (the
+  Markdown) stays as a toggle.
+- **Edit layout sits where Edit note was.** It edits the collection, not the record:
+  `page` (`layout` stack/side/compact, `width`, `media` lead/grid/strip, `mediaSize`, `text`
+  folded/open, `sections` shown and their order) and `header` (the properties under the title).
+  `shared/recordPage.mjs` holds the keys, defaults and validation for both the server and the
+  page; `PATCH /api/collections/:id/meta` stores them, human-only. Every record of the collection
+  follows at once, and an agent can read or set the same keys in the collection file.
+- **Key properties are on the page.** The collection's short fields (choices, tags, relations,
+  dates, scored numbers) show under the title and are editable there. Long text and pictures get
+  their own blocks; everything else stays in Details.
+- **Several pictures per record.** Dropping or choosing a file stores it once by content
+  (`POST /api/files/attach` → `attachments.mjs`) and then changes the record through the ordinary
+  record route. Adding a second picture to a single-file field makes it a field that holds
+  several — a schema change the person just asked for by doing it. Removing a picture takes it
+  off the record; the file stays in `files/` (Law 5).
+- **Long text is one surface**, not a bordered box inside a card, and starts folded to a readable
+  height when it is long.
+
+Not done: images dropped INTO the note body, and `@` links to other records. Both need a new
+editor extension and a Markdown round-trip test first.
+
+## Browsing from a record: a value opens the others that share it (2026-11-17)
+
+Owner: "if I click on tags they disappear… I want a pop-up so I can see the other images, then
+open it as a new tab or full page."
+
+- **The bug.** In the properties card each tag was one button titled "Remove", so a click to look
+  at a tag deleted it. A tag is now two buttons: the name browses, only the × removes.
+- **RecordPeek.** A click on a tag or a choice — in the folded line or the open card — opens a
+  window over the record with every record of the collection that carries that value, as cards
+  (when the collection has pictures) or a list. It reuses `GalleryView` / `ListView` with a
+  temporary, never-saved view and `viewDisplay.applyQuick`; there is no second card component.
+  A tag on a card inside the window re-aims the window, so browsing continues without closing it.
+- **Where things open** is one remembered choice (`scout.peek.where`): here, or in a new tab.
+  It applies to a single record and to "Open as page", which takes the whole set to the
+  collection screen as an ordinary quick filter (droppable, saveable as a view).
+- **By address.** `#open=<path>` opens one record and `#browse=<collection>/<field>/<value>` a
+  set; `App.boot` reads them once. In the desktop app a link back to the app's own origin opens
+  another app window (`desktop/main.cjs`); every other http link still goes to the system browser.
+- **Relations are unchanged**: a relation chip still follows to the record it points at, whose
+  page already lists everything pointing back.
+- **Chip type.** The clickable-chip style carried `font:inherit` and was spread after the chip's
+  own style, so a clickable tag lost its size and mono family. Fixed in `cells.jsx`.
+
+## A link shows the record's name and is a way in (2026-11-17)
+
+Owner, looking at People grouped by company: "linking records is not working". Three things
+were wrong, all the same mistake — the slug treated as something a person reads.
+
+- **Names, not slugs.** A relation still stores a slug on disk (stable, agent-readable). Every
+  place that shows one — a cell, a chip on a record, a group heading, the picker — now prints the
+  record's title through one cache (`frontend/recordNames.js`, one fetch per target collection,
+  stale-while-refilled after a write, renamed in place when the open record's title changes).
+  Until the title is loaded the slug is shown as a name (`relationNames.js`), so nothing flashes.
+  A slug that names nothing is drawn dashed and says so.
+- **A group heading on a relation is the record.** "Bellwether Trust" above its people has the
+  company's dot and opens the company. Choice headings read like their chip (`Closed won`).
+- **Choosing a link.** The old menu took its choices from the target collection's first saved
+  view (a filtered list), showed 60 with no search, and fell back to typing a slug.
+  `RelationPicker.jsx` reads the whole collection, searches by name, works from the keyboard, and
+  offers "Create X in Companies" — through `POST /api/records/upsert`, so dedupe, provenance and
+  the log apply. Unlinking removes the link, never the record.
+- **Following a link** looks in the collection the link names. It used to try the open
+  collection's rows first, so a slug shared by two collections opened the wrong record.
+
+## Automations v1 (2026-11-17)
+
+A rule is one Markdown file (`automations/<slug>.md`) a person can read as one sentence: "When a
+Deal's stage becomes won → Create invoice (ask me first)". It fires from inside the record writer
+(`records.onRecordWrite`), never from a file watcher, so "a field became a value" is decided from
+the write that changed it and hand edits on disk do not fire. A rule can only file one new
+record: press a plugin button, or create a record from a template. `ask` reuses the Needs-you
+queue as card kind `automation`; `auto` writes in the name of the person who switched the rule
+on, and a change made by an assistant always asks. The rule is named in `via` and stamped on the
+record as `automation:`, not used as the actor, because an unknown actor is an agent by the
+border rule. Each (rule, record, value) fires once, kept as a receipt in `.scout/automations/`; a
+record an automation made fires nothing. Only a person enables, edits or archives a rule; an
+agent's arrives switched off; rules are never deleted. Agents can read the rules
+(`GET /api/automations`, also bound as an MCP tool). No schedule trigger and no "send an
+assistant" action in v1.
+
+Around it: a record's sub-collection lists re-read after a save that changed a property (the
+to-do an automation just filed shows without reopening the deal), and the rail's counts re-read
+shortly after a save (the card it raised shows in Needs you).
+
+## The whiteboard is a place to write, connect and draw (2026-11-17)
+
+Owner: "the whiteboard is too basic — add tools, I can write, I can connect, I can do more."
+Until now a person could make a note, a frame and a picture, and every line came from a record
+relation.
+
+- **A tool rail** with one-key shortcuts: select, hand, text, note, shape, connect, pen, eraser,
+  frame, picture. New node kinds `text`, `shape` and `draw`; notes take the eight hues.
+- **Drawn links are the person's own** and are stored in the board file (`links`), apart from the
+  derived edges, which stay facts read from records. Drag from a dot on any card; dropping on
+  empty board makes a linked note; Tab grows a branch.
+- **Make it real** is one explicit button on a link between two records that could be related.
+  It goes through `records.mjs`, human only, and the drawn link then gives way to the derived
+  edge. It is never done silently, and it clears the board's undo history because the record
+  write is not undoable from the board.
+- **An agent reads the board in words** (`describe`, in the Index and bound as an MCP tool):
+  texts, shapes and every drawn link as "A → B: label". Strokes are only counted.
+- The records list starts closed; open, it covered the board and took the keyboard.
+- Known rough edges: links pass under cards and two between the same pair overlap; notes grow
+  but do not shrink; strokes cannot be resized; frames and strokes cannot be link ends.
+
+## One calmer look for chips, cards, the Details panel and the plugin page (2026-11-17)
+
+Owner, on three screens in a row: "pretty ugly", "also ugly, please redesign", "redesign the cards
+as well — must be nicer for all". The common cause was labels shouting: every choice was an
+outlined pill in bold spaced capitals, every panel led with its mechanics.
+
+- **The chip.** `StatusChip` is now a tinted chip with a dot in sentence case (`Lead`, `Food &
+  drink`), one look in tables, lists, cards, records and the panel. A choice with no colour is a
+  neutral chip. This changes the look inherited from FrameForge; the owner asked for it.
+- **Cards of words** (a collection with no picture): name, then the note's opening lines, then
+  the properties pinned to the bottom edge so a row lines up. The title no longer reserves two
+  lines, which left a gap above every summary.
+- **The Details panel.** Leads with where the record lives (collection dot and name), its title
+  and its opening lines. Rows are 34px with 13px labels and 14px values. A number is one field
+  (formatted to read, raw to type) instead of a box plus an echo; "Today" is offered only on an
+  empty date; a single link is one chip whose caret opens the picker (which can remove it)
+  instead of a chip, an × and a "Change" button on two lines. Section headings are readable and
+  empty states are sentences, not capitals.
+- **A plugin's page** shows a live sample of what it makes (drawn from a real record, in a frame
+  that can run nothing), three steps and a Try button; then one calm row per button; and folds
+  the exact reads/writes and the files away. The safety statement is one line at the top.
+
+## A board's columns are any choice field (2026-11-17)
+
+Owner: "how do I change the properties for the board view — on Companies, like on Deals?" They
+could not: a board drew its columns from a `status` field only, so Companies (whose stage, tier
+and industry are plain choices) opened as one unnamed column, and the view bar hid its Group
+control on a board.
+
+- `boardField` accepts any `status` or `select` with options; the default is still the gate, then
+  the first status, then the first choice. The board has its own **Columns** control (saved on the
+  view as `group`, the key it always used).
+- Dragging a card sets the field the columns are drawn from. Only the schema's gate field goes
+  through the move route (the gate and the `move` log entry); any other choice is an ordinary
+  property change through the record route — which also means automations see it.
+- A card shows the properties chosen in **Properties** and nothing else. The line of counts the
+  card worked out itself ("2 all deals · 1 deals · 12 messages") is gone, as are the band labels
+  when no stage declares a band.
+

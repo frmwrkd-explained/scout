@@ -91,6 +91,34 @@ Anything between these is noise, not a decision.
   carries ProjectGenerate's marked-selection band as well as running state, and `--busy`
   would misname half of its call sites. No further blues.
 
+### Collection hues — which collection a thing belongs to
+
+Added 2026-11-17 **at the owner's explicit request** ("instead of a hashtag, coloured dots"), which
+is the request this file requires before any new hue. Eight tokens, a channel of their own:
+
+| Token | Dark | Light |
+|---|---|---|
+| `--hue-red` | `#FF7B72` | `#B4321F` |
+| `--hue-orange` | `#FF9A5C` | `#A34A00` |
+| `--hue-amber` | `#E8C547` | `#7A5C00` |
+| `--hue-green` | `#8FD460` | `#3A7212` |
+| `--hue-teal` | `#3CCFCF` | `#0B7273` |
+| `--hue-blue` | `#8AA4FF` | `#2B5FC7` |
+| `--hue-violet` | `#B197FC` | `#6B46C1` |
+| `--hue-pink` | `#F58BC0` | `#B02A72` |
+
+- **They mean one thing: identity.** A dot beside a collection's name in the rail, on a record's
+  sub-collection heading, in the collection panel. Never "click this" (that is `--accent`), never
+  status (`--ok` / `--warn` / `--danger`), never "in flight" (`--marked`). A hue on a button or a
+  status chip is a bug.
+- **They do not count against the accent budget**, for the same reason status does not: the accent
+  rule is about what asks to be clicked.
+- A collection's hue is its schema's `colour` key, or — when it names none — picked from its id, so
+  every collection has a stable colour without anyone choosing (`frontend/collectionColour.js`).
+- Each clears 4.5:1 on every surface step of its theme (`tests/sub-collections.test.mjs` computes
+  it), so a hue may also colour a short label. Eight and only eight: a ninth collection reuses one,
+  and the name beside the dot is what tells them apart.
+
 ### Light — the second token set, not a second design
 
 `frontend/styles.css` `:root[data-theme="light"]`, mirrored in `frontend/tokens.js` `LIGHT`.
@@ -170,6 +198,19 @@ Display moments (empty states, project headers) may use Schibsted Grotesk at 18�
 weight 500 — the one place type gets room. System/empty states speak in short mono
 uppercase status lines (`NO QUESTIONS — YOUR ASSISTANTS ARE CLEAR`), not friendly
 sentence-case filler.
+
+### Type roles as tokens
+
+`:root` names five type roles: `--t-label` 11px (uppercase mono labels, chips) · `--t-data` 12px
+(mono figures, ids, paths) · `--t-small` 13px (secondary text, long values in a narrow rail) ·
+`--t-body` 14px (what a person reads) · `--t-lead` 16px (the sentence a screen opens with). A
+component asks for a role, never a pixel value. Theme-independent, so the light block does not
+restate them.
+
+**Adoption is partial on purpose.** As of 2026-11-17 only the gallery tiles (`.gallery*`) and long
+read-only property values (`.longText`, `.fileRef*`) read these roles. Every other surface still
+carries the inline sizes the table above describes. Moving the rest of the app onto the roles
+raises its body text from 12–13px to 14px, which is the owner's decision.
 
 ## Radius, spacing, motion
 

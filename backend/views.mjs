@@ -17,6 +17,8 @@ const viewsDir = () => path.join(R(), '.scout', 'views');
 const viewsFile = id => path.join(viewsDir(), safe(id) + '.json');
 
 export const VIEW_TYPES = ['table', 'board', 'list', 'gallery'];
+export const VIEW_SIZES = ['s', 'm', 'l', 'xl'];
+export const VIEW_FITS = ['contain', 'cover'];
 
 class ViewError extends Error {
   constructor(msg) { super(msg); this.status = 400; }
@@ -133,6 +135,29 @@ function validateView(collection, view) {
     if (!known(k)) throw new ViewError('view shows unknown field "' + k + '"');
   }
   if (view.group && !known(view.group)) throw new ViewError('group references unknown field "' + view.group + '"');
+  // The display keys (docs/02_DATA_MODEL.md §3, read by frontend/viewDisplay.js). All optional. A
+  // wrong value is refused here rather than ignored there: a view an agent writes with
+  // `size: "huge"` should hear so, not quietly render at the default.
+  if (view.size !== undefined && view.size !== null && !VIEW_SIZES.includes(view.size)) {
+    throw new ViewError('view size "' + view.size + '" is not one of ' + VIEW_SIZES.join(' · '));
+  }
+  if (view.fit !== undefined && view.fit !== null && !VIEW_FITS.includes(view.fit)) {
+    throw new ViewError('view fit "' + view.fit + '" is not one of ' + VIEW_FITS.join(' · '));
+  }
+  if (view.cover !== undefined && view.cover !== null && view.cover !== false) {
+    const cover = fieldOf(collection, view.cover);
+    if (!cover || cover.type !== 'file') throw new ViewError('cover must name a file field, or be false — "' + view.cover + '" is not one');
+  }
+  for (const key of ['summary', 'wrap']) {
+    if (view[key] !== undefined && view[key] !== null && typeof view[key] !== 'boolean') throw new ViewError(key + ' must be true or false');
+  }
+  if (view.widths !== undefined && view.widths !== null) {
+    if (typeof view.widths !== 'object' || Array.isArray(view.widths)) throw new ViewError('widths must be an object of field → pixels');
+    for (const [k, w] of Object.entries(view.widths)) {
+      if (!known(k)) throw new ViewError('widths references unknown field "' + k + '"');
+      if (!Number.isFinite(Number(w)) || Number(w) < 40 || Number(w) > 2000) throw new ViewError('width of "' + k + '" must be between 40 and 2000 pixels');
+    }
+  }
   return view;
 }
 
@@ -156,6 +181,41 @@ export function saveView(collectionId, view) {
   fs.writeFileSync(tmp, JSON.stringify(next, null, 2) + '\n');
   fs.renameSync(tmp, viewsFile(collectionId));
   return next;
+}
+
+// A field left the schema (`collections.mjs` `removeField`). Every saved view that named it would
+// otherwise 400 on its next save — `validateView` refuses a view that shows, filters, sorts or
+// groups by a field the collection does not have — and the error would name a field the person
+// had deliberately removed. So the key is taken out of every place a view can carry it. Nothing is
+// validated here: the schema has already changed, and this only ever removes.
+// → how many views changed.
+export function scrubFieldFromViews(collectionId, key) {
+  const saved = readFile(collectionId);
+  if (!saved.length) return 0;
+  let changed = 0;
+  const next = saved.map(view => {
+    const out = { ...view };
+    const without = list => (Array.isArray(list) ? list.filter(k => k !== key) : list);
+    if (Array.isArray(out.fields)) out.fields = without(out.fields);
+    if (out.card && Array.isArray(out.card.fields)) out.card = { ...out.card, fields: without(out.card.fields) };
+    if (Array.isArray(out.filter)) out.filter = out.filter.filter(f => f && f.field !== key);
+    if (Array.isArray(out.sort)) out.sort = out.sort.filter(s => s && s.field !== key);
+    if (out.group === key) out.group = null;
+    // The cover falls back to the schema's own picture rather than to "no picture".
+    if (out.cover === key) delete out.cover;
+    if (out.widths && typeof out.widths === 'object' && Object.prototype.hasOwnProperty.call(out.widths, key)) {
+      const { [key]: _gone, ...rest } = out.widths;
+      out.widths = rest;
+    }
+    if (JSON.stringify(out) !== JSON.stringify(view)) changed++;
+    return out;
+  });
+  if (!changed) return 0;
+  fs.mkdirSync(viewsDir(), { recursive: true });
+  const tmp = viewsFile(collectionId) + '.' + process.pid + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(next, null, 2) + '\n');
+  fs.renameSync(tmp, viewsFile(collectionId));
+  return changed;
 }
 
 export function deleteView(collectionId, viewId) {

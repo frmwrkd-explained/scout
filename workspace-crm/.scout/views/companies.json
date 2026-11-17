@@ -1,0 +1,93 @@
+[
+  {
+    "id": "cards",
+    "label": "All companies",
+    "type": "gallery",
+    "filter": [],
+    "sort": [
+      {
+        "field": "name",
+        "dir": "asc"
+      }
+    ],
+    "group": null,
+    "size": "m",
+    "fields": [
+      "stage",
+      "tier",
+      "industry",
+      "city"
+    ],
+    "summary": true
+  },
+  {
+    "id": "key-accounts",
+    "label": "Key accounts",
+    "type": "table",
+    "filter": [
+      {
+        "field": "tier",
+        "op": "is",
+        "value": "key"
+      }
+    ],
+    "sort": [
+      {
+        "field": "pipeline_value",
+        "dir": "desc"
+      }
+    ],
+    "group": null,
+    "size": "m",
+    "fields": [
+      "stage",
+      "owner",
+      "deal_count",
+      "pipeline_value",
+      "last_contact",
+      "tags"
+    ]
+  },
+  {
+    "id": "customers",
+    "label": "Customers",
+    "type": "list",
+    "filter": [
+      {
+        "field": "stage",
+        "op": "is",
+        "value": "customer"
+      }
+    ],
+    "sort": [],
+    "group": null,
+    "size": "m",
+    "fields": [
+      "industry",
+      "owner",
+      "last_contact"
+    ],
+    "summary": true
+  },
+  {
+    "id": "by-owner",
+    "label": "By owner",
+    "type": "table",
+    "filter": [],
+    "sort": [
+      {
+        "field": "name",
+        "dir": "asc"
+      }
+    ],
+    "group": "owner",
+    "size": "m",
+    "fields": [
+      "stage",
+      "tier",
+      "industry",
+      "city",
+      "pipeline_value"
+    ]
+  }
+]

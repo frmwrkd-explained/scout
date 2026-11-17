@@ -1,0 +1,77 @@
+/* collections.css — the sidebar's collection rows, the collection panel (CollectionMenu.jsx) and a
+   record's sub-collections (Subtables.jsx). Tokens only; type by role (--t-*). */
+
+/* ── the dot that says which collection ── */
+.colDot{flex:none;display:inline-block;border-radius:9999px}
+
+/* ── sidebar collection rows (Rail.jsx) ── */
+.colRow{position:relative;display:flex;align-items:center;border-radius:7px;border:1px solid transparent;transition:background 130ms ease,border-color 130ms ease}
+.colRow:hover{background:var(--surface-2)}
+.colRow.on{background:var(--raise);border-color:var(--border-3)}
+.colRowMain{flex:1;min-width:0;display:flex;align-items:center;gap:9px;height:32px;padding:0 10px;background:none;border:none;cursor:pointer;font:inherit;text-align:left;color:var(--fg-muted);border-radius:7px}
+.colRow:hover .colRowMain{color:var(--fg-soft)}
+.colRow.on .colRowMain{color:var(--fg)}
+.colRowLabel{flex:1;min-width:0;font-size:var(--t-small);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.colRow.on .colRowLabel{font-weight:600}
+.colRowCount{flex:none;font-size:var(--t-data);font-weight:500;font-variant-numeric:tabular-nums;color:var(--fg-faint)}
+/* The ⋯ takes the count's place on hover, so the row does not grow and the label does not move. */
+.colRowMore{position:absolute;right:5px;top:50%;transform:translateY(-50%);width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;background:var(--surface-2);border:1px solid var(--border-2);cursor:pointer;font:inherit;font-size:var(--t-small);line-height:1;color:var(--fg-muted);opacity:0;transition:opacity 120ms}
+.colRow.on .colRowMore{background:var(--raise)}
+.colRow:hover .colRowMore,.colRowMore:focus-visible,.colRowMore[aria-expanded="true"]{opacity:1}
+.colRow:hover .colRowCount,.colRow:focus-within .colRowCount{visibility:hidden}
+.colRowMore:hover{color:var(--fg);border-color:var(--border-3)}
+/* a sub-collection sits one step in, on a hairline that ties it to its parent */
+.colRowNest{flex:none;align-self:stretch;width:1px;margin:0 9px 0 13px;background:var(--border-2)}
+
+.colNew{display:flex;align-items:center;height:32px;padding:0 10px;border-radius:7px;background:none;border:none;cursor:pointer;font:inherit;font-size:var(--t-small);font-weight:600;color:var(--accent);text-align:left}
+.colNewInput{box-sizing:border-box;width:100%;height:32px;padding:0 10px;border-radius:7px;background:var(--sunk);border:1px solid var(--border-3);color:var(--fg);font:inherit;font-size:var(--t-small)}
+.colNewError{padding:2px 10px 4px;font-size:var(--t-data);line-height:1.4;color:var(--danger)}
+
+/* ── the collection panel ── */
+.colMenuCatch{position:fixed;inset:0;z-index:120}
+.colMenu{position:fixed;z-index:121;box-sizing:border-box;display:flex;flex-direction:column;gap:6px;padding:12px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border-3);box-shadow:0 16px 48px var(--void);max-height:calc(100vh - 16px);overflow:auto}
+.colMenuLabel{font-size:var(--t-label);font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--fg-faint);padding-top:6px}
+.colMenuLabel:first-child{padding-top:0}
+.colMenuInput{box-sizing:border-box;width:100%;height:32px;padding:0 10px;border-radius:7px;background:var(--ink);border:1px solid var(--border-2);color:var(--fg);font:inherit;font-size:var(--t-small)}
+.colMenuInput:focus{border-color:var(--border-3)}
+.colSwatches{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.colSwatch{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;background:none;border:1px solid transparent;cursor:pointer;padding:0}
+.colSwatch span{width:12px;height:12px;border-radius:9999px}
+.colSwatch:hover{background:var(--raise)}
+.colSwatch.on{background:var(--raise);border-color:var(--border-3)}
+.colSwatchAuto{height:26px;padding:0 9px;border-radius:7px;background:none;border:1px solid transparent;cursor:pointer;font:inherit;font-size:var(--t-data);color:var(--fg-muted)}
+.colSwatchAuto:hover{background:var(--raise)}
+.colSwatchAuto.on{background:var(--raise);border-color:var(--border-3);color:var(--fg)}
+.colMenuHint{font-size:var(--t-data);line-height:1.45;color:var(--fg-faint)}
+.colMenuChildren{display:flex;flex-direction:column;gap:2px}
+.colMenuChild{display:flex;align-items:center;gap:9px;min-height:26px;font-size:var(--t-small);color:var(--fg-soft)}
+.colMenuAdd{display:flex;flex-direction:column;gap:6px}
+.colMenuBtn{align-self:flex-start;height:30px;padding:0 14px;border-radius:7px;background:var(--raise);border:1px solid var(--border-3);color:var(--fg);font:inherit;font-size:var(--t-small);font-weight:600;cursor:pointer}
+.colMenuBtn:disabled{opacity:.5;cursor:default}
+.colMenuLinks{display:flex;flex-wrap:wrap;gap:5px}
+.colMenuLink{display:inline-flex;align-items:center;gap:7px;height:28px;padding:0 10px;border-radius:7px;background:none;border:1px solid var(--border-2);color:var(--fg-soft);font:inherit;font-size:var(--t-small);cursor:pointer}
+.colMenuRow{display:flex;align-items:center;min-height:32px;padding:0 9px;margin:0 -3px;border-radius:6px;background:none;border:none;cursor:pointer;font:inherit;font-size:var(--t-small);color:var(--fg-soft);text-align:left;transition:background 130ms ease}
+.colMenuRow:disabled{opacity:.5;cursor:default}
+.colMenuRule{height:1px;margin:4px 0;background:var(--line)}
+.colMenuError{font-size:var(--t-data);line-height:1.45;color:var(--danger)}
+
+/* ── a record's sub-collections (Subtables.jsx) ── */
+.subtables{display:flex;flex-direction:column;gap:28px;margin-top:40px}
+.subtable{display:flex;flex-direction:column;gap:8px}
+.subtableHead{display:flex;align-items:center;gap:10px}
+.subtableTitle{display:inline-flex;align-items:center;gap:9px;font-size:var(--t-lead);font-weight:600;color:var(--fg)}
+.subtableCount{font-size:var(--t-data);font-variant-numeric:tabular-nums;color:var(--fg-faint)}
+.subtableRule{flex:1;height:1px;background:var(--line)}
+.subtableNew{height:30px;padding:0 12px;border-radius:7px;background:none;border:1px solid var(--border-2);color:var(--fg-soft);font:inherit;font-size:var(--t-small);font-weight:500;cursor:pointer;white-space:nowrap}
+.subtableRows{display:flex;flex-direction:column;border:1px solid var(--border);border-radius:10px;background:var(--surface);overflow:hidden}
+.subtableRow{display:flex;align-items:center;gap:14px;min-height:44px;padding:6px 14px;border-bottom:1px solid var(--line);cursor:pointer;transition:background 130ms ease}
+.subtableRow:last-child{border-bottom:none}
+.subtableRow:hover{background:var(--surface-2)}
+.subtableName{flex:1;min-width:0;padding:0;background:none;border:none;cursor:pointer;font:inherit;font-size:var(--t-body);font-weight:600;color:var(--fg-soft);text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.subtableRow:hover .subtableName{color:var(--fg)}
+.subtableProps{flex:0 1 auto;max-width:60%;display:flex;align-items:center;gap:10px;overflow:hidden;white-space:nowrap}
+.subtableProps *{flex-wrap:nowrap!important}
+.subtableEmpty{padding:14px;border:1px dashed var(--border-2);border-radius:10px;font-size:var(--t-small);line-height:1.5;color:var(--fg-muted)}
+.subtableAdd{display:flex;align-items:center;gap:8px}
+.subtableAdd input{flex:1;min-width:0;box-sizing:border-box;height:34px;padding:0 12px;border-radius:7px;background:var(--sunk);border:1px solid var(--border-3);color:var(--fg);font:inherit;font-size:var(--t-body)}
+.subtableError{font-size:var(--t-data);color:var(--danger)}

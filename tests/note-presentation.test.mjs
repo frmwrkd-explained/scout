@@ -16,29 +16,38 @@ const data = { title: 'Feedback capture sheet', status: 'draft', assistant: 'ana
   source_task: 'task-123', result_hash: 'opaque-hash-123', updated: '2026-10-02' };
 const body = '## Feedback capture sheet\n\n**Template only.** No real replies yet.\n\n## Next experiment\n\nCompare the two guides.';
 
-test('a note opens with readable content and a named author, with technical details deferred', () => {
+// The page has no read mode and no edit mode (docs/decisions.md, "The record page is one live
+// document"): it opens ready to write on, the title is a field, the key properties sit under it,
+// and the button where "Edit note" used to be edits the collection's layout instead.
+test('a record opens live: title, author, key properties and the note, with technical details deferred', () => {
   const html = renderToStaticMarkup(React.createElement(Document, {
     path: 'data/artifacts/opaque-name.md', collection, doc: { data, content: body },
     assistants: [{ id: 'analyst-123', name: 'Signal · Analyst' }],
   }));
-  assert.match(html, /<h1>Feedback capture sheet<\/h1>/);
+  assert.match(html, /<h1>.*Feedback capture sheet.*<\/h1>/s);
   assert.match(html, /Signal · Analyst/);
-  assert.match(html, /<strong[^>]*>Template only\.<\/strong>/);
-  assert.match(html, /Read note/);
-  assert.match(html, /aria-expanded="false">Details/);
+  // Folded by default: one line of the values themselves, which opens into the editable card.
+  assert.match(html, /class="recordProps folded"/, 'the properties sit under the title, folded to one line');
+  assert.match(html, /aria-expanded="false"[^>]*title="Show and edit the properties"/);
+  // The chip reads in sentence case (`Draft`), not spaced capitals — cells.jsx StatusChip.
+  assert.match(html, /class="chip[^"]*"[^>]*>.*?Draft</, 'the status is readable on the page without opening anything');
+  assert.match(html, /class="documentBody"/, 'the note is on the page, not behind a button');
+  assert.match(html, /aria-expanded="false"[^>]*>Details/);
   for (const text of ['opaque-name.md', 'task-123', 'opaque-hash-123', 'analyst-123', 'SUMMARY', 'THE NOTE', 'Archive note']) {
     assert.ok(!html.includes(text), text + ' should not compete with the note');
   }
 });
 
-test('an explicit full-note opening replaces its summary and starts with editing disabled', () => {
+test('there is no mode to enter before writing, and the layout is what the button edits', () => {
   const html = renderToStaticMarkup(React.createElement(Document, {
-    path: 'data/artifacts/opaque-name.md', collection, doc: { data, content: body }, startExpanded: true,
+    path: 'data/artifacts/opaque-name.md', collection, doc: { data, content: body },
   }));
-  assert.match(html, /Show less/);
-  assert.match(html, /Edit note/);
-  assert.ok(!html.includes('Template only.'), 'summary is not repeated above the full editor');
-  assert.ok(!html.includes('rich-toolbar'), 'read mode offers no formatting controls');
+  for (const gone of ['Edit note', 'Finish editing', 'Read note', 'Show less']) {
+    assert.ok(!html.includes(gone), '"' + gone + '" belonged to the read/edit modes');
+  }
+  assert.match(html, />Edit layout</);
+  assert.match(html, />Source</);
+  assert.match(html, /role="status"[^>]*>Saved</, 'the save state is always visible, because the page is always live');
 });
 
 test('generated source identifiers are deferred while ordinary work properties remain available', () => {

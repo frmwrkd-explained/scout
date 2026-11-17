@@ -1,0 +1,88 @@
+/* connectors.css — the Connectors section in Settings (Connectors.jsx) and the Ask AI control on a
+   record (AskAI.jsx). Tokens only; type by role (--t-*); nothing under 11px. */
+
+/* ── Connectors ── */
+.cnx{display:flex;flex-direction:column;gap:14px;max-width:720px}
+.cnxEyebrow{font-size:var(--t-label);font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--fg-muted)}
+.cnxTitle{margin:0;font-size:var(--t-lead);font-weight:500;color:var(--fg)}
+.cnxLead{margin:0;font-size:var(--t-small);line-height:1.6;color:var(--fg-soft);max-width:64ch}
+.cnxLead b{font-weight:600;color:var(--fg)}
+.cnxMeta{margin:0;font-size:var(--t-data);line-height:1.55;color:var(--fg-muted)}
+.cnxGroup{display:flex;flex-direction:column;gap:10px}
+.cnxGroupTitle{margin:6px 0 0;font-size:var(--t-body);font-weight:600;color:var(--fg)}
+
+.cnxCard{display:flex;flex-direction:column;gap:10px;padding:14px 16px;border-radius:10px;background:var(--surface);border:1px solid var(--border)}
+.cnxCard.quiet{background:transparent;border-style:dashed}
+.cnxHead{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.cnxName{flex:1;min-width:140px;font-size:var(--t-body);font-weight:600;color:var(--fg)}
+.cnxState{flex:none;display:inline-flex;align-items:center;gap:7px;height:24px;padding:0 10px;border-radius:9999px;background:var(--surface-2);border:1px solid var(--border-2);font-size:var(--t-label);font-weight:600;color:var(--fg-soft);white-space:nowrap}
+.cnxDot{flex:none;width:7px;height:7px;border-radius:9999px;background:var(--border-3)}
+.cnxState.ok .cnxDot{background:var(--ok)}
+.cnxState.warn .cnxDot{background:var(--warn)}
+.cnxNote{margin:0;font-size:var(--t-small);line-height:1.55;color:var(--fg-muted);max-width:64ch}
+.cnxProblem{margin:0;font-size:var(--t-small);line-height:1.55;color:var(--warn)}
+
+.cnxWhere{flex:1;min-width:0;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;padding-top:4px;font-size:var(--t-data);line-height:1.5;color:var(--fg-muted)}
+.cnxPath{font-family:'Spline Sans Mono',monospace;font-size:var(--t-data);color:var(--fg-soft);overflow-wrap:anywhere}
+.cnxSnippet{display:flex;flex-direction:column;gap:6px}
+.cnxSnippetBar{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.cnxPre{margin:0;padding:10px 12px;max-height:190px;overflow:auto;border-radius:8px;background:var(--sunk);border:1px solid var(--border-2);font-family:'Spline Sans Mono',monospace;font-size:var(--t-data);line-height:1.55;color:var(--fg-soft);white-space:pre;tab-size:2}
+.cnxPre.wrap{white-space:pre-wrap;overflow-wrap:anywhere}
+.cnxCopy{flex:none;height:26px;padding:0 10px;border-radius:6px;border:1px solid var(--border-2);background:var(--surface-2);color:var(--fg-muted);font:inherit;font-size:var(--t-label);font-weight:600;cursor:pointer}
+.cnxCopy:hover{color:var(--fg);border-color:var(--border-3)}
+.cnxAlt{font-size:var(--t-data);color:var(--fg-muted)}
+.cnxAlt summary{cursor:pointer;padding:2px 0;color:var(--fg-soft)}
+.cnxAlt[open] summary{margin-bottom:8px}
+
+.cnxActions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cnxLink{font-size:var(--t-data);color:var(--fg-muted);text-decoration:underline;text-underline-offset:3px}
+.cnxLink:hover{color:var(--fg)}
+.cnxResult{display:flex;flex-direction:column;gap:3px;padding:10px 12px;border-radius:8px;background:var(--surface-2);border:1px solid var(--border-2);font-size:var(--t-data);line-height:1.55;color:var(--fg-soft)}
+.cnxResult span{overflow-wrap:anywhere}
+.cnxResult b{font-weight:600;color:var(--fg)}
+.cnxError{margin:0;font-size:var(--t-small);line-height:1.55;color:var(--danger)}
+
+.cnxOut{display:flex;flex-direction:column;border-radius:10px;background:var(--surface);border:1px solid var(--border);padding:4px 0}
+.cnxOutRow{display:flex;align-items:center;gap:10px;padding:8px 16px;font-size:var(--t-small);color:var(--fg-soft)}
+.cnxOutRow + .cnxOutRow{border-top:1px solid var(--line)}
+.cnxOutRow .cnxName{font-size:var(--t-small);font-weight:500}
+.cnxOutState{flex:none;font-size:var(--t-label);font-weight:600;color:var(--fg-muted)}
+
+/* ── Ask AI ── */
+.askAi{position:relative;display:inline-flex}
+/* Placed by AskAI.jsx under its button and kept inside the window (left/top/width/max-height are set inline). */
+.askAiPanel{position:fixed;z-index:120;box-sizing:border-box;overflow:auto;display:flex;flex-direction:column;gap:10px;padding:14px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border-3);box-shadow:0 16px 48px var(--void);text-align:left}
+.askAiHead{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.askAiTitle{font-size:var(--t-body);font-weight:600;color:var(--fg)}
+.askAiClose{width:26px;height:26px;border-radius:6px;border:none;background:none;color:var(--fg-muted);font:inherit;font-size:var(--t-lead);line-height:1;cursor:pointer}
+.askAiClose:hover{color:var(--fg);background:var(--raise)}
+.askAiStarters{display:flex;gap:6px;flex-wrap:wrap}
+.askAiStarter{height:28px;padding:0 10px;border-radius:9999px;border:1px solid var(--border-2);background:var(--surface);color:var(--fg-soft);font:inherit;font-size:var(--t-data);font-weight:500;cursor:pointer}
+.askAiStarter:hover:not(:disabled){color:var(--fg);border-color:var(--border-3)}
+.askAiStarter:disabled{opacity:.5;cursor:default}
+.askAiBox{box-sizing:border-box;display:block;width:100%;min-height:64px;max-height:180px;resize:vertical;padding:9px 11px;border-radius:8px;background:var(--ink);border:1px solid var(--border-2);color:var(--fg);font:inherit;font-size:var(--t-small);line-height:1.5}
+.askAiBox:focus{border-color:var(--border-3)}
+.askAiBox::placeholder{color:var(--fg-faint)}
+.askAiRow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.askAiSeg{display:inline-flex;padding:2px;border-radius:8px;background:var(--surface);border:1px solid var(--border-2)}
+.askAiSegBtn{height:24px;padding:0 10px;border-radius:6px;border:1px solid transparent;background:none;color:var(--fg-muted);font:inherit;font-size:var(--t-data);font-weight:500;cursor:pointer}
+.askAiSegBtn.on{background:var(--raise);border-color:var(--border-3);color:var(--fg)}
+.askAiSelect{height:28px;padding:0 8px;border-radius:7px;background:var(--surface);border:1px solid var(--border-2);color:var(--fg-soft);font:inherit;font-size:var(--t-data)}
+.askAiSpacer{flex:1}
+
+.askAiOut{display:flex;flex-direction:column;gap:10px;padding-top:10px;border-top:1px solid var(--line)}
+.askAiWait{font-size:var(--t-small);color:var(--fg-muted)}
+.askAiAnswer{margin:0;font-size:var(--t-small);line-height:1.6;color:var(--fg);white-space:pre-wrap;overflow-wrap:anywhere}
+.askAiError{margin:0;font-size:var(--t-small);line-height:1.55;color:var(--danger);overflow-wrap:anywhere}
+.askAiLabel{font-size:var(--t-label);font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--fg-faint)}
+.askAiChanges{display:flex;flex-direction:column;gap:8px;margin:0;padding:0;list-style:none}
+.askAiChange{display:flex;flex-direction:column;gap:3px;padding:8px 10px;border-radius:8px;background:var(--surface);border:1px solid var(--border-2)}
+.askAiKey{font-size:var(--t-data);font-weight:600;color:var(--fg-soft)}
+.askAiDiff{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;font-size:var(--t-small);line-height:1.5}
+.askAiBefore{color:var(--fg-faint);text-decoration:line-through;text-decoration-color:var(--border-3)}
+.askAiBefore.none{text-decoration:none;font-style:italic}
+.askAiArrow{flex:none;color:var(--fg-faint)}
+.askAiAfter{color:var(--fg);white-space:pre-wrap;overflow-wrap:anywhere}
+.askAiAfter.long{display:block;max-height:160px;overflow:auto;width:100%}
+.askAiSmall{margin:0;font-size:var(--t-label);line-height:1.5;color:var(--fg-muted)}
+.askAiDone{margin:0;font-size:var(--t-small);color:var(--ok)}

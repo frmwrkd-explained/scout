@@ -48,7 +48,7 @@ export const api = {
   // answers "what does this view show", which is a different question and the wrong one for
   // following a link.
   allDocuments: id => fetch('/api/collections/' + encodeURIComponent(id) + '/documents?all=1').then(j),
-  views: collection => fetch('/api/views/' + encodeURIComponent(collection)).then(j),
+  views: (collection, { counts = false } = {}) => fetch('/api/views/' + encodeURIComponent(collection) + (counts ? '?counts=1' : '')).then(j),
   saveView: (collection, view) => fetch('/api/views/' + encodeURIComponent(collection), { method: 'PUT', ...opts(view) }).then(j),
   // The route has existed since M1; nothing called it until the view bar could offer a view worth
   // removing. Deleting a VIEW never touches a record — a view is a saved query, not a container.

@@ -5,6 +5,7 @@
 import { listProjects, listItems } from './store.mjs';
 import { listAssets } from './library.mjs';
 import { allDocuments, collectionsOf, firstParagraph } from './documents.mjs';
+import { listCollections } from './collections.mjs';
 import { isQuarantined } from './records.mjs';
 
 // ── query parsing ──
@@ -57,6 +58,7 @@ const MEMORY_TYPES = new Set(['territory', 'playbook', 'learning', 'goal', 'assi
 
 function scoutRows() {
   const out = [];
+  const schemas = listCollections();   // once, not once per document — a search over a thousand records read every schema a thousand times
   for (const doc of allDocuments()) {
     const d = doc.data || {};
     // `.scout/` is cache and schema, not content the person is looking for.
@@ -64,7 +66,7 @@ function scoutRows() {
 
     // collectionsOf() returns IDS, not schema objects. Mapping `.id` over strings gave a list
     // of undefined, so `collection:guest` matched nothing while every other filter worked.
-    const inCollections = collectionsOf(doc);
+    const inCollections = collectionsOf(doc, schemas);
     const kind = String(d.type || '') || (inCollections.length ? 'record' : 'note');
     const title = String(d.name || d.label || d.title || d.claim || doc.slug);
     const tags = [].concat(d.tags ?? []).map(String);
@@ -76,6 +78,8 @@ function scoutRows() {
     // all of it turns every query into a match on somebody's ISO timestamp.
     const searchable = [
       title, d.handle, d.claim, d.job, d.summary, d.why, d.rules, d.url, d.source,
+      // A reference is found by the words in its prompt — that is what the person remembers.
+      d.prompt, d.signature,
       d.status, d.access, d.kind, tags.join(' '), doc.slug, doc.path,
       firstParagraph(doc.content),
     ].filter(Boolean).join(' ').toLowerCase();

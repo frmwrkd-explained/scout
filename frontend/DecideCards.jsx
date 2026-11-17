@@ -41,7 +41,7 @@ import { MONO } from './tokens';
 import { Eyebrow, Input } from './ui';
 
 // ── the two fixed vocabularies (mirrors backend/proposals.mjs) ────────────────────────────────
-export const CARD_KINDS = ['finding', 'outbound', 'territory', 'learning', 'schema', 'question', 'widget'];
+export const CARD_KINDS = ['finding', 'outbound', 'territory', 'learning', 'schema', 'question', 'widget', 'automation'];
 
 // Law 5: the reason is the only labelled data this system ever gets, so it is mandatory and it is
 // ONE KEYSTROKE. Five, fixed, numbered 1–5 — the order IS the keymap, and it is the same list as
@@ -556,6 +556,17 @@ function UnknownBody({ card }) {
   );
 }
 
+// An automation that was told to ask first (backend/automations.mjs). The headline is what
+// happened and the question; the line under it is exactly what a yes will make.
+function AutomationBody({ card }) {
+  return (
+    <Region score={card.score}>
+      <Head>{card.title}</Head>
+      <Line>{card.line}</Line>
+    </Region>
+  );
+}
+
 // ── the dispatch table ────────────────────────────────────────────────────────────────────────
 // ONE line per kind. `effect` is printed under the buttons in mono uppercase, so "what does
 // accepting mean" is answered on the card rather than in a doc — T13's table, rendered.
@@ -594,6 +605,12 @@ export const KIND = {
     label: 'A QUESTION FOR YOU', chip: { one: 'question', many: 'questions' },
     yes: 'Answer it', no: 'No', effect: 'WRITES YOUR ANSWER INTO MEMORY',
     needsAnswer: true, Body: QuestionBody,
+  },
+  automation: {
+    label: 'AN AUTOMATION ASKS', chip: { one: 'automation', many: 'automations' },
+    yes: 'Yes, do it', no: 'Not this time', effect: 'RUNS IT ONCE FOR THIS RECORD AND FILES ONE NEW RECORD',
+    // Saying no to one firing is not a judgement of a proposal, so it asks for no reason.
+    noReason: true, Body: AutomationBody,
   },
   unknown: {
     label: 'PROPOSAL', chip: { one: 'other', many: 'other' },

@@ -19,8 +19,12 @@ import { MONO } from './tokens';
 import { Eyebrow } from './ui';
 import { resolveWikilink } from './DecideCards';
 import PropertyRows, { rowsFor } from './PropertyRows';
+import PanelSplitter, { usePanelWidth } from './PanelSplitter';
+import { RenderMedia } from './RenderMedia';
+import { mediaSrc } from './media';
+import { colourOf, collectionLabel, colourOfId, labelOfId } from './collectionColour';
 
-export const INSPECTOR_W = 302;
+export const INSPECTOR_W = 360;
 const mono = (extra = '') => ({ ...sx(extra), fontFamily: MONO });
 
 // docs/05_UI_SPEC.md §1 draws the inspector "(collapsible)" — it never was. The preference is
@@ -38,22 +42,44 @@ const RAIL_COLLAPSED_W = 28;
 
 function Section({ id, name, count, open, onToggle, children }) {
   return (
-    <div style={sx('border-bottom:1px solid var(--line)')}>
-      <button onClick={() => onToggle(open ? null : id)} aria-expanded={open}
-        style={{ ...sx('display:flex;align-items:center;gap:9px;width:100%;padding:11px 16px;cursor:pointer;background:transparent;border:none;transition:color 130ms ease'), color: open ? 'var(--fg-soft)' : 'var(--fg-muted)' }}>
-        <span style={{ ...mono('font-size:8px;width:12px;text-align:left'), color: 'var(--fg-faint)' }}>{open ? '▾' : '▸'}</span>
-        <span style={sx('font-size:12px;font-weight:500;color:inherit;flex:1;text-align:left')}>{name}</span>
-        {count != null ? (
-          <span style={{ ...mono('font-size:10px;font-weight:600;font-variant-numeric:tabular-nums'), color: 'var(--fg-faint)' }}>{count}</span>
-        ) : null}
+    <div className="inspSection">
+      <button type="button" className={'inspSectionHead' + (open ? ' on' : '')} onClick={() => onToggle(open ? null : id)} aria-expanded={open}>
+        <span className="inspChevron" aria-hidden="true">›</span>
+        <span className="inspSectionName">{name}</span>
+        {count != null ? <span className="inspCount" style={{ fontFamily: MONO }}>{count}</span> : null}
       </button>
-      {open ? <div style={sx('padding:0 16px 14px')}>{children}</div> : null}
+      {open ? <div className="inspSectionBody">{children}</div> : null}
     </div>
   );
 }
 
 function Nothing({ children }) {
-  return <span style={{ ...mono('font-size:9.5px;font-weight:500;letter-spacing:.08em'), color: 'var(--fg-faint)' }}>{children}</span>;
+  return <span className="inspNothing">{children}</span>;
+}
+
+// The selected record, at a glance. The picture is the collection's `primary_media` (else its first
+// file field) shown whole; the name is the record's own. `Open` is a real button — a double-click
+// on a tile is a gesture, and this is the one place a person looks after a single click.
+function Preview({ collection, doc, onOpenPath }) {
+  const files = (collection?.fields || []).filter(f => f.type === 'file');
+  const field = files.find(f => f.primary_media) || files[0] || null;
+  const src = field ? mediaSrc(doc.fields?.[field.key]) : null;
+  return (
+    <div className="inspPreview">
+      {src ? (
+        <div className="inspPreviewMedia">
+          <RenderMedia src={src} fit="contain" controls style={sx('width:100%;height:100%;display:block')} />
+        </div>
+      ) : null}
+      <div className="inspPreviewHead">
+        <span className="inspPreviewTitle">{doc.title}</span>
+        {onOpenPath ? (
+          <button type="button" className="inspPreviewOpen hBd" onClick={() => onOpenPath(doc.path)}>Open</button>
+        ) : null}
+      </div>
+      {doc.summary ? <p className="inspSummary">{doc.summary}</p> : null}
+    </div>
+  );
 }
 
 // `onChange(key, value)` is optional and is the ONLY difference between this panel reading a
@@ -76,6 +102,11 @@ export default function Inspector({ collection, doc, referencedBy = [], open, on
     return () => { alive = false; };
   }, [docPath]);
 
+  // Its width is the person's: drag the left edge. One remembered width for every place this panel
+  // opens, because it is the same panel.
+  const [width, setWidth, resetWidth] = usePanelWidth('scout.inspector.w', INSPECTOR_W, { min: 280, max: 820 });
+  const splitter = <PanelSplitter edge="left" width={width} onResize={setWidth} onReset={resetWidth} label="Resize the details panel" />;
+
   const [collapsed, setCollapsed] = React.useState(() => readCollapsed(screen));
   React.useEffect(() => { setCollapsed(readCollapsed(screen)); }, [screen]);
   const toggleCollapsed = () => setCollapsed(v => { writeCollapsed(screen, !v); return !v; });
@@ -93,20 +124,21 @@ export default function Inspector({ collection, doc, referencedBy = [], open, on
 
   const collapseBtn = (
     <button type="button" onClick={onClose || toggleCollapsed} title={onClose ? 'Close details' : 'Collapse the inspector'} aria-label={onClose ? 'Close details' : 'Collapse the inspector'} className="hFg"
-      style={{ ...mono('flex:none;width:18px;height:18px;display:flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;font-size:10px'), color: 'var(--fg-faint)' }}>
+      style={{ ...sx('flex:none;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:6px;background:none;border:none;cursor:pointer;font-size:16px;line-height:1'), color: 'var(--fg-faint)' }}>
       {onClose ? '×' : '›'}
     </button>
   );
 
   if (!doc) {
     return (
-      <aside style={{ ...sx('flex:none;background:var(--surface);border-left:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden'), width: INSPECTOR_W }}>
+      <aside style={{ ...sx('position:relative;flex:none;background:var(--surface);border-left:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden'), width }}>
+        {splitter}
         <div style={sx('flex:none;height:40px;display:flex;align-items:center;justify-content:space-between;padding:0 12px 0 16px;border-bottom:1px solid var(--line)')}>
-          <Eyebrow style={sx('font-size:9px;font-weight:800;letter-spacing:.18em;color:var(--fg-muted)')}>INSPECTOR</Eyebrow>
+          <span className="inspWhere">Details</span>
           {collapseBtn}
         </div>
-        <div style={sx('flex:1;display:flex;align-items:center;justify-content:center;padding:16px')}>
-          <Nothing>NOTHING SELECTED</Nothing>
+        <div style={sx('flex:1;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center')}>
+          <Nothing>Select a record to see its details here.</Nothing>
         </div>
       </aside>
     );
@@ -120,64 +152,70 @@ export default function Inspector({ collection, doc, referencedBy = [], open, on
   const linksOut = [...String(doc.body || '').matchAll(/\[\[([^\]]+)\]\]/g)].map(m => m[1]);
 
   return (
-    <aside className={className} aria-label="Note details" style={{ ...sx('flex:none;background:var(--surface);border-left:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden'), width: INSPECTOR_W }}>
+    <aside className={className} aria-label="Note details" style={{ ...sx('position:relative;flex:none;background:var(--surface);border-left:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden'), width }}>
+      {splitter}
       <div style={sx('flex:none;height:40px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 16px;border-bottom:1px solid var(--line)')}>
-        <span style={sx('font-size:12px;font-weight:600;color:var(--fg-muted)')}>Details</span>
+        {/* Where the selected record lives, the way the sidebar names it. */}
+        <span className="inspWhere">
+          {collection ? <span className="relDot" style={{ background: colourOf(collection) }} aria-hidden="true" /> : null}
+          {collection ? collectionLabel(collection) : 'Details'}
+        </span>
         <span style={sx('flex:1')} />
         {collapseBtn}
       </div>
 
       <div style={sx('flex:1;min-height:0;overflow-y:auto')}>
+        {/* What was just clicked, large: its picture and its name, and the way in. On the record's
+            own page (`properties` is passed there) the page already shows both. */}
+        {!properties ? <Preview collection={collection} doc={doc} onOpenPath={onOpenPath} /> : null}
         <Section id="props" name="Properties" count={properties ? null : shown.length} open={open === 'props'} onToggle={onToggle}>
           {properties || (shown.length
-            ? <PropertyRows collection={collection} values={doc.fields} onChange={onChange} onFollow={onOpen} variant="inspector" hideEmpty />
-            : <Nothing>NO PROPERTIES SET</Nothing>)}
+            ? <PropertyRows collection={collection} values={doc.fields} onChange={onChange} onFollow={onOpen} variant="inspector" hideEmpty
+                // The preview above already shows the name and the picture — not twice.
+                omit={(collection?.fields || []).filter(f => f.primary || (f.type === 'file' && f === ((collection.fields.filter(x => x.type === 'file').find(x => x.primary_media)) || collection.fields.find(x => x.type === 'file')))).map(f => f.key)} />
+            : <Nothing>No properties set yet.</Nothing>)}
         </Section>
 
         {referencedBy.length ? <Section id="refs" name="Referenced by" count={referencedBy.length} open={open === 'refs'} onToggle={onToggle}>
           {referencedBy.length
             ? referencedBy.map((r, i) => (
-                <button key={i} onClick={() => onOpen && onOpen(null, r.path)}
-                  style={{ ...sx('display:flex;flex-direction:column;gap:3px;width:100%;text-align:left;padding:7px 0;cursor:pointer;background:transparent;border:none;border-bottom:1px solid var(--line)') }}>
-                  <span style={sx('font-size:12px;font-weight:500;color:var(--fg-soft)')}>{r.title}</span>
-                  {/* The pointing FIELD name is the whole point of this section. A DECLARED
-                      relation is typed — it gets the marked colour and a #collection, because `#`
-                      means "a collection" everywhere else in this app. A loose frontmatter pointer
-                      from a memory object (territory/, learnings/) is a real reference but is not
-                      schema, so it says where it came from WITHOUT claiming to be a collection. */}
-                  <span style={{ ...mono('font-size:9.5px;font-weight:500'), color: 'var(--fg-faint)' }}>
-                    <span style={{ color: r.declared ? 'var(--marked)' : 'var(--fg-muted)' }}>{r.field}:</span>
-                    {' '}{r.declared ? '#' + r.collection : r.source}
+                // What points here, by name — and WHICH property of it does the pointing, in the
+                // property's own words ("People · Company"), not as `company: #people`.
+                <button key={i} type="button" className="inspRef hBg" onClick={() => onOpen && onOpen(null, r.path)}>
+                  <span className="inspRefTitle">{r.title}</span>
+                  <span className="inspRefMeta">
+                    {r.declared ? <span className="relDot" style={{ background: colourOfId(r.collection) }} aria-hidden="true" /> : null}
+                    {(r.declared ? labelOfId(r.collection) || r.collection : r.source) + ' · ' + String(r.field || '').replace(/_/g, ' ')}
                   </span>
                 </button>
               ))
-            : <Nothing>NOTHING POINTS HERE</Nothing>}
+            : <Nothing>Nothing points here.</Nothing>}
         </Section> : null}
 
         {linksOut.length ? <Section id="links" name="Links" count={linksOut.length} open={open === 'links'} onToggle={onToggle}>
           {linksOut.length ? (
             <>
-              <span style={{ ...mono('font-size:8.5px;font-weight:700;letter-spacing:.12em;display:block;padding:4px 0'), color: 'var(--fg-faint)' }}>OUT / WRITTEN HERE</span>
+              <span className="inspNothing" style={sx('display:block;padding:2px 0 6px')}>Written in this note</span>
               {linksOut.map((l, i) => {
                 // The one resolver (DecideCards.resolveWikilink) — never a second `|label` stripper.
                 const p = resolveWikilink('[[' + l + ']]');
                 return p && onOpenPath ? (
                   <button key={i} type="button" onClick={() => onOpenPath(p)} className="hAccent"
-                    style={sx('font-size:12px;padding:3px 0;background:none;border:none;text-align:left;cursor:pointer;color:var(--accent)')}>
+                    style={sx('font-size:var(--t-body);padding:4px 0;background:none;border:none;text-align:left;cursor:pointer;color:var(--accent)')}>
                     {l}
                   </button>
                 ) : (
-                  <div key={i} style={sx('font-size:12px;color:var(--fg-soft);padding:3px 0')}>{l}</div>
+                  <div key={i} style={sx('font-size:var(--t-body);color:var(--fg-soft);padding:4px 0')}>{l}</div>
                 );
               })}
             </>
-          ) : <Nothing>NO WIKILINKS IN THE BODY</Nothing>}
+          ) : <Nothing>No links in the note.</Nothing>}
         </Section> : null}
 
         <Section id="history" name="History" count={history.length || null} open={open === 'history'} onToggle={onToggle}>
           {history.length
             ? history.map((ev, i) => <ActivityRow key={ev.id || i} ev={ev} onOpenPath={onOpenPath} />)
-            : <Nothing>NOTHING HAS HAPPENED TO THIS RECORD YET</Nothing>}
+            : <Nothing>Nothing has happened to this record yet.</Nothing>}
         </Section>
 
         {/* A PREVIEW that opens INTO the whiteboard — never a second graph feature (T05 §5).
@@ -190,10 +228,9 @@ export default function Inspector({ collection, doc, referencedBy = [], open, on
           <GraphPreview doc={doc} references={referencedBy} onOpenBoard={onOpenBoard} />
         </Section>
       </div>
-      <div style={sx('flex:none;padding:14px 16px;border-top:1px solid var(--line)')}>
-        <span style={sx('display:block;margin-bottom:5px;font-size:11px;color:var(--fg-muted)')}>Markdown file</span>
-        <button type="button" title={doc.path} onClick={() => onOpenPath?.(doc.path)}
-          style={{ ...mono('width:100%;text-align:left;font-size:10px;background:none;border:none;padding:0;overflow-wrap:anywhere;cursor:pointer'), color: 'var(--fg-faint)' }}>{doc.path}</button>
+      <div className="inspFoot">
+        <span className="inspFootLabel">The file</span>
+        <button type="button" className="inspFootPath hFg" title={'Open ' + doc.path} onClick={() => onOpenPath?.(doc.path)} style={{ fontFamily: MONO }}>{doc.path}</button>
       </div>
     </aside>
   );

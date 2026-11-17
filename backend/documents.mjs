@@ -12,7 +12,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { getStorageRoot, readMd } from './store.mjs';
+import { getStorageRoot, readMd, onMdWrite } from './store.mjs';
 import { getCollection, listCollections, fieldOf, primaryField, AUTO_FIELDS } from './collections.mjs';
 
 const R = () => getStorageRoot();
@@ -41,18 +41,59 @@ function walk(dir, out = []) {
   return out;
 }
 
+// ── the parse cache ────────────────────────────────────────────────────────────────────────
+// The files are the truth and this does not change that: it only remembers what a file SAID the
+// last time it was read, for as long as the file has not changed.
+//
+// Why it exists. `allDocuments()` is behind almost every route — a collection's rows, every tab
+// count, Today, Goals, search, history, references. It used to read and YAML-parse every `.md`
+// in the workspace on every call: 250 to 700 ms with a thousand records, several times per
+// screen, on one thread. That is the wait behind every click. Reading a file's stat costs
+// microseconds; parsing it costs a fraction of a millisecond; so a file is parsed again only when
+// its stat says it changed.
+//
+// What "changed" means: a different modification time, size or inode. That catches an edit made
+// in Finder, Obsidian or by an agent writing the file directly, on the next call. The one case a
+// stat cannot see — a rewrite to the same byte length inside the same timestamp tick — cannot
+// happen through this app's own writer, because `store.writeMd` drops the entry by name
+// (`mdWritten` below).
+//
+// What is handed out. A fresh `{ path, slug, data, content }` with a shallow copy of `data` on
+// every call, so a caller that adds or deletes a key on its record does not change what the next
+// caller sees. A malformed file is remembered as malformed (and stays excluded) until it changes.
+//
+// Disposable by construction: empty it and the next call reads everything again.
+const parsed = new Map();   // absolute file → { key, data, content } | { key, bad: true }
+const MAX_CACHED = 50000;
+const statKey = st => st.mtimeMs + ':' + st.size + ':' + st.ino;
+onMdWrite(file => { parsed.delete(file); });
+export function forgetParsed() { parsed.clear(); }
+
+function readCached(file) {
+  let st;
+  try { st = fs.statSync(file); } catch { parsed.delete(file); return null; }
+  const key = statKey(st);
+  const hit = parsed.get(file);
+  if (hit && hit.key === key) return hit.bad ? null : hit;
+  let entry;
+  try { const { data, content } = readMd(file); entry = { key, data, content }; }
+  // A malformed file is quarantined, never fatal — one bad record costs one record.
+  catch { entry = { key, bad: true }; }
+  if (parsed.size >= MAX_CACHED) parsed.clear();
+  parsed.set(file, entry);
+  return entry.bad ? null : entry;
+}
+
 export function allDocuments() {
   const root = R();
-  return walk(root).map(file => {
-    try {
-      const { data, content } = readMd(file);
-      const rel = path.relative(root, file).split(path.sep).join('/');
-      return { path: rel, slug: path.basename(file, '.md'), data, content };
-    } catch {
-      // A malformed file is quarantined, never fatal — one bad record costs one record.
-      return null;
-    }
-  }).filter(Boolean);
+  const out = [];
+  for (const file of walk(root)) {
+    const hit = readCached(file);
+    if (!hit) continue;
+    const rel = path.relative(root, file).split(path.sep).join('/');
+    out.push({ path: rel, slug: path.basename(file, '.md'), data: { ...hit.data }, content: hit.content });
+  }
+  return out;
 }
 
 // ── query matching ─────────────────────────────────────────────────────────────────────────────
@@ -169,7 +210,7 @@ export function documentsFor(collectionId, { bind = null } = {}) {
     fields: { ...d.data, ...computeDerived(collection, d, index) },
     summary: firstParagraph(d.content),
   }));
-  writeComputedCache(collectionId, shaped);
+  writeComputedCache(collection, shaped);
   return { collection, documents: shaped };
 }
 
@@ -209,6 +250,26 @@ export async function viewFor(collectionId, { view = null, bind = null, all = fa
     // accept the ones that are fine (Law 8).
     quarantined: held.map(d => ({ path: d.path, slug: d.slug, title: d.title })),
   };
+}
+
+// How many records each saved view holds — ONE pass over the store for all of them.
+//
+// The view strip prints a count on every tab. The app used to get those by fetching every view's
+// full rows (`viewFor` once per tab), so opening a collection with six views read the whole store
+// six times and shipped six copies of it to the browser to throw five away: three seconds of blank
+// pane on a thousand-record library. Counting is the cheap half of that work, so it is done here,
+// once, with the same quarantine rule `viewFor` applies.
+export async function viewCounts(collectionId) {
+  const [{ listViews, applyView }, { excludeQuarantined }] = await Promise.all([
+    import('./views.mjs'), import('./records.mjs'),
+  ]);
+  const found = documentsFor(collectionId);
+  const views = listViews(collectionId);
+  if (!found || !views) return null;
+  const clean = excludeQuarantined(found.documents);
+  const counts = {};
+  for (const view of views.views) counts[view.id] = applyView({ ...view, sort: [], group: null }, clean).rows.length;
+  return { counts, total: clean.length };
 }
 
 export function documentAt(relPath) {
@@ -253,21 +314,35 @@ export function firstParagraph(content) {
 
 // Disposable by construction: delete .scout/cache/ and everything still resolves, because every
 // read recomputes. This exists to be inspectable, not to be depended on.
-function writeComputedCache(collectionId, shaped) {
+//
+// It holds the DERIVED values only (rollups and formulas) — what the file's name says. It used to
+// hold every field of every record of the collection, rewritten on every read: opening a library
+// of a thousand references wrote six megabytes to disk each time anything asked for its rows. And
+// it is written only when what it would say has changed.
+const computedWritten = new Map();   // file + collection → the JSON last written for it
+function writeComputedCache(collection, shaped) {
   try {
+    const derived = (collection.fields || []).filter(f => f.type === 'rollup' || f.type === 'formula').map(f => f.key);
+    const entry = Object.fromEntries(shaped.map(d => [d.slug, Object.fromEntries(derived.filter(k => d.fields[k] !== undefined).map(k => [k, d.fields[k]]))]));
+    const text = JSON.stringify(entry);
+    const memo = computedFile() + '\u0000' + collection.id;
+    if (computedWritten.get(memo) === text && fs.existsSync(computedFile())) return;
     fs.mkdirSync(cacheDir(), { recursive: true });
     let all = {};
     try { all = JSON.parse(fs.readFileSync(computedFile(), 'utf8')); } catch { /* first write */ }
-    all[collectionId] = Object.fromEntries(shaped.map(d => [d.slug, d.fields]));
+    all[collection.id] = entry;
     const tmp = computedFile() + '.' + process.pid + '.tmp';
     fs.writeFileSync(tmp, JSON.stringify(all, null, 2));
     fs.renameSync(tmp, computedFile());
+    computedWritten.set(memo, text);
   } catch { /* a cache that cannot be written is still only a cache */ }
 }
 
 // Which collections does this document belong to? It may be several — that is the point.
-export function collectionsOf(doc) {
-  return listCollections().filter(c => matchesQuery(doc, c.query)).map(c => c.id);
+// `collections` may be handed in by a caller that asks about many documents at once (search asks
+// about every one): reading the schema files once instead of once per document.
+export function collectionsOf(doc, collections = null) {
+  return (collections || listCollections()).filter(c => matchesQuery(doc, c.query)).map(c => c.id);
 }
 
 // ── REFERENCED BY ──────────────────────────────────────────────────────────────────────────────

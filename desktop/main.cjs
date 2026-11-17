@@ -80,6 +80,8 @@ async function createWindow() {
 
   // open external links (docs, fal URLs) in the real browser, not inside the app window
   win.webContents.setWindowOpenHandler(({ url }) => {
+    // A link back into Scout itself (a record opened in a new tab) is another window of the app.
+    if (url.startsWith('http://127.0.0.1:' + port + '/')) return { action: 'allow', overrideBrowserWindowOptions: { width: 1280, height: 860, webPreferences: { contextIsolation: true, nodeIntegration: false, preload: path.join(__dirname, 'preload.cjs') } } };
     if (/^https?:\/\//.test(url)) { shell.openExternal(url); return { action: 'deny' }; }
     return { action: 'allow' };
   });

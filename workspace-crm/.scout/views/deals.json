@@ -1,0 +1,103 @@
+[
+  {
+    "id": "pipeline",
+    "label": "Pipeline",
+    "type": "board",
+    "filter": [],
+    "sort": [],
+    "group": "stage",
+    "size": "m",
+    "fields": [
+      "amount",
+      "close_date",
+      "owner"
+    ]
+  },
+  {
+    "id": "closing-this-quarter",
+    "label": "Closing this quarter",
+    "type": "table",
+    "filter": [
+      {
+        "field": "quarter",
+        "op": "is",
+        "value": "2026-Q4"
+      },
+      {
+        "field": "stage",
+        "op": "is-not",
+        "value": "won"
+      },
+      {
+        "field": "stage",
+        "op": "is-not",
+        "value": "lost"
+      }
+    ],
+    "sort": [
+      {
+        "field": "close_date",
+        "dir": "asc"
+      }
+    ],
+    "group": null,
+    "size": "m",
+    "fields": [
+      "stage",
+      "amount",
+      "close_date",
+      "company",
+      "person",
+      "owner"
+    ]
+  },
+  {
+    "id": "won",
+    "label": "Won",
+    "type": "table",
+    "filter": [
+      {
+        "field": "stage",
+        "op": "is",
+        "value": "won"
+      }
+    ],
+    "sort": [
+      {
+        "field": "close_date",
+        "dir": "desc"
+      }
+    ],
+    "group": null,
+    "size": "m",
+    "fields": [
+      "amount",
+      "close_date",
+      "company",
+      "owner",
+      "source"
+    ]
+  },
+  {
+    "id": "all",
+    "label": "All deals",
+    "type": "table",
+    "filter": [],
+    "sort": [
+      {
+        "field": "amount",
+        "dir": "desc"
+      }
+    ],
+    "group": null,
+    "size": "m",
+    "fields": [
+      "stage",
+      "amount",
+      "close_date",
+      "company",
+      "owner",
+      "probability"
+    ]
+  }
+]

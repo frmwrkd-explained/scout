@@ -113,9 +113,10 @@ test('a guest, its territory and the project brief: the two relation edges draw 
   assert.equal(byField.top_finds.from, groundNode.id);
   assert.equal(byField.top_finds.to, guestNode.id);
 
-  // the label IS the field name — never a guess, never a generic "related"
-  assert.equal(byField.found_in.label, 'found_in');
-  assert.equal(byField.top_finds.label, 'top_finds');
+  // the label IS the field's name, as a person reads it — never a guess, never a generic "related".
+  // `field` stays the machine key (asserted above): an agent reading the board keys off that.
+  assert.equal(byField.found_in.label, 'Found in');
+  assert.equal(byField.top_finds.label, 'Top finds');
 
   // both are typed `relation` fields, so the canvas can say WHICH collection declares them
   assert.equal(byField.found_in.declared, true);
@@ -171,7 +172,8 @@ test('a loose frontmatter pointer still draws a labelled edge, and says it is no
   const e = b.edges.find(x => x.field === 'wants');
   assert.ok(e, 'an undeclared pointer is still a real relation — the memory objects have no schema');
   assert.equal(e.declared, false);
-  assert.equal(e.label, 'wants');
+  assert.equal(e.field, 'wants');
+  assert.equal(e.label, 'Wants');
 });
 
 test('a card whose file is gone draws no edge and is reported missing rather than faked', () => {
@@ -245,9 +247,11 @@ test('a stale base is refused rather than clobbering the newer board', () => {
 });
 
 // ── 4 · the document stays readable, and fails closed ──────────────────────────────────────────
-test('there is no hand-drawn edge kind', () => {
+// A relation between records is still never drawn by hand — it is read (deriveEdges). What a person
+// draws is a LINK, kept in its own list (tests/whiteboard-links.test.mjs), and neither is a node.
+test('a line is never a node kind', () => {
   assert.equal(NODE_KINDS.includes('arrow'), false);
-  assert.deepEqual(NODE_KINDS, ['document', 'collection-view', 'territory', 'goal', 'note', 'image', 'frame']);
+  assert.deepEqual(NODE_KINDS, ['document', 'collection-view', 'territory', 'goal', 'note', 'image', 'frame', 'text', 'shape', 'draw']);
   assert.deepEqual(RECORD_KINDS, ['document', 'territory', 'goal']);
   assert.equal(cleanNode({ t: 'arrow', from: 'a', to: 'b' }, 'n1'), null);
   assert.equal(cleanNode({ t: 'shot', shot: 'SH010' }, 'n1'), null, 'a FrameForge kind is not a Scout kind');
@@ -368,7 +372,8 @@ test('GET /api/scout/board/:id hands back the nodes, the derived edges and the l
   assert.equal(status, 200);
   assert.equal(body.nodes.length, 3);
   assert.equal(body.edges.length, 2);
-  assert.deepEqual(body.edges.map(e => e.label).sort(), ['found_in', 'top_finds']);
+  assert.deepEqual(body.edges.map(e => e.field).sort(), ['found_in', 'top_finds']);
+  assert.deepEqual(body.edges.map(e => e.label).sort(), ['Found in', 'Top finds']);
   assert.equal(body.cards[GUEST].title, 'Maria Santos');
 });
 

@@ -1,122 +1,196 @@
-// The collection table — the default view type, and the densest surface in the app.
+// The collection table — rows and columns, the layout for scanning and comparing.
 //
-// One component per view type, chosen by the view's `type` (docs/05_UI_SPEC.md §3). This is
-// `table`. Measurements and the query-bar shape come from `design/Scout.dc.html`; the typed cells
-// come from `./cells`, which is the only place a field type becomes UI.
+// One component per view type, chosen by the view's `type` (docs/05_UI_SPEC.md §3). The columns
+// are the view's `fields` (the name always leads), the row scale is its `size`, and typed cells
+// come from `./cells`, the only place a field type becomes UI. Every figure is mono with tabular
+// numerals so digits line up down a column.
 //
-// Density stays (§6). Every figure is mono with tabular numerals so digits line up down a column.
+// COLUMN WIDTHS are the view's, like everything else about it (`view.widths`, pixels by field).
+// Drag the edge of a header to set one. Until somebody does, the browser sizes the columns to
+// their content; the first drag pins every column at the width it has right then, so resizing one
+// column never makes the others jump.
+//
+// A COLUMN IS A PROPERTY, and its header is where it is changed. Clicking a header opens that
+// column's own menu: sort by it, rename it, change what kind of thing it is, hide it from this
+// view, delete it. The last header is a `+` that adds a property and shows it here at once. The
+// editor is `PropertyMenu.jsx` — the same one the view bar's Properties menu opens, so the list,
+// the cards and the board edit a property the same way.
 
 import React from 'react';
 import { sx } from './sx';
 import { MONO } from './tokens';
 import { Cell } from './cells';
 import { Empty, OpenRecord } from './ui';
-import { densityOf } from './ViewBar';
+import { GroupHeader } from './ListView';
+import { sizeOf, wrapOf, shownFields, primaryOf, groupRows, groupFieldOf, fieldLabel } from './viewDisplay';
+import { useIncremental, takeGroups, More } from './useIncremental.jsx';
+import { Menu, MenuRow, MenuDivider, PropertyEditor, AddProperty, shownKeys } from './PropertyMenu';
 
-const mono = (extra = '') => ({ ...sx(extra), fontFamily: MONO });
+const MIN_COL = 72;
 
-// The view strip: one pill per saved view, count on each. Selected is a raised neutral chip with a
-// --border-3 edge — never an accent fill (§6: one solid accent fill per screen, and it is the
-// primary action, not a tab).
-// ViewTabs and QueryBar used to live here as private copies, byte-equivalent to the ones in
-// CollectionView.jsx. That was a second implementation of one strip (Law 10) — it existed only
-// because this file drew its own chrome before the dispatcher was written. The dispatcher now draws
-// it for all four view types, so a change to the query bar lands on the board, the list and the
-// gallery at the same time instead of on the table alone.
+const MENU_W = 284;
+const ADD_COL = 44;
 
-export default function TableView({ collection, view, views, rows, counts, selected, onSelect, onOpen, onFollow, onPickView, onSaveView }) {
-  // The row scale the view was saved with. `density` has been on the view object since M1 and
-  // this is its first reader — see ViewBar.jsx.
-  const d = densityOf(view);
-  const fieldsShown = (view.fields && view.fields.length ? view.fields : (collection.fields || []).slice(0, 6).map(f => f.key));
-  const defs = fieldsShown.map(k => (collection.fields || []).find(f => f.key === k) || { key: k, type: 'text' });
-  // The primary field is the title column and always leads, whatever the view says.
-  const primary = (collection.fields || []).find(f => f.primary);
+export default function TableView({ collection, view, rows, selected, onSelect, onOpen, onFollow, onPick, onSaveView, onSchemaChanged, actor }) {
+  const z = sizeOf(view);
+  const wrap = wrapOf(view);
+  const defs = shownFields(collection, view, { title: true });
+  const primary = primaryOf(collection);
+  const groups = groupRows(rows, collection, view);
+  // A screenful at a time (./useIncremental) — the rest is drawn as it is scrolled towards.
+  const win = useIncremental(rows.length, { step: 150, resetKey: collection.id + '/' + view.id });
 
-  // Sorting existed only through ViewBar's Filters composer (design/EXTRACT.md §2 wants a header
-  // click too, item 9). One writer: this calls the SAME `onSaveView` the composer calls, into the
-  // SAME saved-view path (`.scout/views/<collection>.json`) — a session-only sort would disagree
-  // with what an agent or another machine sees of "this view", and Law 1 says the file is the
-  // truth. none → asc → desc → none, one field at a time (ViewComposer's own sort picker manages
-  // only one field too — a second, independent multi-sort model here would be the second
-  // implementation Law 10 warns about).
+  // Sorting from a header writes the SAME saved view the Sort control writes — one model, one
+  // field at a time.
   const sortField = view.sort?.[0]?.field || null;
   const sortDir = view.sort?.[0]?.dir || null;
-  const cycleSort = key => {
+  const save = next => (onSaveView ? Promise.resolve(onSaveView(next)).catch(() => {}) : Promise.resolve());
+  const setSort = (key, dir) => save({ ...view, sort: dir ? [{ field: key, dir }] : [] });
+
+  // The open header menu: { key, mode: 'menu' | 'edit' | 'delete', align } — or { key: '+' } for
+  // the add column. One at a time; opening another closes this one.
+  const [menu, setMenu] = React.useState(null);
+  const closeMenu = React.useCallback(() => setMenu(null), []);
+  const scroller = React.useRef(null);
+  const toggleMenu = (key, e) => {
+    if (menu && menu.key === key) return setMenu(null);
+    // A menu hangs from its column's left edge unless that would run it out of the pane.
+    const th = e.currentTarget.closest('th').getBoundingClientRect();
+    const pane = scroller.current ? scroller.current.getBoundingClientRect() : { right: window.innerWidth };
+    setMenu({ key, mode: 'menu', align: th.left + MENU_W > pane.right - 8 ? 'right' : 'left' });
+  };
+  const canEdit = !!onSchemaChanged;
+  const hide = key => { closeMenu(); return save({ ...view, fields: shownKeys(collection, view).filter(k => k !== key), card: null }); };
+
+  // While a column is being dragged the width lives here; it is written to the view on release.
+  const [live, setLive] = React.useState(null);
+  const widths = live || view.widths || null;
+  const head = React.useRef(null);
+
+  const startResize = (key, e) => {
     if (!onSaveView) return;
-    const sort = sortField !== key ? [{ field: key, dir: 'asc' }]
-      : sortDir === 'asc' ? [{ field: key, dir: 'desc' }]
-      : [];
-    onSaveView({ ...view, sort });
+    e.preventDefault(); e.stopPropagation();
+    // Pin every column at its current width first (see the header note).
+    const measured = {};
+    for (const th of head.current ? head.current.querySelectorAll('th[data-key]') : []) measured[th.dataset.key] = Math.round(th.getBoundingClientRect().width);
+    const base = { ...measured, ...(view.widths || {}) };
+    const from = e.clientX, start = base[key] || 160;
+    let next = base;
+    const move = ev => { next = { ...base, [key]: Math.max(MIN_COL, Math.round(start + ev.clientX - from)) }; setLive(next); };
+    const up = () => {
+      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up);
+      Promise.resolve(onSaveView({ ...view, widths: next })).catch(() => {}).finally(() => setLive(null));
+    };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+  };
+  const resetWidths = () => { if (onSaveView && view.widths) onSaveView({ ...view, widths: undefined }); };
+
+  const body = r => {
+    const on = selected === r.path;
+    return (
+      // `rvH` arms the reveal-on-hover Open chip in the name cell. The row still opens on
+      // double-click — OpenRecord makes that gesture discoverable rather than replacing it.
+      <tr key={r.path} className={'tvRow rvH' + (on ? ' on' : '')} onClick={() => onSelect(r)} onDoubleClick={() => onOpen(r)}>
+        {defs.map(f => (
+          <td key={f.key} style={{ paddingTop: z.row, paddingBottom: z.row }}>
+            {f.key === primary?.key ? (
+              <span className={'tvName' + (wrap ? ' wrap' : '')}>
+                <span className="tvNameText" style={{ fontSize: z.title }}>{r.title}</span>
+                <OpenRecord onOpen={() => onOpen(r)} />
+              </span>
+            ) : (
+              <div className={'tvCell' + (wrap ? ' wrap' : '')} style={{ zoom: z.zoom }}>
+                <Cell field={f} value={r.fields[f.key]} onFollow={onFollow} onPick={onPick} />
+              </div>
+            )}
+          </td>
+        ))}
+        {canEdit ? <td aria-hidden="true" /> : null}
+      </tr>
+    );
   };
 
   return (
     <div style={sx('flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden')}>
-      <div style={sx('flex:1;min-height:0;overflow:auto')}>
-        <table style={sx('width:100%;border-collapse:collapse')}>
-          <thead>
+      <div ref={scroller} style={sx('flex:1;min-height:0;overflow:auto')}>
+        <table className={'tv' + (widths ? ' fixed' : '')} style={widths ? { width: defs.reduce((sum, f) => sum + (widths[f.key] || 160), 0) + (canEdit ? ADD_COL : 0) } : undefined}>
+          {widths ? <colgroup>{defs.map(f => <col key={f.key} style={{ width: widths[f.key] || 160 }} />)}{canEdit ? <col style={{ width: ADD_COL }} /> : null}</colgroup> : null}
+          <thead ref={head}>
             <tr>
               {defs.map(f => {
                 const on = sortField === f.key;
+                const open = !!menu && menu.key === f.key;
+                // A key the schema does not declare has a column (Law 8) and nothing to edit yet.
+                const declared = (collection.fields || []).some(x => x.key === f.key);
+                const isName = f.key === primary?.key;
                 return (
-                  <th key={f.key} style={{ ...sx('text-align:left;padding:0;position:sticky;top:0;background:var(--ink)'), borderBottom: '1px solid var(--line)' }}>
+                  <th key={f.key} data-key={f.key} className={open ? 'tvOpen' : undefined}>
+                    <button type="button" className="tvHead hFg" aria-haspopup="menu" aria-expanded={open}
+                      onClick={e => toggleMenu(f.key, e)} disabled={!onSaveView}
+                      title={fieldLabel(f) + (on ? (sortDir === 'asc' ? ' — sorted ascending' : ' — sorted descending') : '')}
+                      style={{ color: on || open ? 'var(--fg)' : 'var(--fg-muted)' }}>
+                      <span className="tvHeadText">{fieldLabel(f)}</span>
+                      {on ? <span style={{ fontFamily: MONO, fontSize: 'var(--t-label)', color: 'var(--fg-faint)' }}>{sortDir === 'asc' ? '↑' : '↓'}</span> : null}
+                      <span className="tvHeadCaret" aria-hidden="true">▾</span>
+                    </button>
+                    <Menu open={open} onDismiss={closeMenu} width={MENU_W} align={open ? menu.align : 'left'}>
+                      {open && menu.mode === 'menu' ? (
+                        <>
+                          <MenuRow on={on && sortDir === 'asc'} label="Sort ascending" onClick={() => { closeMenu(); setSort(f.key, 'asc'); }} />
+                          <MenuRow on={on && sortDir === 'desc'} label="Sort descending" onClick={() => { closeMenu(); setSort(f.key, 'desc'); }} />
+                          {on ? <MenuRow label="Clear sort" onClick={() => { closeMenu(); setSort(f.key, null); }} /> : null}
+                          {canEdit && declared ? (
+                            <>
+                              <MenuDivider />
+                              <MenuRow label={isName ? 'Rename' : 'Edit property'} hint={isName ? null : 'Name, type, choices'}
+                                onClick={() => setMenu({ ...menu, mode: 'edit' })} />
+                              {!isName ? <MenuRow label="Hide in this view" onClick={() => hide(f.key)} /> : null}
+                              {!isName && !f.gate ? <MenuRow danger label="Delete property…" onClick={() => setMenu({ ...menu, mode: 'delete' })} /> : null}
+                            </>
+                          ) : null}
+                        </>
+                      ) : open ? (
+                        <PropertyEditor collection={collection} field={f} view={view} onSaveView={save} onSchemaChanged={onSchemaChanged}
+                          actor={actor} startAt={menu.mode === 'delete' ? 'delete' : 'edit'} onClose={closeMenu} />
+                      ) : null}
+                    </Menu>
                     {onSaveView ? (
-                      <button type="button" onClick={() => cycleSort(f.key)} className="hFg"
-                        title={!on ? 'Sort by ' + (f.label || f.key) : sortDir === 'asc' ? 'Sorting ascending — click for descending' : 'Sorting descending — click to clear'}
-                        style={{ ...mono('display:flex;align-items:center;gap:5px;width:100%;padding:0 14px 8px;font-size:9px;font-weight:700;letter-spacing:.16em;background:none;border:none;cursor:pointer;text-align:left'), color: on ? 'var(--fg-soft)' : 'var(--fg-muted)' }}>
-                        <span>{(f.label || f.key).replace(/_/g, ' ').toUpperCase()}</span>
-                        <span style={{ ...sx('font-size:8px;line-height:1'), opacity: on ? 1 : 0, color: 'var(--fg-faint)' }}>{sortDir === 'asc' ? '▲' : '▼'}</span>
-                      </button>
-                    ) : (
-                      <span style={{ ...mono('display:block;padding:0 14px 8px;font-size:9px;font-weight:700;letter-spacing:.16em'), color: 'var(--fg-muted)' }}>
-                        {(f.label || f.key).replace(/_/g, ' ').toUpperCase()}
-                      </span>
-                    )}
+                      <span className="tvGrip" role="separator" aria-orientation="vertical" aria-label={'Resize ' + fieldLabel(f)}
+                        title="Drag to resize. Double-click to let the columns size themselves again."
+                        onPointerDown={e => startResize(f.key, e)} onDoubleClick={resetWidths} />
+                    ) : null}
                   </th>
                 );
               })}
+              {canEdit ? (
+                <th className={'tvAddCol' + (menu && menu.key === '+' ? ' tvOpen' : '')}>
+                  <button type="button" className="tvAddBtn" aria-haspopup="dialog" aria-expanded={!!menu && menu.key === '+'}
+                    title="Add a property" aria-label="Add a property"
+                    onClick={() => setMenu(m => (m && m.key === '+' ? null : { key: '+', mode: 'add', align: 'right' }))}>+</button>
+                  <Menu open={!!menu && menu.key === '+'} onDismiss={closeMenu} width={MENU_W} align="right">
+                    <AddProperty collection={collection} view={view} onSaveView={save} onSchemaChanged={onSchemaChanged} actor={actor} onClose={closeMenu} />
+                  </Menu>
+                </th>
+              ) : null}
             </tr>
           </thead>
           <tbody>
-            {rows.map(r => {
-              const on = selected === r.path;
-              return (
-                // `rvH` arms the reveal-on-hover chrome in the title cell. The row still opens on
-                // double-click — OpenRecord makes that gesture discoverable rather than replacing it.
-                <tr key={r.path} className="rvH"
-                  onClick={() => onSelect(r)}
-                  onDoubleClick={() => onOpen(r)}
-                  style={{
-                    ...sx('cursor:pointer;transition:background 130ms ease'),
-                    background: on ? 'var(--raise)' : 'transparent',
-                    borderBottom: '1px solid var(--line)',
-                  }}>
-                  {defs.map(f => (
-                    <td key={f.key} style={{ ...sx('vertical-align:middle'), padding: d.pad, lineHeight: d.line }}>
-                      {f.key === primary?.key
-                        ? (
-                          <span style={{ ...sx('display:flex;align-items:center;min-width:0'), gap: d.gap }}>
-                            <span style={{ ...sx('min-width:0;overflow:hidden;text-overflow:ellipsis;font-weight:600'), fontSize: d.font, color: on ? 'var(--fg)' : 'var(--fg-soft)' }}>{r.title}</span>
-                            <OpenRecord onOpen={() => onOpen(r)} />
-                          </span>
-                        )
-                        : <Cell field={f} value={r.fields[f.key]} onFollow={onFollow} />}
-                    </td>
-                  ))}
-                </tr>
-              );
-            })}
+            {groups
+              ? takeGroups(groups, win.count).map(g => (
+                <React.Fragment key={g.key || 'none'}>
+                  <tr className="tvGroup"><td colSpan={defs.length + (canEdit ? 1 : 0)}><GroupHeader label={g.label} count={g.size} field={groupFieldOf(collection, view)} value={g.key} onFollow={onFollow} /></td></tr>
+                  {g.items.map(body)}
+                </React.Fragment>
+              ))
+              : rows.slice(0, win.count).map(body)}
           </tbody>
         </table>
+        <More win={win} total={rows.length} />
 
         {!rows.length ? (
           <div style={sx('padding:40px 20px;display:flex;justify-content:center')}>
-            <Empty
-              size="page"
-              style={sx('max-width:420px')}
-              title="Nothing matches this view"
-              body="The collection's query and this view's filters together return no records. Nothing is hidden — widen either one."
-            />
+            <Empty size="page" style={sx('max-width:420px')} title="Nothing matches this view"
+              body="The collection's query and this view's filters together return no records. Nothing is hidden — widen either one." />
           </div>
         ) : null}
       </div>

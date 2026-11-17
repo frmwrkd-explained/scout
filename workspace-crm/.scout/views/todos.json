@@ -1,0 +1,62 @@
+[
+  {
+    "id": "open",
+    "label": "Open",
+    "type": "list",
+    "filter": [
+      {
+        "field": "status",
+        "op": "is-not",
+        "value": "done"
+      }
+    ],
+    "sort": [
+      {
+        "field": "due",
+        "dir": "asc"
+      }
+    ],
+    "group": null,
+    "size": "m",
+    "fields": [
+      "status",
+      "due",
+      "owner"
+    ],
+    "summary": false
+  },
+  {
+    "id": "by-status",
+    "label": "By status",
+    "type": "board",
+    "filter": [],
+    "sort": [],
+    "group": "status",
+    "size": "m",
+    "fields": [
+      "due",
+      "owner"
+    ]
+  },
+  {
+    "id": "all",
+    "label": "All to-dos",
+    "type": "table",
+    "filter": [],
+    "sort": [
+      {
+        "field": "due",
+        "dir": "desc"
+      }
+    ],
+    "group": null,
+    "size": "m",
+    "fields": [
+      "status",
+      "due",
+      "deal",
+      "company",
+      "owner"
+    ]
+  }
+]

@@ -30,6 +30,19 @@ fields:
 
 A document belongs to a collection if it matches the query. **Documents are never "moved into" a collection** — they match or they don't. A record can belong to several.
 
+**What a person calls it, and how it is recognised.** A collection is a *kind of thing* — Companies,
+People, References — and is shown by its `label` with a coloured dot, never as `#id`:
+
+| Key | Meaning |
+|---|---|
+| `id` | lower-kebab, starts with a letter. The file name, the default folder (`data/<id>/`), and what relations point at. It does not change when the collection is renamed. |
+| `label` | the name a person reads. Renaming a collection changes only this. |
+| `colour` | one of `red` · `orange` · `amber` · `green` · `teal` · `blue` · `violet` · `pink`, or absent. Absent means "automatic": a stable pick from the `id`. |
+
+A person makes one from the sidebar (`+ New collection` → `POST /api/collections/create { label }`):
+`id` is the slug of the name, the query is `path: data/<id>/**`, and it starts with one field, `name`.
+An assistant still *proposes* a collection as a card (§6); these routes refuse an agent.
+
 ## 2. Field types — the set, and why exactly these
 
 Chosen by looking at what Notion, Airtable, Heptabase and Tesseract actually converged on, then cutting everything that does not earn its place in this app.
@@ -74,6 +87,26 @@ A view is a saved query-plus-presentation, stored **in the vault** (`.scout/view
   "card": null, "density":"compact" }
 ```
 
+**How a view looks is part of the view.** Besides its query (`filter`, `sort`), a view carries
+optional display keys. They are written by the view bar and may be written by an agent; both go
+through `PUT /api/views/:collection`, which refuses a wrong value by name. `frontend/viewDisplay.js`
+is the one reader, so all four layouts agree on what each key means and what it defaults to.
+
+| Key | Values | Meaning | Default |
+|---|---|---|---|
+| `type` | `table` · `list` · `board` · `gallery` | the layout (`gallery` is labelled Cards) | inferred from the collection's shape |
+| `size` | `s` · `m` · `l` · `xl` | how big rows, cards and their text are | `m` (an older `density` is still read) |
+| `fields` | `[key, …]` | the properties shown, in order: table columns, list values, card lines | the first six fields |
+| `cover` | a `file` field key, or `false` | the picture that leads a row or card | the `primary_media` field |
+| `fit` | `contain` · `cover` | whole picture, or fill the frame | `contain` |
+| `summary` | `true` · `false` | show the note's first paragraph | on for lists, off elsewhere |
+| `wrap` | `true` · `false` | let long values take several lines | `false` |
+| `group` | a field key, or `null` | section the rows by that field (a date groups by day) | none; a list with a date field groups by day |
+| `widths` | `{ key: px }` | table column widths | sized to content |
+
+`GET /api/views/:collection?counts=1` adds `{ counts: { viewId: n }, total }`, counted in one read
+of the store.
+
 | View type | For | Notes |
 |---|---|---|
 | **table** | Dense scanning. The default. | Inline edit, resizable columns, group-by. |
@@ -89,18 +122,50 @@ A view is a saved query-plus-presentation, stored **in the vault** (`.scout/view
 
 The person can change it; they should never have to pick one to get started.
 
-## 4. Subtables
+## 4. Sub-collections (subtables)
 
-A subtable is **a collection with a bound parameter** — no new concept, no new storage.
+A **sub-collection** is a collection whose records each belong to a record of another collection.
+People belong to a company; shots belong to a project. It is **a collection with a bound
+parameter** — no new concept, no new storage.
+
+Two things say it, and they are the two ends of one edge:
 
 ```yaml
-# on the guest collection
+# .scout/collections/people.md — the CHILD carries a relation to its parent
+fields:
+  - { key: name,    type: text, primary: true }
+  - { key: company, type: relation, target: company }
+
+# .scout/collections/company.md — the PARENT declares the subtable
 subtables:
-  - { id: outreach, label: Outreach, collection: message, bind: { guest: $self } }
-  - { id: evidence, label: Evidence, collection: finding, bind: { about: $self } }
+  - { id: people, label: People, collection: people, bind: { company: $self } }
 ```
 
-Opening `guests/maria-santos` shows an `Outreach` tab listing every `#message` whose `guest` relation points at her. The subtable is a real view — filterable, addable, with its own default type.
+`bind` names the child's relation field; `$self` is the parent record being looked at. A relation
+stores the **slug** of the record it points at (`company: acme`), so the question "who is at Acme"
+is `GET /api/collections/people/documents?all=1&bind={"company":"acme"}`.
+
+What a person gets from it:
+
+- **On the company's page**, under the note: a *People* section listing every person whose
+  `company` is this one, and `+ New in People`, which creates a person with `company` already set.
+- **On a person**: the company is a chip that opens it.
+- **In the People collection**: Group or Filter by `company` like any other field.
+- **In the sidebar**: People sits one step in under Companies. A collection nested under two
+  parents is listed under each.
+
+Made from the sidebar (a collection's ⋯ → *Add sub-collection*), through routes only a human may call:
+
+| Route | Body | Does |
+|---|---|---|
+| `POST /api/collections/:id/subcollections` | `{ label }` | creates the child collection with a relation to `:id`, and adds the subtable |
+| | `{ collection }` | nests an existing collection: reuses its relation to `:id` if it has one, else adds one. Doing it twice changes nothing. |
+| `DELETE /api/collections/:id/subcollections/:child` | — | removes the subtable entry only. The child, its relation field and every record stay. |
+| `PATCH /api/collections/:id/meta` | `{ label?, colour? }` | renames or recolours; nothing else |
+
+A loop is refused (a collection cannot sit inside something it contains). An assistant proposes a
+subtable as a card instead (§6) — both paths write the same two things. The shape rules live in
+`shared/collectionShape.mjs`, read by the backend, the sidebar and the record page alike.
 
 *Why this shape:* a subtable is the inverse side of a relation. Modelling it as anything else would create a second way to express the same edge, and the two would drift.
 
@@ -141,3 +206,28 @@ An agent may propose a collection, a field, or a view. It lands as a card in DEC
 > [ Add it ] [ No ]
 
 Approved → written to the collection file. Rejected → recorded with a reason, and the agent is told. **Never silent.** See `04_AGENT_CONTRACT.md` §4.
+
+## The whiteboard file
+
+`projects/<id>/board.md` holds `nodes` and `links` in frontmatter and an append-only log in the
+body. A node is `{ id, t, x, y, w, h }` plus its kind's keys:
+
+| kind | keys |
+|---|---|
+| `text` | `text`, `size: s|m|l|xl`, `bold`, `colour`, `fixed` |
+| `note` | `text`, `colour` (or a legacy `tone`) |
+| `shape` | `shape: rect|round|ellipse|diamond`, `text`, `colour`, `size` |
+| `draw` | `points: "x,y x,y …"` (relative to its box), `width: 2|4|8`, `colour` |
+| `image`, `frame` | as before |
+| a record | `path` |
+
+`colour` is a hue NAME (red, orange, amber, green, teal, blue, violet, pink), never a value.
+
+A link is `{ id, from, to, label?, ends: none|arrow|both, line: solid|dashed, colour? }` between
+two node ids; a link whose node is gone is dropped on save. **Links are stored; edges are not** —
+edges are derived on every read from the records' relation fields. A drawn link between two
+records can be turned into the relation it stands for by a person only
+(`POST /api/scout/board/:id/links/:link/realise`): `records.mjs` writes the record, the link is
+removed, and the derived edge replaces it. `GET /api/scout/board/:id/describe` returns the board
+in words, for an agent.
+

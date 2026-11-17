@@ -1,0 +1,64 @@
+[
+  {
+    "id": "all",
+    "label": "All invoices",
+    "type": "table",
+    "filter": [],
+    "sort": [
+      {
+        "field": "date",
+        "dir": "desc"
+      }
+    ],
+    "group": null,
+    "size": "m",
+    "fields": [
+      "status",
+      "amount",
+      "date",
+      "due_date",
+      "company",
+      "label"
+    ]
+  },
+  {
+    "id": "by-status",
+    "label": "By status",
+    "type": "board",
+    "filter": [],
+    "sort": [],
+    "group": "status",
+    "size": "m",
+    "fields": [
+      "amount",
+      "due_date",
+      "label"
+    ]
+  },
+  {
+    "id": "unpaid",
+    "label": "Unpaid",
+    "type": "table",
+    "filter": [
+      {
+        "field": "status",
+        "op": "is-not",
+        "value": "paid"
+      }
+    ],
+    "sort": [
+      {
+        "field": "due_date",
+        "dir": "asc"
+      }
+    ],
+    "group": null,
+    "size": "m",
+    "fields": [
+      "status",
+      "amount",
+      "due_date",
+      "company"
+    ]
+  }
+]

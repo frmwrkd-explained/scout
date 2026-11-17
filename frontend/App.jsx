@@ -29,7 +29,9 @@ import Palette from './Palette';
 // deleted (item D). Its theme radio and key input are ported here; the name is deliberately
 // different so a later cleanup pass can never confuse the two.
 import ScoutSettings from './ScoutSettings';
-import CollectionView from './CollectionView';
+import CollectionView, { CollectionLoading } from './CollectionView';
+import { sameQuery } from './viewDisplay';
+import { rememberCollections } from './collectionColour';
 import Document from './Document';
 import Today from './Today';
 import Admin from './Admin';
@@ -43,6 +45,10 @@ import Assistants from './Assistants';
 import Hire from './Hire';
 import Project from './Project';
 import Files from './Files';
+import { refreshRecordNames, renameRecord } from './recordNames';
+import Skills from './Skills';
+import Plugins from './Plugins';
+import Automations from './Automations';
 import Whiteboard from './Whiteboard';
 import Interview from './Interview';
 
@@ -187,10 +193,18 @@ export default class App extends React.Component {
     try {
       const { collections } = await api.collections();
       this.setState({ collections, loading: false });
+      // `#open=<path>` — one record, opened straight from the address. It is how "open in a new
+      // tab" works (RecordPeek.jsx): the new window boots and lands on that record.
+      const wanted = /^#open=(.+)$/.exec(window.location.hash || '');
+      if (wanted && !this._openedFromHash) { this._openedFromHash = true; setTimeout(() => this.openPath(decodeURIComponent(wanted[1])), 0); }
+      // `#browse=<collection>/<field>/<value>` — a whole set (every reference tagged X) as a page.
+      const set = /^#browse=([^/]+)\/([^/]+)\/(.+)$/.exec(window.location.hash || '');
+      if (set && !this._openedFromHash) { this._openedFromHash = true; setTimeout(() => this.browse(decodeURIComponent(set[1]), decodeURIComponent(set[2]), decodeURIComponent(set[3])), 0); }
       // Every collection's count, not just the open one. The rail showed `#guest ·` beside
       // `#group 8` because only the collection being opened ever reported a total — a rail that
       // half-knows its own numbers reads as broken before anything else has a chance to.
-      Promise.all(collections.map(c => api.documents(c.id).then(r => [c.id, r.total]).catch(() => null)))
+      // Counted on the server (`?counts=1`), never by downloading every record to measure the array.
+      Promise.all(collections.map(c => api.views(c.id, { counts: true }).then(r => [c.id, r.total]).catch(() => null)))
         .then(pairs => this.setState(st => ({
           counts: { ...st.counts, ...Object.fromEntries(pairs.filter(Boolean)) },
         })));
@@ -270,8 +284,13 @@ export default class App extends React.Component {
   openRelation = (collection, id) => {
     if (!id) return;
     if (String(id).endsWith('.md')) return this.openPath(String(id));
-    const row = this.state.rows.find(r => r.slug === id);
-    if (row) return this.openPath(row.path);
+    // The open collection's own rows are a shortcut only when the link points INTO that
+    // collection (or names none). It used to be tried first for every link, so a person whose slug
+    // happened to match a company's opened the person.
+    if (!collection || collection === this.state.active) {
+      const row = this.state.rows.find(r => r.slug === id);
+      if (row) return this.openPath(row.path);
+    }
     // A relation names a slug, not a path. Ask the collection that owns it where that slug lives
     // rather than guessing a folder — a guessed path is how a link silently dead-ends.
     if (collection) {
@@ -303,34 +322,49 @@ export default class App extends React.Component {
   // re-resolved against the rows that actually came back: still there → kept; gone (archived,
   // filtered out by the view) → cleared, because showing a document the view no longer holds is
   // worse than showing nothing.
+  // Open a collection narrowed to the records that carry one value — "every reference tagged
+  // Food & Beverage", as a full page. The narrowing is CollectionView's ordinary quick filter.
+  browse = async (collectionId, fieldKey, value) => {
+    if (!this.state.collections.some(c => c.id === collectionId)) return;
+    this.setState({ startQuick: { id: collectionId, quick: [{ field: fieldKey, value: String(value) }], n: Date.now() } });
+    await this.pickCollection(collectionId);
+  };
+
   async pickCollection(id, viewId = null, { navigate = true, keepSelection = false } = {}) {
+    // A newer click wins. Without the ticket, a slow answer for the collection somebody has
+    // already left lands last and paints its rows under the new collection's name.
+    const ticket = (this._pickTicket = (this._pickTicket || 0) + 1);
     this.setState(s => ({
       active: id,
+      // The rows on screen belong to `rowsOf`. Until this collection's own arrive, the centre
+      // says it is loading instead of showing the last collection's table under a new heading.
+      loadingCollection: s.rowsOf === id ? null : id,
       ...(keepSelection ? {} : { selected: null, referencedBy: [], refsFor: null, external: null }),
       screen: navigate ? 'collection' : s.screen,
     }));
     try {
       // `warnings` names a `default_view` that points at nothing — silently falling back to
       // index 0 is how #guest opened as a board called "Everything" for a whole build.
-      const { views, warnings } = await api.views(id);
+      // ONE view's rows are fetched. Every tab's count comes from the server in the same call
+      // that lists the views; this used to fetch all rows of every view just to count them.
+      const { views, warnings, counts: serverCounts = {}, total } = await api.views(id, { counts: true });
+      if (ticket !== this._pickTicket) return;
       if (warnings && warnings.length) this.showToast(warnings[0]);
-      const results = await Promise.all(views.map(v => api.documents(id, v.id).catch(() => null)));
-      const viewCounts = {};
-      views.forEach((v, i) => { if (results[i]) viewCounts[v.id] = results[i].rows.length; });
       const wanted = viewId || (this.state.collections.find(c => c.id === id) || {}).default_view || views[0].id;
-      const i = Math.max(0, views.findIndex(v => v.id === wanted));
-      const chosen = results[i] || results.find(Boolean);
-      if (!chosen) return;
+      const pick = views.find(v => v.id === wanted) || views[0];
+      const chosen = await api.documents(id, pick.id);
+      if (ticket !== this._pickTicket || !chosen) return;
       this.setState(s => {
         const stillThere = keepSelection && s.selected && chosen.rows.some(r => r.path === s.selected);
         return {
-          views, view: chosen.view, rows: chosen.rows, viewCounts,
+          views, view: chosen.view, rows: chosen.rows, rowsOf: id, loadingCollection: null,
+          viewCounts: { ...serverCounts, [chosen.view.id]: chosen.rows.length },
           quarantined: chosen.quarantined || [],
-          counts: { ...s.counts, [id]: chosen.total },
+          counts: { ...s.counts, [id]: total ?? chosen.total },
           ...(keepSelection && !stillThere ? { selected: null, referencedBy: [], refsFor: null, external: null } : {}),
         };
       });
-    } catch (e) { this.setState({ error: e.message }); }
+    } catch (e) { if (ticket === this._pickTicket) this.setState({ error: e.message, loadingCollection: null }); }
   }
 
   // A view is data in the vault (docs/02_DATA_MODEL.md §3), so changing its shape, its density or
@@ -338,13 +372,64 @@ export default class App extends React.Component {
   // this bar, from an agent, or from someone editing the JSON in Obsidian. There is no
   // second, session-local notion of "how I like this collection", because two people looking at
   // one collection and seeing different screens is worse than either screen.
+  // How a view LOOKS — its layout, size, shown properties, picture, column widths — changes nothing
+  // about which rows it holds, so those changes paint at once and are written behind the paint. Only
+  // a change to the filter or the sort asks the server for rows again. Still one route and one
+  // file; this is about not re-downloading a thousand records because a card got bigger.
   saveView = async v => {
     const id = this.state.active;
     if (!id) return;
+    const before = this.state.view;
+    if (before && before.id === v.id && sameQuery(before, v)) {
+      const next = { ...v, generated: undefined };
+      const swap = to => s => ({ view: to, views: (s.views || []).map(x => (x.id === to.id ? to : x)) });
+      this.setState(swap(next));
+      try { await api.saveView(id, next); }
+      catch (e) { this.setState(swap(before)); this.showToast(e.message, 'danger'); throw e; }
+      return;
+    }
     try {
       await api.saveView(id, v);
       await this.pickCollection(id, v.id, { navigate: false, keepSelection: true });
     } catch (e) { this.showToast(e.message, 'danger'); throw e; }
+  };
+
+  // A value changed in the details panel beside a table, list, board or wall of cards. It shows
+  // at once and is written through the one record route (`PATCH /api/records`, the same writer the
+  // record's own page uses, with the gate and the log). If the write is refused the row goes back
+  // to what is on disk and the refusal is said out loud.
+  patchSelected = async (key, value) => {
+    const path = this.state.selected;
+    const row = this.state.rows.find(r => r.path === path);
+    if (!row) return;
+    const primary = ((this.state.collections.find(c => c.id === this.state.active) || {}).fields || []).find(f => f.primary);
+    const put = fields => s => ({
+      rows: s.rows.map(r => (r.path === path
+        ? { ...r, fields, ...(primary && fields[primary.key] ? { title: fields[primary.key] } : {}) }
+        : r)),
+    });
+    const before = row.fields;
+    this.setState(put({ ...before, [key]: value }));
+    try {
+      const res = await api.patchRecord(path, { [key]: value }, undefined, undefined, HUMAN);
+      if (res && res.data) this.setState(put({ ...before, ...res.data, [key]: res.data[key] }));
+    } catch (e) {
+      this.setState(put(before));
+      this.showToast(e.message, 'danger');
+    }
+  };
+
+  // The schema changed under the screen (a property added, renamed, retyped or removed; a
+  // collection created or re-labelled). Re-read the collections and the open view, in place.
+  onSchemaChanged = async () => {
+    try {
+      const { collections } = await api.collections();
+      this.setState({ collections });
+      Promise.all(collections.map(c => api.views(c.id, { counts: true }).then(r => [c.id, r.total]).catch(() => null)))
+        .then(pairs => this.setState(st => ({ counts: { ...st.counts, ...Object.fromEntries(pairs.filter(Boolean)) } })));
+      const id = this.state.active;
+      if (id && collections.some(c => c.id === id)) await this.pickCollection(id, this.state.view && this.state.view.id, { navigate: false, keepSelection: true });
+    } catch (e) { this.showToast(e.message, 'danger'); }
   };
 
   deleteView = async viewId => {
@@ -381,6 +466,7 @@ export default class App extends React.Component {
   // A refresh, never a navigation — the inspector stays put unless the row it is showing is
   // actually gone (see pickCollection's `keepSelection`).
   reload = () => {
+    refreshRecordNames();   // something was written: the names links print may have changed
     if (this.state.active) this.pickCollection(this.state.active, this.state.view && this.state.view.id, { navigate: false, keepSelection: true });
     this.loadSidebar();
     this.setState(s => ({ nonce: s.nonce + 1, refreshKey: s.refreshKey + 1 }));
@@ -428,9 +514,13 @@ export default class App extends React.Component {
     this.reload();
   };
 
-  onMove = async (row, to) => {
+  // `field` is the one the board's columns are drawn from. The schema's GATE field moves through
+  // the move route (which guards the promotion gate and logs a `move`); any other choice — a tier,
+  // an industry, a stage that is not the gate — is an ordinary property change.
+  onMove = async (row, to, field) => {
     try {
-      await api.moveRecord(row.path, to, HUMAN);
+      if (field && !(field.type === 'status' && field.gate)) await api.patchRecord(row.path, { [field.key]: to }, undefined, undefined, HUMAN);
+      else await api.moveRecord(row.path, to, HUMAN);
       this.reload();
     } catch (e) {
       // The important kind of toast (Law 4's gate, most of the time this fires) — click-to-dismiss,
@@ -447,10 +537,16 @@ export default class App extends React.Component {
   // a field is structural. Archive, move, a schema change and a decision still call reload() —
   // those really do change which rows exist or which view they belong to.
   onDocSaved = ({ path, data, content }) => {
+    // A save can raise a card (an automation asking "create the invoice?"), so the rail's counts are
+    // re-read once the typing settles — not on every autosave, and not only on the next navigation.
+    clearTimeout(this._railSoon);
+    this._railSoon = setTimeout(() => this.loadSidebar(), 700);
     this.setState(s => {
       const activeCollection = s.collections.find(c => c.id === s.active);
       const primary = activeCollection && (activeCollection.fields || []).find(f => f.primary);
       const title = (primary && data && data[primary.key]) || (data && data.name) || (data && data.title);
+      // Every link to this record, anywhere on screen, follows the rename at once.
+      if (title && s.active) renameRecord(s.active, String(path).split('/').pop().replace(/\.md$/, ''), String(title));
       return {
         rows: s.rows.map(r => (r.path === path ? { ...r, fields: data, ...(title ? { title } : {}) } : r)),
         external: s.external && s.external.path === path ? { ...s.external, fields: data, body: content } : s.external,
@@ -593,6 +689,9 @@ export default class App extends React.Component {
         );
 
       case 'files':  return <Files path={arg || docPath || ''} onOpenPath={this.openPath} />;
+      case 'skills':  return <Skills collections={collections} onPickCollection={id => this.pickCollection(id)} onNavigate={this.go} />;
+      case 'plugins': return <Plugins collections={collections} actor={HUMAN} onOpenPath={this.openPath} onPickCollection={id => this.pickCollection(id)} onNavigate={this.go} />;
+      case 'automations': return <Automations actor={HUMAN} onOpenPath={this.openPath} onNavigate={this.go} />;
       case 'settings': return <ScoutSettings onToast={(m, tone) => this.showToast(m, tone)} onRootChanged={this.onStorageRootChanged} />;
       case 'board':
         // Whiteboard's own PROPS block names `board` / `onOpenDocument` / `onToast` — it was being
@@ -624,8 +723,10 @@ export default class App extends React.Component {
             actor={HUMAN}
             onOpen={this.openRelation}
             onOpenPath={this.openPath}
+            onBrowse={this.browse}
             onSaved={this.onDocSaved}
             onPromote={next => this.onMove({ path: docPath }, next)}
+            onSchemaChanged={this.onSchemaChanged}
             onBack={() => this.go('collection')}
             // Presence says adding is allowed; the composer itself lives in the property list.
             onFieldAdded={activeCollection ? f => {
@@ -658,7 +759,9 @@ export default class App extends React.Component {
             </div>
           );
         }
-        if (!view) return null;
+        if (!view || this.state.loadingCollection === active || this.state.rowsOf !== active) {
+          return <CollectionLoading collection={activeCollection} />;
+        }
         return (
           <CollectionView
             collection={activeCollection} view={view} views={views} rows={rows} counts={viewCounts}
@@ -673,8 +776,11 @@ export default class App extends React.Component {
             onOpen={r => this.openPath(r.path)}
             onFollow={this.openRelation}
             onPickView={id => this.pickCollection(active, id, { navigate: false })}
+            startQuick={this.state.startQuick}
             onSaveView={this.saveView}
             onDeleteView={this.deleteView}
+            onSchemaChanged={this.onSchemaChanged}
+            actor={HUMAN}
             onMove={this.onMove}
           />
         );
@@ -687,6 +793,7 @@ export default class App extends React.Component {
       assistants, memoryCounts, needsYou, project, projects, activityOpen, toast, toastDanger,
     } = this.state;
 
+    rememberCollections(collections);   // so a relation chip's dot matches its collection's (collectionColour.js)
     const activeCollection = collections.find(c => c.id === active) || null;
     // The inspector may be showing a document from ANOTHER collection, followed out of REFERENCED
     // BY. It is then read with THAT document's schema, not whichever one the table happens to be on.
@@ -723,6 +830,8 @@ export default class App extends React.Component {
             counts={counts}
             activeCollection={active}
             onPickCollection={id => this.pickCollection(id)}
+            onCollectionsChanged={this.onSchemaChanged}
+            actor={HUMAN}
             assistants={assistants}
             activeAssistant={this.state.activeAssistant}
             memoryCounts={memoryCounts}
@@ -767,6 +876,8 @@ export default class App extends React.Component {
               // the id as a path sent `nurses-ph` to the file browser instead of the territory.
               onOpen={this.openRelation}
               onOpenPath={this.openPath}
+              // Editable in place — only for a record of the open collection that is in `rows`.
+              onChange={!outside && doc ? this.patchSelected : undefined}
               onOpenBoard={path => this.go('board', path || null)}
             />
           ) : null}

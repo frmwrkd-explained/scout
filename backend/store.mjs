@@ -43,6 +43,14 @@ export function readMd(file) {
   const { data, content } = matter(fs.readFileSync(file, 'utf8'), { cache: false });
   return { data, content };
 }
+// Anything that remembers what a file said (documents.mjs's parse cache) registers here and is
+// told the moment this writer replaces that file. It is a notification, not a second writer.
+// A hoisted function holding its own set, not a `const`: store.mjs and documents.mjs sit in an
+// import cycle (through memory.mjs), so documents.mjs can run its top level — and register here —
+// before this module's `const`s exist. A function declaration is callable from the first line.
+function mdWriteListeners() { return mdWriteListeners.set || (mdWriteListeners.set = new Set()); }
+export function onMdWrite(listener) { mdWriteListeners().add(listener); return () => mdWriteListeners().delete(listener); }
+
 export function writeMd(file, data, content = '') {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   // js-yaml refuses undefined values — drop them instead of crashing the request
@@ -57,6 +65,7 @@ export function writeMd(file, data, content = '') {
   // and silently dropped on the next read. The {content} form serializes the body verbatim.
   fs.writeFileSync(tmp, matter.stringify({ content }, clean));
   fs.renameSync(tmp, file);
+  for (const listener of mdWriteListeners()) { try { listener(file); } catch { /* a listener must never fail a write */ } }
 }
 
 const R = () => getStorageRoot();
