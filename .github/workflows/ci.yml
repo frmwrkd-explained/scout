@@ -3,10 +3,10 @@
 # fixtures committed without their exec bit (seven tests died with spawn EACCES) and the seeded
 # workspace being gitignored (npm run demonstrate could not run at all).
 name: ci
+# Manual only (owner rule, 2026-11-20): started by hand from the Actions tab, never by a push or a
+# pull request. Run `npm test` locally before pushing — that is the gate.
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 jobs:
   test:
     runs-on: ubuntu-latest
