@@ -34,6 +34,8 @@ Each result gives the id, the name, the tags, the **absolute image path** and th
 
 Show the user a short list (id, name, why it fits) and let them choose. Do not pick silently when several fit.
 
+Some libraries are shared without pictures (the public prompts-only pack): `stats` then reports "0 with an image" and a result's image shows `—`. Work from the name, tags and prompt, say that the picture is not included, and do not go looking for one.
+
 ## 2 · Hand over the prompt, word for word
 
 ```bash
